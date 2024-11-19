@@ -19,7 +19,7 @@ func MustInit(ctx context.Context, config *appconfig.AppConfig, funcList ...func
 	if config.DefaultMySQLSupport {
 		initMySQL(debugWriter, infoWriter, warnErrorFatalWriter)
 	}
-	if config.RedisSupport {
+	if config.DefaultRedisSupport {
 		initRedis(debugWriter, infoWriter, warnErrorFatalWriter)
 	}
 	if config.AliyunOSSSupport {

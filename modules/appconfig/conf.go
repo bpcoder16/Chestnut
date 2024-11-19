@@ -16,7 +16,7 @@ type AppConfig struct {
 	FilterValues []string
 
 	DefaultMySQLSupport bool
-	RedisSupport        bool
+	DefaultRedisSupport bool
 	AliyunOSSSupport    bool
 }
 
