@@ -18,6 +18,7 @@ type AppConfig struct {
 	DefaultMySQLSupport      bool
 	DefaultClickhouseSupport bool
 	DefaultRedisSupport      bool
+	DefaultMongoDBSupport    bool
 	AliyunOSSSupport         bool
 }
 

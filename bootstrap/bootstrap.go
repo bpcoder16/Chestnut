@@ -9,6 +9,7 @@ import (
 	"github.com/bpcoder16/Chestnut/modules/appconfig"
 	"github.com/bpcoder16/Chestnut/modules/appconfig/env"
 	"github.com/bpcoder16/Chestnut/modules/zaplogger"
+	"github.com/bpcoder16/Chestnut/mongodb"
 	"github.com/bpcoder16/Chestnut/mysql"
 	"github.com/bpcoder16/Chestnut/redis"
 	"io"
@@ -25,6 +26,9 @@ func MustInit(ctx context.Context, config *appconfig.AppConfig, funcList ...func
 	}
 	if config.DefaultRedisSupport {
 		initRedis(debugWriter, infoWriter, warnErrorFatalWriter)
+	}
+	if config.DefaultMongoDBSupport {
+		initMongoDB(ctx, debugWriter, infoWriter, warnErrorFatalWriter)
 	}
 	if config.AliyunOSSSupport {
 		initAliyunOSS()
@@ -90,6 +94,24 @@ func initClickhouse(debugWriter, infoWriter, warnErrorFatalWriter io.Writer) {
 
 func initRedis(debugWriter, infoWriter, warnErrorFatalWriter io.Writer) {
 	redis.SetManager(env.RootPath()+"/conf/redis.json", log.NewHelper(
+		zaplogger.GetZapLogger(
+			debugWriter, infoWriter, warnErrorFatalWriter,
+			log.FileWithLineNumCallerRedis(),
+			log.FilterLevel(func() log.Level {
+				if env.RunMode() == env.RunModeRelease {
+					return log.LevelInfo
+				}
+				return log.LevelDebug
+			}()),
+			//log.FilterFunc(func(level log.Level, keyValues ...interface{}) bool {
+			//	return false
+			//}),
+		),
+	))
+}
+
+func initMongoDB(ctx context.Context, debugWriter, infoWriter, warnErrorFatalWriter io.Writer) {
+	mongodb.SetManager(ctx, env.RootPath()+"/conf/mongodb.json", log.NewHelper(
 		zaplogger.GetZapLogger(
 			debugWriter, infoWriter, warnErrorFatalWriter,
 			log.FileWithLineNumCallerRedis(),

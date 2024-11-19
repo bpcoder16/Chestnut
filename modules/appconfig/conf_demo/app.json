@@ -12,5 +12,6 @@
   "DefaultMySQLSupport": true,
   "DefaultClickhouseSupport": true,
   "DefaultRedisSupport": true,
+  "DefaultMongoDBSupport": true,
   "AliyunOSSSupport": true
 }

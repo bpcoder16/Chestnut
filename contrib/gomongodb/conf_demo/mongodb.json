@@ -1,0 +1,8 @@
+{
+  "host": "",
+  "port": 0,
+  "database": "",
+  "maxPoolSize": 50,
+  "minPoolSize": 10,
+  "maxConnIdleTimeSec": 120
+}
