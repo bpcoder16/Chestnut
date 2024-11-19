@@ -12,6 +12,7 @@ import (
 	"github.com/bpcoder16/Chestnut/mongodb"
 	"github.com/bpcoder16/Chestnut/mysql"
 	"github.com/bpcoder16/Chestnut/redis"
+	"github.com/bpcoder16/Chestnut/resty"
 	"io"
 )
 
@@ -33,6 +34,7 @@ func MustInit(ctx context.Context, config *appconfig.AppConfig, funcList ...func
 	if config.AliyunOSSSupport {
 		initAliyunOSS()
 	}
+	initHTTPClient()
 	for _, fn := range funcList {
 		fn(ctx, debugWriter, infoWriter, warnErrorFatalWriter)
 	}
@@ -130,4 +132,8 @@ func initMongoDB(ctx context.Context, debugWriter, infoWriter, warnErrorFatalWri
 
 func initAliyunOSS() {
 	oss.InitAliyunOSS(env.RootPath() + "/conf/aliyun.json")
+}
+
+func initHTTPClient() {
+	resty.SetClient()
 }
