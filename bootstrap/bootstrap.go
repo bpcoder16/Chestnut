@@ -2,6 +2,7 @@ package bootstrap
 
 import (
 	"context"
+	"github.com/bpcoder16/Chestnut/clickhouse"
 	"github.com/bpcoder16/Chestnut/contrib/aliyun/oss"
 	"github.com/bpcoder16/Chestnut/core/log"
 	"github.com/bpcoder16/Chestnut/logit"
@@ -18,6 +19,9 @@ func MustInit(ctx context.Context, config *appconfig.AppConfig, funcList ...func
 	initLoggers(ctx, config, debugWriter, infoWriter, warnErrorFatalWriter)
 	if config.DefaultMySQLSupport {
 		initMySQL(debugWriter, infoWriter, warnErrorFatalWriter)
+	}
+	if config.DefaultClickhouseSupport {
+		initClickhouse(debugWriter, infoWriter, warnErrorFatalWriter)
 	}
 	if config.DefaultRedisSupport {
 		initRedis(debugWriter, infoWriter, warnErrorFatalWriter)
@@ -50,6 +54,24 @@ func initLoggers(_ context.Context, config *appconfig.AppConfig, debugWriter, in
 
 func initMySQL(debugWriter, infoWriter, warnErrorFatalWriter io.Writer) {
 	mysql.SetManager(env.RootPath()+"/conf/mysql.json", log.NewHelper(
+		zaplogger.GetZapLogger(
+			debugWriter, infoWriter, warnErrorFatalWriter,
+			nil,
+			log.FilterLevel(func() log.Level {
+				if env.RunMode() == env.RunModeRelease {
+					return log.LevelInfo
+				}
+				return log.LevelDebug
+			}()),
+			//log.FilterFunc(func(level log.Level, keyValues ...interface{}) bool {
+			//	return false
+			//}),
+		),
+	))
+}
+
+func initClickhouse(debugWriter, infoWriter, warnErrorFatalWriter io.Writer) {
+	clickhouse.SetManager(env.RootPath()+"/conf/clickhouse.json", log.NewHelper(
 		zaplogger.GetZapLogger(
 			debugWriter, infoWriter, warnErrorFatalWriter,
 			nil,

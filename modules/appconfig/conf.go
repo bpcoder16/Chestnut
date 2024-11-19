@@ -15,9 +15,10 @@ type AppConfig struct {
 	FilterKeys   []string
 	FilterValues []string
 
-	DefaultMySQLSupport bool
-	DefaultRedisSupport bool
-	AliyunOSSSupport    bool
+	DefaultMySQLSupport      bool
+	DefaultClickhouseSupport bool
+	DefaultRedisSupport      bool
+	AliyunOSSSupport         bool
 }
 
 func (c *AppConfig) Check() (err error) {
