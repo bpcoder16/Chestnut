@@ -1,0 +1,15 @@
+{
+  "env": {
+    "appName": "Chestnut",
+    "runMode": "debug"
+  },
+  "filterKeys": [
+    "password"
+  ],
+  "filterValues": [
+    "bpcoder"
+  ],
+  "MySQLSupport": true,
+  "RedisSupport": true,
+  "AliyunOSSSupport": true
+}
