@@ -13,10 +13,10 @@ import (
 	"io"
 )
 
-func MustInit(ctx context.Context, config *appconfig.AppConfig) {
+func MustInit(ctx context.Context, config *appconfig.AppConfig, funcList ...func(ctx context.Context, debugWriter, infoWriter, warnErrorFatalWriter io.Writer)) {
 	debugWriter, infoWriter, warnErrorFatalWriter := zaplogger.GetWriters(env.RootPath(), env.AppName(), env.AppName())
 	initLoggers(ctx, config, debugWriter, infoWriter, warnErrorFatalWriter)
-	if config.MySQLSupport {
+	if config.DefaultMySQLSupport {
 		initMySQL(debugWriter, infoWriter, warnErrorFatalWriter)
 	}
 	if config.RedisSupport {
@@ -24,6 +24,9 @@ func MustInit(ctx context.Context, config *appconfig.AppConfig) {
 	}
 	if config.AliyunOSSSupport {
 		initAliyunOSS()
+	}
+	for _, fn := range funcList {
+		fn(ctx, debugWriter, infoWriter, warnErrorFatalWriter)
 	}
 }
 

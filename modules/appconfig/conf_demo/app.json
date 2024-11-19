@@ -9,7 +9,7 @@
   "filterValues": [
     "bpcoder"
   ],
-  "MySQLSupport": true,
+  "DefaultMySQLSupport": true,
   "RedisSupport": true,
   "AliyunOSSSupport": true
 }
