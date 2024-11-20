@@ -4,5 +4,13 @@
   "db": 0,
   "username": "",
   "password": "",
-  "maxRetries": 2
+  "maxRetries": 2,
+  "dialTimeoutMillisecond": 200,
+  "readTimeoutMillisecond": 200,
+  "writeTimeoutMillisecond": 200,
+  "poolFIFO": true,
+  "poolSize": 100,
+  "minIdleConns": 20,
+  "maxIdleConns": 50,
+  "connMaxIdleTimeMinute": 10
 }
