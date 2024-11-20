@@ -17,12 +17,12 @@ var (
 	DefaultTimestamp = Timestamp(time.RFC3339)
 )
 
-var zeroSourceDir string
+var chestnutSourceDir string
 
 func init() {
 	_, file, _, _ := runtime.Caller(0)
 	// compatible solution to get gorm source directory with various operating systems
-	zeroSourceDir = sourceDir(file)
+	chestnutSourceDir = sourceDir(file)
 }
 
 func sourceDir(file string) string {
@@ -30,7 +30,7 @@ func sourceDir(file string) string {
 	dir = filepath.Dir(dir)
 
 	s := filepath.Dir(dir)
-	if filepath.Base(s) != "zero" {
+	if filepath.Base(s) != "Chestnut" {
 		s = dir
 	}
 	return filepath.ToSlash(s) + "/"
@@ -69,7 +69,7 @@ func FileWithLineNumCaller() Valuer {
 		for i := 0; i < length; i++ {
 			// second return value is "more", not "ok"
 			frame, _ := frames.Next()
-			if (!strings.HasPrefix(frame.File, zeroSourceDir) ||
+			if (!strings.HasPrefix(frame.File, chestnutSourceDir) ||
 				strings.HasSuffix(frame.File, "_test.go")) && !strings.HasSuffix(frame.File, ".gen.go") {
 				return string(strconv.AppendInt(append([]byte(frame.File), ':'), int64(frame.Line), 10))
 			}
@@ -89,7 +89,7 @@ func FileWithLineNumCallerRedis() Valuer {
 			// second return value is "more", not "ok"
 			frame, _ := frames.Next()
 			// TODO 很尴尬的处理方式，等我后续有想法再改吧
-			if !strings.HasPrefix(frame.File, zeroSourceDir) && !strings.Contains(frame.File, "github.com/redis/go-redis") && !strings.HasSuffix(frame.File, ".gen.go") {
+			if !strings.HasPrefix(frame.File, chestnutSourceDir) && !strings.Contains(frame.File, "github.com/redis/go-redis") && !strings.HasSuffix(frame.File, ".gen.go") {
 				return string(strconv.AppendInt(append([]byte(frame.File), ':'), int64(frame.Line), 10))
 			}
 		}
