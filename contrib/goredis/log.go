@@ -22,10 +22,10 @@ func NewLoggerHook(helper *log.Helper) *LoggerHook {
 func (l *LoggerHook) DialHook(next redis.DialHook) redis.DialHook {
 	return func(ctx context.Context, network, addr string) (conn net.Conn, err error) {
 		ctx = context.WithValue(ctx, log.DefaultDownstreamKey, "Redis")
-		begin := time.Now()
+		//begin := time.Now()
 		conn, err = next(ctx, network, addr)
-		elapsed := time.Since(begin)
-		fmt.Printf("redis cmd[connect %s] costTime[%s]\n", addr, fmt.Sprintf("%.3fms", float64(elapsed.Nanoseconds())/1e6))
+		//elapsed := time.Since(begin)
+		//fmt.Printf("redis cmd[connect %s] costTime[%s]\n", addr, fmt.Sprintf("%.3fms", float64(elapsed.Nanoseconds())/1e6))
 		return
 	}
 }

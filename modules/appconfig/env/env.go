@@ -1,9 +1,7 @@
 package env
 
 import (
-	"fmt"
 	"github.com/bpcoder16/Chestnut/core/utils"
-	"log"
 )
 
 // 可以依据不同的运行等级来开启不同的调试功能、接口
@@ -97,7 +95,6 @@ func (a *appEnv) setRootPath(path string) {
 
 func setValue(addr *string, value string, fieldName string) {
 	*addr = value
-	_ = log.Output(2, fmt.Sprintf("[env] set %q=%q\n", fieldName, value))
 }
 
 func New(opt Option) AppEnv {
