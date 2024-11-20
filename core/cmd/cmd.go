@@ -18,6 +18,7 @@ func InitRootCmd(ctx context.Context) {
 		Short: "命令应用列表",
 		Long:  env.AppName() + " 的命令应用列表",
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+			ctx = context.WithValue(ctx, log.DefaultMessageKey, "Command")
 			ctx = context.WithValue(ctx, log.DefaultLogIdKey, uuid.New().String())
 			cmd.SetContext(ctx)
 		},
