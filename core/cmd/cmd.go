@@ -3,7 +3,9 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"github.com/bpcoder16/Chestnut/core/log"
 	"github.com/bpcoder16/Chestnut/modules/appconfig/env"
+	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 )
 
@@ -16,6 +18,7 @@ func InitRootCmd(ctx context.Context) {
 		Short: "命令应用列表",
 		Long:  env.AppName() + " 的命令应用列表",
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+			ctx = context.WithValue(ctx, log.DefaultLogIdKey, uuid.New().String())
 			cmd.SetContext(ctx)
 		},
 	}
