@@ -5,7 +5,7 @@ import (
 	"os"
 )
 
-func init() {
+func StdRedirectFile() {
 	log.SetOutput(os.Stdout)
 	log.SetFlags(log.LstdFlags | log.Lshortfile | log.Lmicroseconds)
 	// 重定向 stderr 和 stdout 到指定文件

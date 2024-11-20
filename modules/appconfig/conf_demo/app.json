@@ -9,6 +9,7 @@
   "filterValues": [
     "bpcoder"
   ],
+  "StdRedirectFileSupport": true,
   "DefaultMySQLSupport": true,
   "DefaultClickhouseSupport": true,
   "DefaultRedisSupport": true,

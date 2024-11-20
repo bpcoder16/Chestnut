@@ -15,6 +15,7 @@ type AppConfig struct {
 	FilterKeys   []string
 	FilterValues []string
 
+	StdRedirectFileSupport   bool
 	DefaultMySQLSupport      bool
 	DefaultClickhouseSupport bool
 	DefaultRedisSupport      bool
