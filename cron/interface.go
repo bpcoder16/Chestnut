@@ -1,6 +1,9 @@
 package cron
 
-import "time"
+import (
+	"context"
+	"time"
+)
 
 // Interface 执行顺序 Before->Process->Run->Defer
 // 只建议重写 Init 和 Process
@@ -8,8 +11,8 @@ import "time"
 // Process 添加运行中才能确定执行的脚本，使用 AddProcessAddTaskList 添加
 type Interface interface {
 	GetIsRun() bool
-	AddBaseTaskList(task func())
-	AddProcessAddTaskList(task func())
+	AddBaseTaskList(task func(context.Context))
+	AddProcessAddTaskList(task func(context.Context))
 
 	// Init 初始化只会执行一次
 	Init(base Interface)

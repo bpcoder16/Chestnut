@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/bpcoder16/Chestnut/appconfig/env"
+	"github.com/bpcoder16/Chestnut/core/log"
 	"github.com/go-co-op/gocron/v2"
 	"reflect"
 	"time"
@@ -45,6 +46,7 @@ func Run(ctx context.Context) {
 		panic(err)
 	}
 
+	ctx = context.WithValue(ctx, log.DefaultMessageKey, "Cron")
 	for _, cronConfig := range config.CronList {
 		cronController, cronErr := getCron(cronConfig)
 		if cronErr == nil {
@@ -65,7 +67,7 @@ func Run(ctx context.Context) {
 			}
 			_, _ = s.NewJob(
 				job,
-				gocron.NewTask(func(task Interface, configItem ConfigItem, lockPreName string) {
+				gocron.NewTask(func(ctx context.Context, task Interface, configItem ConfigItem, lockPreName string) {
 					task.Before(
 						configItem.Name,
 						env.AppName()+":"+lockPreName+":"+configItem.Name,
@@ -77,7 +79,7 @@ func Run(ctx context.Context) {
 						task.Process()
 						task.Run()
 					}
-				}, cronController, cronConfigNew, config.LockPreName),
+				}, ctx, cronController, cronConfigNew, config.LockPreName),
 			)
 		}
 	}

@@ -50,6 +50,16 @@ func GetZapLogger(debugWriter, infoWriter, warnErrorFatalWriter io.Writer, calle
 				return msg
 			}
 		}(),
+		log.DefaultConcurrencyLogIdKey,
+		func() log.Valuer {
+			return func(ctx context.Context) interface{} {
+				msg := ctx.Value(log.DefaultConcurrencyLogIdKey)
+				if msg == nil {
+					return "None"
+				}
+				return msg
+			}
+		}(),
 	)
 	if caller != nil {
 		kv = append(kv, log.DefaultCallerKey, caller)

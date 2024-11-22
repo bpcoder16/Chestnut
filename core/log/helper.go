@@ -7,10 +7,11 @@ import (
 )
 
 const (
-	DefaultMessageKey    = "type"
-	DefaultDownstreamKey = "downstream"
-	DefaultLogIdKey      = "logId"
-	DefaultCallerKey     = "caller"
+	DefaultMessageKey          = "type"
+	DefaultDownstreamKey       = "downstream"
+	DefaultLogIdKey            = "logId"
+	DefaultCallerKey           = "caller"
+	DefaultConcurrencyLogIdKey = "concurrencyLogId"
 )
 
 type HelperOption func(*Helper)

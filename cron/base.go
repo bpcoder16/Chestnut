@@ -4,8 +4,10 @@ import (
 	"context"
 	"github.com/bpcoder16/Chestnut/core/log"
 	"github.com/bpcoder16/Chestnut/logit"
+	"github.com/bpcoder16/Chestnut/modules/concurrency"
 	"github.com/bpcoder16/Chestnut/modules/lock/nonblock"
 	"github.com/google/uuid"
+	"strconv"
 	"time"
 )
 
@@ -18,8 +20,8 @@ type Base struct {
 	deadLockExpireTime time.Duration
 	maxConcurrencyCnt  int
 
-	baseTaskList       []func()
-	processAddTaskList []func()
+	baseTaskList       []func(context.Context)
+	processAddTaskList []func(context.Context)
 }
 
 func (b *Base) Before(name, lockName string, deadLockExpireTime time.Duration, maxConcurrencyCnt int) {
@@ -36,20 +38,20 @@ func (b *Base) Before(name, lockName string, deadLockExpireTime time.Duration, m
 	b.lockName = lockName
 	b.deadLockExpireTime = deadLockExpireTime
 	b.maxConcurrencyCnt = maxConcurrencyCnt
-	b.processAddTaskList = make([]func(), 0, 100)
-	b.baseTaskList = make([]func(), 0, 100)
+	b.processAddTaskList = make([]func(context.Context), 0, 100)
+	b.baseTaskList = make([]func(context.Context), 0, 100)
 }
 
-func (b *Base) AddBaseTaskList(task func()) {
+func (b *Base) AddBaseTaskList(task func(context.Context)) {
 	b.baseTaskList = append(b.baseTaskList, task)
 }
 
-func (b *Base) AddProcessAddTaskList(task func()) {
+func (b *Base) AddProcessAddTaskList(task func(context.Context)) {
 	b.processAddTaskList = append(b.processAddTaskList, task)
 }
 
 func (b *Base) Init(_ Interface) {
-	b.baseTaskList = make([]func(), 0, 100)
+	b.baseTaskList = make([]func(context.Context), 0, 100)
 }
 
 func (b *Base) Process() {}
@@ -76,11 +78,37 @@ func (b *Base) GetIsRun() bool {
 	return b.isRun
 }
 
-func (b *Base) taskPoolRun(taskList []func()) {
+func (b *Base) taskPoolRun(taskList []func(context.Context)) {
 	if len(taskList) == 0 {
 		return
 	}
-	for _, task := range taskList {
-		task()
+	taskMap := make(map[string]func(ctx context.Context) concurrency.ChanResult)
+	if len(taskList) > b.maxConcurrencyCnt {
+		cnt := 0
+		for index, item := range taskList {
+			if cnt >= b.maxConcurrencyCnt {
+				_, _ = concurrency.Manager(b.Ctx, taskMap, b.name)
+				cnt = 0
+				taskMap = make(map[string]func(ctx context.Context) concurrency.ChanResult)
+			}
+			f := item
+			taskMap[strconv.Itoa(index)] = func(ctx context.Context) concurrency.ChanResult {
+				f(ctx)
+				return concurrency.ChanResult{}
+			}
+			cnt++
+		}
+		if len(taskMap) > 0 {
+			_, _ = concurrency.Manager(b.Ctx, taskMap, b.name)
+		}
+	} else {
+		for index, item := range taskList {
+			f := item
+			taskMap[strconv.Itoa(index)] = func(ctx context.Context) concurrency.ChanResult {
+				f(ctx)
+				return concurrency.ChanResult{}
+			}
+		}
+		_, _ = concurrency.Manager(b.Ctx, taskMap, b.name)
 	}
 }
