@@ -9,6 +9,7 @@ import (
 
 func startedMonitorFunc(l *log.Helper) func(context.Context, *event.CommandStartedEvent) {
 	return func(ctx context.Context, evt *event.CommandStartedEvent) {
+		ctx = context.WithValue(ctx, log.DefaultDownstreamKey, "MongoDB")
 		l.WithContext(ctx).DebugW(
 			"MongoDBMonitor", "Started",
 			"Command", fmt.Sprintf("%v", evt.Command),
@@ -22,6 +23,7 @@ func startedMonitorFunc(l *log.Helper) func(context.Context, *event.CommandStart
 
 func succeededMonitorFunc(l *log.Helper) func(context.Context, *event.CommandSucceededEvent) {
 	return func(ctx context.Context, evt *event.CommandSucceededEvent) {
+		ctx = context.WithValue(ctx, log.DefaultDownstreamKey, "MongoDB")
 		l.WithContext(ctx).DebugW(
 			"MongoDBMonitor", "Succeeded",
 			"CommandName", evt.CommandName,
@@ -34,6 +36,7 @@ func succeededMonitorFunc(l *log.Helper) func(context.Context, *event.CommandSuc
 
 func failedMonitorFunc(l *log.Helper) func(ctx context.Context, evt *event.CommandFailedEvent) {
 	return func(ctx context.Context, evt *event.CommandFailedEvent) {
+		ctx = context.WithValue(ctx, log.DefaultDownstreamKey, "MongoDB")
 		l.WithContext(ctx).WarnW(
 			"MongoDBMonitor", "Succeeded",
 			"CommandName", evt.CommandName,

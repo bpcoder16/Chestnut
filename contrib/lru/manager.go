@@ -21,6 +21,7 @@ func NewManager(configPath string, logger *log.Helper) *Manager {
 		logger:         logger,
 		config:         loadConfig(configPath),
 	}
+	manager.initLRUCache()
 	return manager
 }
 
