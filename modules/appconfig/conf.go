@@ -25,6 +25,7 @@ type AppConfig struct {
 	DefaultRedisSupport      bool
 	DefaultMongoDBSupport    bool
 	AliyunOSSSupport         bool
+	UseLRUCache              bool
 }
 
 func (c *AppConfig) Check() (err error) {

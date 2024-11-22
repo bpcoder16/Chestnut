@@ -5,6 +5,7 @@ import (
 	"github.com/bpcoder16/Chestnut/clickhouse"
 	"github.com/bpcoder16/Chestnut/contrib/aliyun/oss"
 	"github.com/bpcoder16/Chestnut/core/log"
+	"github.com/bpcoder16/Chestnut/core/lru"
 	"github.com/bpcoder16/Chestnut/logit"
 	"github.com/bpcoder16/Chestnut/modules/appconfig"
 	"github.com/bpcoder16/Chestnut/modules/appconfig/env"
@@ -41,6 +42,9 @@ func MustInit(ctx context.Context, config *appconfig.AppConfig, funcList ...func
 	}
 	if config.AliyunOSSSupport {
 		initAliyunOSS()
+	}
+	if config.UseLRUCache {
+		initUseLRUCache()
 	}
 	initHTTPClient()
 	for _, fn := range funcList {
@@ -144,4 +148,8 @@ func initAliyunOSS() {
 
 func initHTTPClient() {
 	resty.SetClient()
+}
+
+func initUseLRUCache() {
+	lru.InitLRU()
 }

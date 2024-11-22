@@ -7,6 +7,7 @@ require (
 	github.com/go-co-op/gocron/v2 v2.12.3
 	github.com/go-resty/resty/v2 v2.16.0
 	github.com/google/uuid v1.6.0
+	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/lestrrat-go/file-rotatelogs v2.4.0+incompatible
 	github.com/redis/go-redis/v9 v9.7.0
 	github.com/spf13/cobra v1.6.1
