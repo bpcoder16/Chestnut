@@ -2,6 +2,7 @@ package env
 
 import (
 	"github.com/bpcoder16/Chestnut/core/utils"
+	"time"
 )
 
 // 可以依据不同的运行等级来开启不同的调试功能、接口
@@ -25,6 +26,8 @@ type Option struct {
 
 	// RunMode 运行模式
 	RunMode string
+
+	TimeLocation string
 }
 
 // AppEnv 应用环境信息完整的接口定义
@@ -38,6 +41,8 @@ type AppEnv interface {
 	RootPath() string
 
 	LocalIPV4() string
+
+	TimeLocation() *time.Location
 }
 
 // AppNameEnv 应用名称
@@ -53,10 +58,11 @@ type RunModeEnv interface {
 var _ AppEnv = (*appEnv)(nil)
 
 type appEnv struct {
-	appName   string
-	runMode   string
-	rootPath  string
-	localIPV4 string
+	appName      string
+	runMode      string
+	rootPath     string
+	localIPV4    string
+	timeLocation *time.Location
 }
 
 func (a *appEnv) AppName() string {
@@ -79,6 +85,10 @@ func (a *appEnv) RootPath() string {
 
 func (a *appEnv) LocalIPV4() string {
 	return a.localIPV4
+}
+
+func (a *appEnv) TimeLocation() *time.Location {
+	return a.timeLocation
 }
 
 func (a *appEnv) setAppName(name string) {
@@ -113,6 +123,16 @@ func New(opt Option) AppEnv {
 	env.localIPV4, ipErr = getLocalIPv4()
 	if ipErr != nil {
 		panic(ipErr)
+	}
+
+	//env.timeLocation, timeLocationErr := time.LoadLocation(opt.TimeLocation)
+	if len(opt.TimeLocation) == 0 {
+		opt.TimeLocation = "Asia/Shanghai"
+	}
+	var timeLocationErr error
+	env.timeLocation, timeLocationErr = time.LoadLocation(opt.TimeLocation)
+	if timeLocationErr != nil {
+		panic(timeLocationErr)
 	}
 
 	return env

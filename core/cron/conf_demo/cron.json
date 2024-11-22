@@ -1,0 +1,35 @@
+{
+  "lockPreName": "cron:lock:v1",
+  "isRunCron": true,
+  "cronList": [
+    {
+      "name": "Demo1",
+      "deadLockExpireMillisecond": 2000,
+      "maxConcurrencyCnt": 1,
+      "jobType": "CronJob",
+      "cronJobParams": {
+        "crontab": "*/2 * * * * *",
+        "withSeconds": true
+      }
+    },
+    {
+      "name": "Demo2",
+      "deadLockExpireMillisecond": 2000,
+      "maxConcurrencyCnt": 1,
+      "jobType": "DurationJob",
+      "durationJobParams": {
+        "everyMillisecond": 5000
+      }
+    },
+    {
+      "name": "Demo3",
+      "deadLockExpireMillisecond": 2000,
+      "maxConcurrencyCnt": 1,
+      "jobType": "DurationRandomJob",
+      "durationRandomJobParams": {
+        "minMillisecond": 1000,
+        "maxMillisecond": 5000
+      }
+    }
+  ]
+}

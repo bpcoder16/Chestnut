@@ -1,7 +1,8 @@
 {
   "env": {
     "appName": "Chestnut",
-    "runMode": "debug"
+    "runMode": "debug",
+    "timeLocation": "Asia/Shanghai"
   },
   "filterKeys": [
     "password"

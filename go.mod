@@ -4,6 +4,7 @@ go 1.21
 
 require (
 	github.com/aliyun/aliyun-oss-go-sdk v3.0.2+incompatible
+	github.com/go-co-op/gocron/v2 v2.12.3
 	github.com/go-resty/resty/v2 v2.16.0
 	github.com/google/uuid v1.6.0
 	github.com/lestrrat-go/file-rotatelogs v2.4.0+incompatible
@@ -44,6 +45,7 @@ require (
 	github.com/pelletier/go-toml/v2 v2.2.2 // indirect
 	github.com/pierrec/lz4/v4 v4.1.21 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
+	github.com/robfig/cron/v3 v3.0.1 // indirect
 	github.com/sagikazarmark/locafero v0.4.0 // indirect
 	github.com/sagikazarmark/slog-shim v0.1.0 // indirect
 	github.com/segmentio/asm v1.2.0 // indirect
@@ -61,7 +63,7 @@ require (
 	go.opentelemetry.io/otel/trace v1.26.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/crypto v0.27.0 // indirect
-	golang.org/x/exp v0.0.0-20230905200255-921286631fa9 // indirect
+	golang.org/x/exp v0.0.0-20240613232115-7f521ea00fb8 // indirect
 	golang.org/x/net v0.27.0 // indirect
 	golang.org/x/sys v0.25.0 // indirect
 	golang.org/x/text v0.18.0 // indirect

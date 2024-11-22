@@ -1,5 +1,7 @@
 package env
 
+import "time"
+
 // Default (全局)默认的环境信息
 //
 // 全局的 RootDir() 、DataDir() 等方法均使用该环境信息
@@ -23,4 +25,8 @@ func RootPath() string {
 
 func LocalIPV4() string {
 	return Default.LocalIPV4()
+}
+
+func TimeLocation() *time.Location {
+	return Default.TimeLocation()
 }
