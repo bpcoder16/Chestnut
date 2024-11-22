@@ -2,9 +2,9 @@ package cron
 
 import (
 	"context"
+	"github.com/bpcoder16/Chestnut/core/lock/nonblock"
 	"github.com/bpcoder16/Chestnut/core/log"
 	"github.com/bpcoder16/Chestnut/logit"
-	"github.com/bpcoder16/Chestnut/modules/lock/nonblock"
 	"github.com/google/uuid"
 	"time"
 )
