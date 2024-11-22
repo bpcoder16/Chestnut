@@ -6,25 +6,26 @@ import (
 )
 
 var (
-	once   sync.Once
-	Config *ConfigItem
+	once    sync.Once
+	_config *Config
 )
 
-func InitAliyun(configPath string) {
+type Config struct {
+	AccessKeyId     string `json:"accessKeyId"`
+	AccessKeySecret string `json:"accessKeySecret"`
+	Endpoint        string `json:"endpoint"`
+	BucketName      string `json:"bucketName"`
+}
+
+func InitAliyunConfig(configPath string) *Config {
 	once.Do(func() {
-		Config = loadAliyunConfig(configPath)
+		_config = loadConfig(configPath)
 	})
+	return _config
 }
 
-type ConfigItem struct {
-	AccessKeyId     string
-	AccessKeySecret string
-	Endpoint        string
-	BucketName      string
-}
-
-func loadAliyunConfig(configPath string) *ConfigItem {
-	var config ConfigItem
+func loadConfig(configPath string) *Config {
+	var config Config
 	err := utils.ParseJSONFile(configPath, &config)
 	if err != nil {
 		panic("load Aliyun conf err:" + err.Error())

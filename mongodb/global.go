@@ -7,12 +7,12 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-var defaultMongodbManager *gomongodb.Manager
+var defaultManager *gomongodb.Manager
 
 func SetManager(ctx context.Context, configPath string, logger *log.Helper) {
-	defaultMongodbManager = gomongodb.NewManager(ctx, configPath, logger)
+	defaultManager = gomongodb.NewManager(ctx, configPath, logger)
 }
 
 func DefaultClient() *mongo.Database {
-	return defaultMongodbManager.ClientDatabase()
+	return defaultManager.ClientDatabase()
 }

@@ -10,17 +10,17 @@ import (
 	"time"
 )
 
-type GormDBManager struct {
+type Manager struct {
 	dbMaster *gorm.DB
 	dbSlaves []*gorm.DB
 	logger   *log.Helper
 	config   *Config
 }
 
-func NewGormDBManager(configPath string, logger *log.Helper) *GormDBManager {
-	manager := &GormDBManager{
+func NewManager(configPath string, logger *log.Helper) *Manager {
+	manager := &Manager{
 		logger:   logger,
-		config:   loadMySQLConfig(configPath),
+		config:   loadConfig(configPath),
 		dbMaster: nil,
 		dbSlaves: make([]*gorm.DB, 0, 10),
 	}
@@ -29,22 +29,22 @@ func NewGormDBManager(configPath string, logger *log.Helper) *GormDBManager {
 	return manager
 }
 
-func (g *GormDBManager) MasterDB() *gorm.DB {
-	return g.dbMaster
+func (m *Manager) MasterDB() *gorm.DB {
+	return m.dbMaster
 }
 
-func (g *GormDBManager) SlaveDB() *gorm.DB {
-	switch len(g.dbSlaves) {
+func (m *Manager) SlaveDB() *gorm.DB {
+	switch len(m.dbSlaves) {
 	case 0:
-		return g.MasterDB()
+		return m.MasterDB()
 	case 1:
-		return g.dbSlaves[0]
+		return m.dbSlaves[0]
 	default:
-		return g.dbSlaves[utils.RandIntN(len(g.dbSlaves))]
+		return m.dbSlaves[utils.RandIntN(len(m.dbSlaves))]
 	}
 }
 
-func (g *GormDBManager) connect(config *ConfigItem) *gorm.DB {
+func (m *Manager) connect(config *ConfigItem) *gorm.DB {
 	dsn := config.Username + ":" + config.Password +
 		"@tcp(" + config.Host + ":" + strconv.Itoa(config.Port) + ")/" + config.Database +
 		"?charset=utf8mb4&parseTime=True&loc=Local"
@@ -56,7 +56,7 @@ func (g *GormDBManager) connect(config *ConfigItem) *gorm.DB {
 		//DontSupportRenameColumn:   true,  // 用 `change` 重命名列，MySQL 8 之前的数据库和 MariaDB 不支持重命名列
 		//SkipInitializeWithVersion: false, // 根据当前 MySQL 版本自动配置
 	}), &gorm.Config{
-		Logger: NewLogger(g.logger, logger.Config{
+		Logger: NewLogger(m.logger, logger.Config{
 			SlowThreshold:             200 * time.Millisecond, // Slow SQL threshold
 			LogLevel:                  logger.Info,            // Log level
 			IgnoreRecordNotFoundError: true,                   // Ignore ErrRecordNotFound error for zaplogger
@@ -70,7 +70,7 @@ func (g *GormDBManager) connect(config *ConfigItem) *gorm.DB {
 	return db
 }
 
-func (g *GormDBManager) setConnectionPool(db *gorm.DB, config *ConfigItem) {
+func (m *Manager) setConnectionPool(db *gorm.DB, config *ConfigItem) {
 	sqlDB, _ := db.DB()
 
 	// SetMaxIdleConns sets the maximum number of connections in the idle connection pool.
@@ -83,17 +83,17 @@ func (g *GormDBManager) setConnectionPool(db *gorm.DB, config *ConfigItem) {
 	sqlDB.SetConnMaxLifetime(time.Hour)
 }
 
-func (g *GormDBManager) connectMaster() {
-	g.dbMaster = g.connect(g.config.Master)
-	g.setConnectionPool(g.dbMaster, g.config.Master)
+func (m *Manager) connectMaster() {
+	m.dbMaster = m.connect(m.config.Master)
+	m.setConnectionPool(m.dbMaster, m.config.Master)
 }
 
-func (g *GormDBManager) connectSlaves() {
-	if len(g.config.Slaves) > 0 {
-		for _, slaveConfig := range g.config.Slaves {
-			db := g.connect(slaveConfig)
-			g.setConnectionPool(db, slaveConfig)
-			g.dbSlaves = append(g.dbSlaves, db)
+func (m *Manager) connectSlaves() {
+	if len(m.config.Slaves) > 0 {
+		for _, slaveConfig := range m.config.Slaves {
+			db := m.connect(slaveConfig)
+			m.setConnectionPool(db, slaveConfig)
+			m.dbSlaves = append(m.dbSlaves, db)
 		}
 	}
 }

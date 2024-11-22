@@ -2,49 +2,51 @@ package bootstrap
 
 import (
 	"context"
+	"github.com/bpcoder16/Chestnut/appconfig"
+	env2 "github.com/bpcoder16/Chestnut/appconfig/env"
 	"github.com/bpcoder16/Chestnut/clickhouse"
 	"github.com/bpcoder16/Chestnut/contrib/aliyun/oss"
 	"github.com/bpcoder16/Chestnut/core/log"
-	"github.com/bpcoder16/Chestnut/core/lru"
-	"github.com/bpcoder16/Chestnut/core/zaplogger"
 	"github.com/bpcoder16/Chestnut/logit"
-	"github.com/bpcoder16/Chestnut/modules/appconfig"
-	"github.com/bpcoder16/Chestnut/modules/appconfig/env"
+	"github.com/bpcoder16/Chestnut/lru"
+	"github.com/bpcoder16/Chestnut/modules/zaplogger"
 	"github.com/bpcoder16/Chestnut/mongodb"
 	"github.com/bpcoder16/Chestnut/mysql"
 	"github.com/bpcoder16/Chestnut/redis"
 	"github.com/bpcoder16/Chestnut/resty"
 	"io"
+	"path"
 )
 
 func MustInit(ctx context.Context, config *appconfig.AppConfig, funcList ...func(ctx context.Context, debugWriter, infoWriter, warnErrorFatalWriter io.Writer)) {
 	var debugWriter, infoWriter, warnErrorFatalWriter io.Writer
 	if config.NotUseRotateLog {
-		debugWriter, infoWriter, warnErrorFatalWriter = zaplogger.GetStandardWriters(config.LogDir, env.AppName(), env.AppName())
+		debugWriter, infoWriter, warnErrorFatalWriter = zaplogger.GetStandardWriters(config.LogDir, env2.AppName(), env2.AppName())
 	} else {
-		debugWriter, infoWriter, warnErrorFatalWriter = zaplogger.GetFileRotateLogWriters(config.LogDir, env.AppName(), env.AppName())
+		debugWriter, infoWriter, warnErrorFatalWriter = zaplogger.GetFileRotateLogWriters(config.LogDir, env2.AppName(), env2.AppName())
 	}
 	if config.StdRedirectFileSupport {
 		zaplogger.StdRedirectFile(config.LogDir)
 	}
 	initLoggers(ctx, config, debugWriter, infoWriter, warnErrorFatalWriter)
+
+	if config.AliyunOSSSupport {
+		initAliyunOSS()
+	}
+	if config.DefaultMongoDBSupport {
+		initMongoDB(ctx, debugWriter, infoWriter, warnErrorFatalWriter)
+	}
+	if config.DefaultRedisSupport {
+		initRedis(debugWriter, infoWriter, warnErrorFatalWriter)
+	}
+	if config.UseLRUCache {
+		initUseLRUCache(ctx, debugWriter, infoWriter, warnErrorFatalWriter)
+	}
 	if config.DefaultMySQLSupport {
 		initMySQL(debugWriter, infoWriter, warnErrorFatalWriter)
 	}
 	if config.DefaultClickhouseSupport {
 		initClickhouse(debugWriter, infoWriter, warnErrorFatalWriter)
-	}
-	if config.DefaultRedisSupport {
-		initRedis(debugWriter, infoWriter, warnErrorFatalWriter)
-	}
-	if config.DefaultMongoDBSupport {
-		initMongoDB(ctx, debugWriter, infoWriter, warnErrorFatalWriter)
-	}
-	if config.AliyunOSSSupport {
-		initAliyunOSS()
-	}
-	if config.UseLRUCache {
-		initUseLRUCache()
 	}
 	initHTTPClient()
 	for _, fn := range funcList {
@@ -59,7 +61,7 @@ func initLoggers(_ context.Context, config *appconfig.AppConfig, debugWriter, in
 		log.FilterKey(config.FilterKeys...),
 		log.FilterValue(config.FilterValues...),
 		log.FilterLevel(func() log.Level {
-			if env.RunMode() == env.RunModeRelease {
+			if env2.RunMode() == env2.RunModeRelease {
 				return log.LevelInfo
 			}
 			return log.LevelDebug
@@ -70,13 +72,17 @@ func initLoggers(_ context.Context, config *appconfig.AppConfig, debugWriter, in
 	))
 }
 
-func initMySQL(debugWriter, infoWriter, warnErrorFatalWriter io.Writer) {
-	mysql.SetManager(env.RootPath()+"/conf/mysql.json", log.NewHelper(
+func initAliyunOSS() {
+	oss.InitAliyunOSS(path.Join(env2.RootPath(), "conf/aliyun.json"))
+}
+
+func initMongoDB(ctx context.Context, debugWriter, infoWriter, warnErrorFatalWriter io.Writer) {
+	mongodb.SetManager(ctx, path.Join(env2.RootPath(), "conf/mongodb.json"), log.NewHelper(
 		zaplogger.GetZapLogger(
 			debugWriter, infoWriter, warnErrorFatalWriter,
-			nil,
+			log.FileWithLineNumCaller(),
 			log.FilterLevel(func() log.Level {
-				if env.RunMode() == env.RunModeRelease {
+				if env2.RunMode() == env2.RunModeRelease {
 					return log.LevelInfo
 				}
 				return log.LevelDebug
@@ -88,13 +94,13 @@ func initMySQL(debugWriter, infoWriter, warnErrorFatalWriter io.Writer) {
 	))
 }
 
-func initClickhouse(debugWriter, infoWriter, warnErrorFatalWriter io.Writer) {
-	clickhouse.SetManager(env.RootPath()+"/conf/clickhouse.json", log.NewHelper(
+func initUseLRUCache(_ context.Context, debugWriter, infoWriter, warnErrorFatalWriter io.Writer) {
+	lru.SetManager(path.Join(env2.RootPath(), "conf/lru.json"), log.NewHelper(
 		zaplogger.GetZapLogger(
 			debugWriter, infoWriter, warnErrorFatalWriter,
-			nil,
+			log.FileWithLineNumCaller(),
 			log.FilterLevel(func() log.Level {
-				if env.RunMode() == env.RunModeRelease {
+				if env2.RunMode() == env2.RunModeRelease {
 					return log.LevelInfo
 				}
 				return log.LevelDebug
@@ -107,12 +113,12 @@ func initClickhouse(debugWriter, infoWriter, warnErrorFatalWriter io.Writer) {
 }
 
 func initRedis(debugWriter, infoWriter, warnErrorFatalWriter io.Writer) {
-	redis.SetManager(env.RootPath()+"/conf/redis.json", log.NewHelper(
+	redis.SetManager(path.Join(env2.RootPath(), "conf/redis.json"), log.NewHelper(
 		zaplogger.GetZapLogger(
 			debugWriter, infoWriter, warnErrorFatalWriter,
 			log.FileWithLineNumCallerRedis(),
 			log.FilterLevel(func() log.Level {
-				if env.RunMode() == env.RunModeRelease {
+				if env2.RunMode() == env2.RunModeRelease {
 					return log.LevelInfo
 				}
 				return log.LevelDebug
@@ -124,13 +130,13 @@ func initRedis(debugWriter, infoWriter, warnErrorFatalWriter io.Writer) {
 	))
 }
 
-func initMongoDB(ctx context.Context, debugWriter, infoWriter, warnErrorFatalWriter io.Writer) {
-	mongodb.SetManager(ctx, env.RootPath()+"/conf/mongodb.json", log.NewHelper(
+func initMySQL(debugWriter, infoWriter, warnErrorFatalWriter io.Writer) {
+	mysql.SetManager(env2.RootPath()+"/conf/mysql.json", log.NewHelper(
 		zaplogger.GetZapLogger(
 			debugWriter, infoWriter, warnErrorFatalWriter,
-			log.FileWithLineNumCallerRedis(),
+			nil,
 			log.FilterLevel(func() log.Level {
-				if env.RunMode() == env.RunModeRelease {
+				if env2.RunMode() == env2.RunModeRelease {
 					return log.LevelInfo
 				}
 				return log.LevelDebug
@@ -142,14 +148,24 @@ func initMongoDB(ctx context.Context, debugWriter, infoWriter, warnErrorFatalWri
 	))
 }
 
-func initAliyunOSS() {
-	oss.InitAliyunOSS(env.RootPath() + "/conf/aliyun.json")
+func initClickhouse(debugWriter, infoWriter, warnErrorFatalWriter io.Writer) {
+	clickhouse.SetManager(env2.RootPath()+"/conf/clickhouse.json", log.NewHelper(
+		zaplogger.GetZapLogger(
+			debugWriter, infoWriter, warnErrorFatalWriter,
+			nil,
+			log.FilterLevel(func() log.Level {
+				if env2.RunMode() == env2.RunModeRelease {
+					return log.LevelInfo
+				}
+				return log.LevelDebug
+			}()),
+			//log.FilterFunc(func(level log.Level, keyValues ...interface{}) bool {
+			//	return false
+			//}),
+		),
+	))
 }
 
 func initHTTPClient() {
 	resty.SetClient()
-}
-
-func initUseLRUCache() {
-	lru.InitLRU()
 }

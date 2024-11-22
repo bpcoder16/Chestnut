@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/bpcoder16/Chestnut/modules/appconfig/env"
+	"github.com/bpcoder16/Chestnut/appconfig/env"
 	"github.com/go-co-op/gocron/v2"
 	"reflect"
 	"time"

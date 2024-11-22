@@ -1,7 +1,7 @@
 package zaplogger
 
 import (
-	"github.com/bpcoder16/Chestnut/contrib/file/standard"
+	"github.com/bpcoder16/Chestnut/core/file/standard"
 	"path"
 	"syscall"
 )

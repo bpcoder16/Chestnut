@@ -6,12 +6,12 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-var defaultRedisManager *goredis.RedisManager
+var defaultManager *goredis.Manager
 
 func SetManager(configPath string, logger *log.Helper) {
-	defaultRedisManager = goredis.NewRedisManager(configPath, logger)
+	defaultManager = goredis.NewManager(configPath, logger)
 }
 
 func DefaultClient() *redis.Client {
-	return defaultRedisManager.Client()
+	return defaultManager.Client()
 }

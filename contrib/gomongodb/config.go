@@ -11,7 +11,7 @@ type Config struct {
 	MaxConnIdleTimeSec int    `json:"maxConnIdleTimeSec"`
 }
 
-func loadMongoDBConfig(configPath string) *Config {
+func loadConfig(configPath string) *Config {
 	var config Config
 	err := utils.ParseJSONFile(configPath, &config)
 	if err != nil {

@@ -45,7 +45,6 @@ func TestFilterLevel(t *testing.T) {
 	logger.Info("Info")
 	logger.Warn("Warn")
 	logger.Error("Error")
-	//zaplogger.Fatal("Fatal")
 }
 
 func TestFilerCaller(t *testing.T) {

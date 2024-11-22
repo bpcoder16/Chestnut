@@ -6,16 +6,16 @@ import (
 	"gorm.io/gorm"
 )
 
-var defaultMySQLGormDBManager *mysql.GormDBManager
+var defaultManager *mysql.Manager
 
 func SetManager(configPath string, logger *log.Helper) {
-	defaultMySQLGormDBManager = mysql.NewGormDBManager(configPath, logger)
+	defaultManager = mysql.NewManager(configPath, logger)
 }
 
 func MasterDB() *gorm.DB {
-	return defaultMySQLGormDBManager.MasterDB()
+	return defaultManager.MasterDB()
 }
 
 func SlaveDB() *gorm.DB {
-	return defaultMySQLGormDBManager.SlaveDB()
+	return defaultManager.SlaveDB()
 }

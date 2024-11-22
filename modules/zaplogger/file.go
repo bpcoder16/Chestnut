@@ -1,8 +1,8 @@
 package zaplogger
 
 import (
-	"github.com/bpcoder16/Chestnut/contrib/file/filerotatelogs"
-	"github.com/bpcoder16/Chestnut/contrib/file/standard"
+	"github.com/bpcoder16/Chestnut/core/file/filerotatelogs"
+	"github.com/bpcoder16/Chestnut/core/file/standard"
 	"io"
 	"path"
 	"time"

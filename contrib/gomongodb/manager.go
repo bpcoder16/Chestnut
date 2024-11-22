@@ -21,7 +21,7 @@ func NewManager(ctx context.Context, configPath string, logger *log.Helper) *Man
 	manager := &Manager{
 		ctx:            ctx,
 		logger:         logger,
-		config:         loadMongoDBConfig(configPath),
+		config:         loadConfig(configPath),
 		clientDatabase: nil,
 	}
 	manager.connect()
@@ -39,9 +39,9 @@ func (m *Manager) connect() {
 		SetMinPoolSize(m.config.MinPoolSize).
 		SetMaxConnIdleTime(time.Duration(m.config.MaxConnIdleTimeSec) * time.Second).
 		SetMonitor(&event.CommandMonitor{
-			Started:   startedMonitor,
-			Succeeded: succeededMonitor,
-			Failed:    failedMonitor,
+			Started:   startedMonitorFunc(m.logger),
+			Succeeded: succeededMonitorFunc(m.logger),
+			Failed:    failedMonitorFunc(m.logger),
 		})
 
 	client, err := mongo.Connect(m.ctx, clientOptions)

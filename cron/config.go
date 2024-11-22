@@ -1,8 +1,8 @@
 package cron
 
 import (
+	"github.com/bpcoder16/Chestnut/appconfig/env"
 	"github.com/bpcoder16/Chestnut/core/utils"
-	"github.com/bpcoder16/Chestnut/modules/appconfig/env"
 )
 
 func init() {

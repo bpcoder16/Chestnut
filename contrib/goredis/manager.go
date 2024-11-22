@@ -9,47 +9,47 @@ import (
 	"time"
 )
 
-type RedisManager struct {
+type Manager struct {
 	client *redis.Client
 	logger *log.Helper
 	config *Config
 }
 
-func NewRedisManager(configPath string, logger *log.Helper) *RedisManager {
-	manager := &RedisManager{
+func NewManager(configPath string, logger *log.Helper) *Manager {
+	manager := &Manager{
 		logger: logger,
-		config: loadRedisConfig(configPath),
+		config: loadConfig(configPath),
 		client: nil,
 	}
 	manager.connect()
 	return manager
 }
 
-func (r *RedisManager) Client() *redis.Client {
-	return r.client
+func (m *Manager) Client() *redis.Client {
+	return m.client
 }
 
-func (r *RedisManager) connect() {
-	r.client = redis.NewClient(&redis.Options{
-		Addr:         r.config.Host + ":" + strconv.Itoa(r.config.Port),
-		Username:     r.config.Username,
-		Password:     r.config.Password,
-		DB:           r.config.DB,
-		MaxRetries:   r.config.MaxRetries,
-		DialTimeout:  r.config.DialTimeoutMillisecond * time.Millisecond,
-		ReadTimeout:  r.config.ReadTimeoutMillisecond * time.Millisecond,
-		WriteTimeout: r.config.WriteTimeoutMillisecond * time.Millisecond,
-		PoolFIFO:     r.config.PoolFIFO,
-		PoolSize:     r.config.PoolSize,
+func (m *Manager) connect() {
+	m.client = redis.NewClient(&redis.Options{
+		Addr:         m.config.Host + ":" + strconv.Itoa(m.config.Port),
+		Username:     m.config.Username,
+		Password:     m.config.Password,
+		DB:           m.config.DB,
+		MaxRetries:   m.config.MaxRetries,
+		DialTimeout:  m.config.DialTimeoutMillisecond * time.Millisecond,
+		ReadTimeout:  m.config.ReadTimeoutMillisecond * time.Millisecond,
+		WriteTimeout: m.config.WriteTimeoutMillisecond * time.Millisecond,
+		PoolFIFO:     m.config.PoolFIFO,
+		PoolSize:     m.config.PoolSize,
 		//PoolTimeout:  200 * time.Millisecond,
-		MinIdleConns:    r.config.MinIdleConns,
-		MaxIdleConns:    r.config.MaxIdleConns,
-		ConnMaxIdleTime: r.config.ConnMaxIdleTimeMinute * time.Minute,
+		MinIdleConns:    m.config.MinIdleConns,
+		MaxIdleConns:    m.config.MaxIdleConns,
+		ConnMaxIdleTime: m.config.ConnMaxIdleTimeMinute * time.Minute,
 		//ConnMaxLifetime: 2 * time.Hour,
 	})
-	r.client.AddHook(NewLoggerHook(r.logger))
-	err := r.client.Get(context.Background(), "testConnect").Err()
+	m.client.AddHook(NewLoggerHook(m.logger))
+	err := m.client.Get(context.Background(), "testConnect").Err()
 	if err != nil && !errors.Is(err, redis.Nil) {
-		panic(r.config.Host + ":" + strconv.Itoa(r.config.Port) + ", failed to connect redis: " + err.Error())
+		panic(m.config.Host + ":" + strconv.Itoa(m.config.Port) + ", failed to connect redis: " + err.Error())
 	}
 }

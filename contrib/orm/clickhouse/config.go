@@ -17,7 +17,7 @@ type Config struct {
 	Slaves []*ConfigItem `json:"slaves"`
 }
 
-func loadClickhouseConfig(configPath string) *Config {
+func loadConfig(configPath string) *Config {
 	var config Config
 	err := utils.ParseJSONFile(configPath, &config)
 	if err != nil {

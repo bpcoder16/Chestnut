@@ -1,8 +1,8 @@
 package appconfig
 
 import (
+	env2 "github.com/bpcoder16/Chestnut/appconfig/env"
 	"github.com/bpcoder16/Chestnut/core/utils"
-	"github.com/bpcoder16/Chestnut/modules/appconfig/env"
 )
 
 // 配置文件使用 json 格式
@@ -16,6 +16,6 @@ func MustLoadAppConfig() *AppConfig {
 	if err != nil {
 		panic("parse app config failed: " + err.Error())
 	}
-	env.Default = env.New(config.Env)
+	env2.Default = env2.New(config.Env)
 	return &config
 }

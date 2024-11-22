@@ -22,7 +22,7 @@ type Config struct {
 	ConnMaxIdleTimeMinute   time.Duration `json:"connMaxIdleTimeMinute"`
 }
 
-func loadRedisConfig(configPath string) *Config {
+func loadConfig(configPath string) *Config {
 	var config Config
 	err := utils.ParseJSONFile(configPath, &config)
 	if err != nil {

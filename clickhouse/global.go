@@ -6,16 +6,16 @@ import (
 	"gorm.io/gorm"
 )
 
-var defaultClickhouseGormDBManager *clickhouse.GormDBManager
+var defaultManager *clickhouse.Manager
 
 func SetManager(configPath string, logger *log.Helper) {
-	defaultClickhouseGormDBManager = clickhouse.NewGormDBManager(configPath, logger)
+	defaultManager = clickhouse.NewManager(configPath, logger)
 }
 
 func MasterDB() *gorm.DB {
-	return defaultClickhouseGormDBManager.MasterDB()
+	return defaultManager.MasterDB()
 }
 
 func SlaveDB() *gorm.DB {
-	return defaultClickhouseGormDBManager.SlaveDB()
+	return defaultManager.SlaveDB()
 }
