@@ -17,9 +17,14 @@ import (
 )
 
 func MustInit(ctx context.Context, config *appconfig.AppConfig, funcList ...func(ctx context.Context, debugWriter, infoWriter, warnErrorFatalWriter io.Writer)) {
-	debugWriter, infoWriter, warnErrorFatalWriter := zaplogger.GetWriters(env.RootPath(), env.AppName(), env.AppName())
+	var debugWriter, infoWriter, warnErrorFatalWriter io.Writer
+	if config.NotUseRotateLog {
+		debugWriter, infoWriter, warnErrorFatalWriter = zaplogger.GetStandardWriters(config.LogDir, env.AppName(), env.AppName())
+	} else {
+		debugWriter, infoWriter, warnErrorFatalWriter = zaplogger.GetFileRotateLogWriters(config.LogDir, env.AppName(), env.AppName())
+	}
 	if config.StdRedirectFileSupport {
-		zaplogger.StdRedirectFile()
+		zaplogger.StdRedirectFile(config.LogDir)
 	}
 	initLoggers(ctx, config, debugWriter, infoWriter, warnErrorFatalWriter)
 	if config.DefaultMySQLSupport {

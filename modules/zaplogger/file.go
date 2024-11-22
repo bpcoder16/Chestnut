@@ -2,26 +2,40 @@ package zaplogger
 
 import (
 	"github.com/bpcoder16/Chestnut/contrib/file/filerotatelogs"
+	"github.com/bpcoder16/Chestnut/contrib/file/standard"
 	"io"
 	"path"
 	"time"
 )
 
-func GetWriters(rootPath, appName, logName string) (debugWriter, infoWriter, warnErrorFatalWriter io.Writer) {
+func GetFileRotateLogWriters(logDir, appName, logName string) (debugWriter, infoWriter, warnErrorFatalWriter io.Writer) {
 	debugWriter = filerotatelogs.NewWriter(
-		path.Join(rootPath, "log", appName, logName+".debug.log"),
+		path.Join(logDir, appName, logName+".debug.log"),
 		time.Duration(86400*30)*time.Second,
 		time.Duration(3600)*time.Second,
 	)
 	infoWriter = filerotatelogs.NewWriter(
-		path.Join(rootPath, "log", appName, logName+".info.log"),
+		path.Join(logDir, appName, logName+".info.log"),
 		time.Duration(86400*30)*time.Second,
 		time.Duration(3600)*time.Second,
 	)
 	warnErrorFatalWriter = filerotatelogs.NewWriter(
-		path.Join(rootPath, "log", appName, logName+".wf.log"),
+		path.Join(logDir, appName, logName+".wf.log"),
 		time.Duration(86400*30)*time.Second,
 		time.Duration(3600)*time.Second,
+	)
+	return
+}
+
+func GetStandardWriters(logDir, appName, logName string) (debugWriter, infoWriter, warnErrorFatalWriter io.Writer) {
+	debugWriter = standard.NewWriter(
+		path.Join(logDir, appName, logName+".debug.log"),
+	)
+	infoWriter = standard.NewWriter(
+		path.Join(logDir, appName, logName+".info.log"),
+	)
+	warnErrorFatalWriter = standard.NewWriter(
+		path.Join(logDir, appName, logName+".wf.log"),
 	)
 	return
 }

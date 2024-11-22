@@ -4,6 +4,7 @@ import (
 	"errors"
 	"github.com/bpcoder16/Chestnut/core/utils"
 	"github.com/bpcoder16/Chestnut/modules/appconfig/env"
+	"path"
 	"path/filepath"
 )
 
@@ -14,6 +15,9 @@ type AppConfig struct {
 
 	FilterKeys   []string
 	FilterValues []string
+
+	LogDir          string
+	NotUseRotateLog bool
 
 	StdRedirectFileSupport   bool
 	DefaultMySQLSupport      bool
@@ -35,14 +39,15 @@ func (c *AppConfig) Check() (err error) {
 	return err
 }
 
-func ParseConfig(path string, configPtr *AppConfig) (err error) {
-	var confPath string
-	confPath, err = filepath.Abs(path)
-	if confPath, err = filepath.Abs(path); err == nil {
+func ParseConfig(confPath string, configPtr *AppConfig) (err error) {
+	if confPath, err = filepath.Abs(confPath); err == nil {
 		if err = utils.ParseJSONFile(confPath, configPtr); err == nil {
 			err = configPtr.Check()
 		}
 	}
 	configPtr.ConfPath = confPath
+	if len(configPtr.LogDir) == 0 {
+		configPtr.LogDir = path.Join(utils.RootPath(), "log")
+	}
 	return
 }
