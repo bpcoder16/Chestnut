@@ -1,5 +1,9 @@
 {
-  "server": {
-    "port": "8888"
-  }
+  "port": "8888",
+  "readTimeoutMillisecond": 5000,
+  "readHeaderTimeoutMillisecond": 2000,
+  "writeTimeoutMillisecond": 10000,
+  "idleTimeoutMillisecond": 15000,
+  "maxHeaderBytes": 1048576,
+  "isOpenConnStateTraceLog": false
 }
