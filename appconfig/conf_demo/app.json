@@ -7,9 +7,6 @@
   "filterKeys": [
     "password"
   ],
-  "filterValues": [
-    "bpcoder"
-  ],
   "logDir": "",
   "notUseRotateLog": false,
   "StdRedirectFileSupport": true,

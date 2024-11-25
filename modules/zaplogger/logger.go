@@ -11,7 +11,6 @@ import (
 //		"/Users/bpcoder/git/one",
 //		"one",
 //		log.FilterKey("password"),
-//		log.FilterValue("bpcoder"),
 //		log.FilterLevel(log.LevelDebug),
 //		log.FilterFunc(func(level log.Level, keyValues ...interface{}) bool {
 //			return true

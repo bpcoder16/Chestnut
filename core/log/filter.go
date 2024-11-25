@@ -10,7 +10,6 @@ type Filter struct {
 	logger Logger
 	level  Level
 	key    map[interface{}]struct{}
-	value  map[interface{}]struct{}
 	filter func(level Level, keyValues ...interface{}) bool
 }
 
@@ -29,16 +28,13 @@ func (f *Filter) Log(level Level, keyValues ...interface{}) error {
 		return nil
 	}
 
-	if len(f.key) > 0 || len(f.value) > 0 {
+	if len(f.key) > 0 {
 		for i := 0; i < len(keyValues); i += 2 {
 			v := i + 1
 			if v >= len(keyValues) {
 				break
 			}
 			if _, ok := f.key[keyValues[i]]; ok {
-				keyValues[v] = fuzzyStr
-			}
-			if _, ok := f.value[keyValues[v]]; ok {
 				keyValues[v] = fuzzyStr
 			}
 		}
@@ -52,7 +48,6 @@ func NewFilter(logger Logger, opts ...FilterOption) *Filter {
 		logger: logger,
 		level:  LevelDebug,
 		key:    make(map[interface{}]struct{}),
-		value:  make(map[interface{}]struct{}),
 	}
 	for _, o := range opts {
 		o(&options)
@@ -72,15 +67,6 @@ func FilterKey(keys ...string) FilterOption {
 	return func(o *Filter) {
 		for _, v := range keys {
 			o.key[v] = struct{}{}
-		}
-	}
-}
-
-// FilterValue with filter value.
-func FilterValue(values ...string) FilterOption {
-	return func(o *Filter) {
-		for _, v := range values {
-			o.value[v] = struct{}{}
 		}
 	}
 }

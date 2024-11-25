@@ -59,7 +59,6 @@ func initLoggers(_ context.Context, config *appconfig.AppConfig, debugWriter, in
 		debugWriter, infoWriter, warnErrorFatalWriter,
 		log.FileWithLineNumCaller(),
 		log.FilterKey(config.FilterKeys...),
-		log.FilterValue(config.FilterValues...),
 		log.FilterLevel(func() log.Level {
 			if env2.RunMode() == env2.RunModeRelease {
 				return log.LevelInfo

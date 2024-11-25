@@ -23,7 +23,7 @@ func NewLogger(debugWriter, infoWriter, warnErrorFatalWriter io.Writer) *Logger 
 	}
 }
 
-func (l *Logger) Log(level log.Level, keyValues ...interface{}) error {
+func (l *Logger) Log(level log.Level, keyValues ...any) error {
 	keyValuesLen := len(keyValues)
 	if keyValuesLen == 0 || keyValuesLen%2 != 0 {
 		l.log.Warn(fmt.Sprint("keyValues must appear in pairs: ", keyValues))

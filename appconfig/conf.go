@@ -13,8 +13,7 @@ type AppConfig struct {
 
 	Env env.Option
 
-	FilterKeys   []string
-	FilterValues []string
+	FilterKeys []string
 
 	LogDir          string
 	NotUseRotateLog bool

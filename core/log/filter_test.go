@@ -23,7 +23,6 @@ func TestFilterAll(t *testing.T) {
 		With(DefaultLogger, "ts", DefaultTimestamp, "caller", DefaultCaller),
 		FilterLevel(LevelDebug),
 		FilterKey("username"),
-		FilterValue("hello"),
 		FilterFunc(testFilterFunc),
 	))
 
@@ -66,17 +65,6 @@ func TestFilterKey(t *testing.T) {
 	logger.DebugW("password", "123456")
 }
 
-func TestFilterValue(t *testing.T) {
-	logger := NewHelper(NewFilter(
-		With(DefaultLogger, "ts", DefaultTimestamp, "caller", DefaultCaller),
-		FilterValue("debug"),
-	))
-	logger.DebugF("test %s", "debug")
-	logger.Debug("debug", "debug")
-	logger.Debug("debug")
-	logger.DebugW("key", "debug")
-}
-
 func TestFilterFunc(t *testing.T) {
 	logger := NewHelper(NewFilter(
 		With(DefaultLogger, "ts", DefaultTimestamp, "caller", DefaultCaller),
@@ -91,7 +79,6 @@ func BenchmarkFilterAll(b *testing.B) {
 	log := NewHelper(NewFilter(
 		With(DefaultLogger, "ts", DefaultTimestamp, "caller", DefaultCaller),
 		FilterKey("username"),
-		FilterValue("Water"),
 		FilterFunc(testFilterFunc),
 	))
 	for i := 0; i < b.N; i++ {
