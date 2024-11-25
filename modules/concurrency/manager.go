@@ -32,14 +32,14 @@ func Manager(ctx context.Context, taskMap map[string]func(ctx context.Context) C
 		task := f
 		uniqueNameNew := uniqueName
 		g.Go(func() error {
-			ctx = context.WithValue(ctx, log.DefaultConcurrencyLogIdKey, uuid.New().String())
-			defer utils.TimeCostLog(ctx, "concurrency.Manager."+logField+"."+uniqueNameNew)()
+			ctxG := context.WithValue(ctx, log.DefaultConcurrencyLogIdKey, uuid.New().String())
+			defer utils.TimeCostLog(ctxG, "concurrency.Manager."+logField+"."+uniqueNameNew)()
 			defer func() {
 				if r := recover(); r != nil {
 					panicFunc(r)
 				}
 			}()
-			taskResult := task(ctx)
+			taskResult := task(ctxG)
 			taskResult.uniqueName = uniqueNameNew
 			chanList <- taskResult
 			return nil
