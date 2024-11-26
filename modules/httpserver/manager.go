@@ -2,9 +2,7 @@ package httpserver
 
 import (
 	"context"
-	"github.com/bpcoder16/Chestnut/core/log"
 	"github.com/bpcoder16/Chestnut/logit"
-	"github.com/google/uuid"
 	"net"
 	"net/http"
 	"time"
@@ -42,12 +40,12 @@ func (m *Manager) Run() {
 			}
 			return nil
 		}(),
-		BaseContext: func(listener net.Listener) context.Context {
-			ctx := context.Background()
-			ctx = context.WithValue(ctx, log.DefaultMessageKey, "HTTP")
-			ctx = context.WithValue(ctx, log.DefaultLogIdKey, uuid.New().String())
-			return ctx
-		},
+		//BaseContext: func(listener net.Listener) context.Context {
+		//	ctx := context.Background()
+		//	ctx = context.WithValue(ctx, log.DefaultMessageKey, "HTTP")
+		//	ctx = context.WithValue(ctx, log.DefaultLogIdKey, uuid.New().String())
+		//	return ctx
+		//},
 	}).ListenAndServe())
 }
 

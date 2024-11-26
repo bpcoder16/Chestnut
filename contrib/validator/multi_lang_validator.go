@@ -34,7 +34,8 @@ func (v *MultiLangValidator) ValidateStruct(obj interface{}) error {
 	if valueType == reflect.Struct {
 		v.lazyInit()
 		if err := v.validate.Struct(obj); err != nil {
-			errList := err.(validator.ValidationErrors)
+			var errList validator.ValidationErrors
+			errors.As(err, &errList)
 			var sliceErrList []string
 			for _, e := range errList {
 				sliceErrList = append(sliceErrList, e.Translate(v.trans))
