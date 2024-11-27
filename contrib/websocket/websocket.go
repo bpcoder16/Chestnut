@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"github.com/bpcoder16/Chestnut/core/gtask"
+	"github.com/bpcoder16/Chestnut/core/log"
 	"github.com/bpcoder16/Chestnut/logit"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
@@ -114,8 +115,12 @@ func (ws *WebSocket) Handle(ctx context.Context, w http.ResponseWriter, r *http.
 		return
 	}
 
-	uuidStr := ctx.Value(ConnUUIDCTXKey).(string)
-	if len(uuidStr) == 0 {
+	ctx = context.WithValue(ctx, log.DefaultMessageKey, "WebSocket")
+	ctx = context.WithValue(ctx, log.DefaultLogIdKey, uuid.New().String())
+
+	var uuidStr string
+	var isOK bool
+	if uuidStr, isOK = ctx.Value(ConnUUIDCTXKey).(string); !isOK {
 		uuidStr = uuid.New().String()
 	}
 

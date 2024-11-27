@@ -49,7 +49,7 @@ func (r *Router) RegisterHandler(engine *gin.Engine) {
 
 func NewRouter(path, configPath string) *Router {
 	r := &Router{
-		wsRouter:  ginHandler.NewDefaultRouter(basePath),
+		wsRouter:  ginHandler.NewRouterNoLogger(basePath),
 		wsManager: websocket.New(configPath),
 		path:      path,
 	}

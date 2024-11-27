@@ -41,7 +41,6 @@ func HTTPHandler(routers ...Router) http.Handler {
 	h := gin.New()
 	h.Use(
 		recoveryWithWriter(os.Stderr),
-		defaultLogger(),
 	)
 	for _, router := range routers {
 		router.RegisterHandler(h)

@@ -99,13 +99,21 @@ func (c *Client) errorLog(ctx context.Context, keyValues ...interface{}) {
 	c.log(ctx, "ERROR", keyValues...)
 }
 
-// TODO  SetWriteDeadline 设置写超时
+func (c *Client) getMessageTypeString(messageType int) string {
+	return map[int]string{
+		websocket.TextMessage:   "Text",
+		websocket.BinaryMessage: "Binary",
+		websocket.CloseMessage:  "Close",
+		websocket.PingMessage:   "Ping",
+		websocket.PongMessage:   "Pong",
+	}[messageType]
+}
 
 func (c *Client) readMessage(ctx context.Context) (messageType int, message []byte, err error) {
 	messageType, message, err = c.conn.ReadMessage()
 	c.debugLog(ctx,
 		"function", "ReadMessage",
-		"messageType", messageType,
+		"messageType", c.getMessageTypeString(messageType),
 		"message", string(message),
 		"err", err,
 	)
@@ -121,7 +129,7 @@ func (c *Client) WriteTextMessage(ctx context.Context, message []byte) (err erro
 			err = errors.New("c.textMsgCh is closed")
 			c.errorLog(ctx,
 				"function", "WriteTextMessage",
-				"messageType", "Text",
+				"messageType", c.getMessageTypeString(websocket.TextMessage),
 				"message", string(message),
 				"err", err,
 			)
@@ -132,7 +140,7 @@ func (c *Client) WriteTextMessage(ctx context.Context, message []byte) (err erro
 		c.textMsgCh <- message
 		c.debugLog(ctx,
 			"function", "WriteTextMessage",
-			"messageType", "Text",
+			"messageType", c.getMessageTypeString(websocket.TextMessage),
 			"message", string(message),
 		)
 	} else {
@@ -246,30 +254,24 @@ func (c *Client) readPump(ctx context.Context) {
 		}
 		message = bytes.TrimSpace(bytes.Replace(message, newline, space, -1))
 
-		var messageTypeShow string
 		begin := time.Now()
 		switch mt {
 		case websocket.TextMessage:
 			errR = c.receiveTextMessage(ctx, message)
-			messageTypeShow = "Text"
 		case websocket.BinaryMessage:
 			errR = c.receiveBinaryMessage(ctx, message)
-			messageTypeShow = "Binary"
 		case websocket.CloseMessage:
 			errR = c.receiveCloseMessage(ctx, message)
-			messageTypeShow = "Close"
 		case websocket.PingMessage:
 			errR = c.receivePingMessage(ctx, message)
-			messageTypeShow = "Ping"
 		case websocket.PongMessage:
 			errR = c.receivePongMessage(ctx, message)
-			messageTypeShow = "Pong"
 		}
 
 		elapsed := time.Since(begin)
 		c.infoLog(ctx,
 			"function", "client.readPump",
-			"messageType", messageTypeShow,
+			"messageType", c.getMessageTypeString(mt),
 			"readMessage.Err", errR,
 			"costTime", fmt.Sprintf("%.3fms", float64(elapsed.Nanoseconds())/1e6),
 		)
@@ -288,7 +290,7 @@ func (c *Client) readPump(ctx context.Context) {
 func (c *Client) sendPing(ctx context.Context) error {
 	c.debugLog(ctx,
 		"function", "sendPing",
-		"messageType", "Ping",
+		"messageType", c.getMessageTypeString(websocket.PingMessage),
 	)
 	return c.conn.WriteControl(websocket.PingMessage, []byte{}, time.Now().Add(writeWait))
 }
