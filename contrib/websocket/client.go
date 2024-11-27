@@ -24,7 +24,7 @@ type Client struct {
 	textMsgCh chan []byte
 	isClosed  bool
 	uuidStr   string
-	state     State // 客户端状态信息
+	State     State // 客户端状态信息
 
 	mu sync.RWMutex
 }
@@ -42,7 +42,7 @@ func NewClient(conn *websocket.Conn, uuidStr string) *Client {
 		textMsgCh: make(chan []byte, 1024),
 		isClosed:  false,
 		uuidStr:   uuidStr,
-		state: State{
+		State: State{
 			SceneParams: make(map[string]interface{}),
 		},
 	}
@@ -165,19 +165,19 @@ func (c *Client) receiveTextMessage(ctx context.Context, messageBytes []byte) (e
 		"receiveMessage", receiveMessage,
 	)
 	if len(receiveMessage.Scene) == 0 {
-		if len(c.state.Scene) == 0 {
+		if len(c.State.Scene) == 0 {
 			c.warnLog(ctx,
 				"function", "receiveTextMessage",
 				"receiveMessage.Scene", receiveMessage.Scene,
-				"state.Scene", c.state.Scene,
+				"State.Scene", c.State.Scene,
 			)
 			err = errors.New("receiveMessage.Scene.Empty")
 			return
 		}
 		// 如果没有传递，说明用户停留在当前场景
-		receiveMessage.Scene = c.state.Scene
-		receiveMessage.SceneParams = c.state.SceneParams
-		receiveMessage.SID = c.state.SID
+		receiveMessage.Scene = c.State.Scene
+		receiveMessage.SceneParams = c.State.SceneParams
+		receiveMessage.SID = c.State.SID
 	}
 
 	var controller TextMessageController

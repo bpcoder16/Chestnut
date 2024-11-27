@@ -62,6 +62,11 @@ type responseWriter struct {
 	body *bytes.Buffer
 }
 
+func (w responseWriter) Write(b []byte) (int, error) {
+	w.body.Write(b)
+	return w.ResponseWriter.Write(b)
+}
+
 func recoveryWithWriter(out io.Writer) gin.HandlerFunc {
 	var logger *gLog.Logger
 	if out != nil {
