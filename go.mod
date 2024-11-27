@@ -11,6 +11,7 @@ require (
 	github.com/go-playground/validator/v10 v10.23.0
 	github.com/go-resty/resty/v2 v2.16.2
 	github.com/google/uuid v1.6.0
+	github.com/gorilla/websocket v1.5.3
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/lestrrat-go/file-rotatelogs v2.4.0+incompatible
 	github.com/redis/go-redis/v9 v9.7.0

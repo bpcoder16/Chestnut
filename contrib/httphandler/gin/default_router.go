@@ -49,6 +49,8 @@ type registry struct {
 	handler gin.HandlersChain
 }
 
+var _ Router = (*DefaultRouter)(nil)
+
 type DefaultRouter struct {
 	RouterGroup
 	registries []registry

@@ -1,0 +1,10 @@
+{
+  "handshakeTimeoutSec": 5,
+  "readBufferSize": 4096,
+  "writeBufferSize": 4096,
+  "writeBufferPool": 4096,
+  "allowedOrigins": [
+    "https://www.baidu.com"
+  ],
+  "enableCompression": false
+}
