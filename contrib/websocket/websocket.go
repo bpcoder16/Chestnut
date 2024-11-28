@@ -138,9 +138,13 @@ func (ws *WebSocket) Handle(ctx context.Context, w http.ResponseWriter, r *http.
 	}
 
 	client := NewClient(conn, uuidStr)
+	client.ws = ws
+	client.ws.clientManager.Store(uuidStr, client)
+
 	client.infoLog(ctx,
 		"Connection.Status", "Success",
 		"Connection.CostTime", utils.ShowDurationString(elapsed),
+		"client.ws.clientManager.Len()", client.ws.clientManager.Len(),
 	)
 
 	// 设置连接重要参数
@@ -148,12 +152,13 @@ func (ws *WebSocket) Handle(ctx context.Context, w http.ResponseWriter, r *http.
 	_ = conn.SetWriteDeadline(time.Now().Add(writeWait))
 	_ = conn.SetReadDeadline(time.Now().Add(readDeadlineDuration))
 	conn.SetCloseHandler(func(code int, text string) (err error) {
+		client.close(ctx)
 		client.debugLog(ctx,
 			"function", "SetCloseHandler",
 			"code", code,
 			"text", text,
+			"client.ws.clientManager.Len()", client.ws.clientManager.Len(),
 		)
-		client.close(ctx)
 		return
 	})
 	conn.SetPingHandler(func(appData string) (err error) {
@@ -172,9 +177,6 @@ func (ws *WebSocket) Handle(ctx context.Context, w http.ResponseWriter, r *http.
 		_ = conn.SetReadDeadline(time.Now().Add(readDeadlineDuration))
 		return
 	})
-
-	client.ws = ws
-	client.ws.clientManager.Store(uuidStr, client)
 
 	g, gCtx := gtask.WithContext(ctx)
 
