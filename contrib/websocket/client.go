@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/bpcoder16/Chestnut/core/log"
 	"github.com/bpcoder16/Chestnut/core/utils"
 	"github.com/bpcoder16/Chestnut/logit"
 	"github.com/gorilla/websocket"
@@ -51,11 +52,9 @@ func NewClient(conn *websocket.Conn, uuidStr string) *Client {
 func (c *Client) close(ctx context.Context) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	isClosedForLog := c.isClosed
 	if false == c.isClosed {
-		c.debugLog(ctx,
-			"function", "Client.close",
-			"process", "c.conn.Close()/close(c.textMsgCh)",
-		)
+		_ = c.sendCloseMessage(ctx)
 		_ = c.conn.Close()
 		c.isClosed = true
 		close(c.textMsgCh)
@@ -63,12 +62,12 @@ func (c *Client) close(ctx context.Context) {
 			c.ws.clientCloseFunc(ctx, c.uuidStr)
 		}
 	}
+	c.ws.clientManager.Delete(c.uuidStr)
 	c.debugLog(ctx,
 		"function", "Client.close",
-		"c.isClosed", c.isClosed,
-		"c.ws.clientManager", "Delete("+c.uuidStr+")",
+		"client.isClosed", isClosedForLog,
+		"client.ws.clientManager", "Delete("+c.uuidStr+")",
 	)
-	c.ws.clientManager.Delete(c.uuidStr)
 }
 
 func (c *Client) log(ctx context.Context, level string, keyValues ...interface{}) {
@@ -76,8 +75,10 @@ func (c *Client) log(ctx context.Context, level string, keyValues ...interface{}
 		"subProtocol", c.conn.Subprotocol(),
 		"localAddr", c.conn.LocalAddr().String(),
 		"remoteAddr", c.conn.RemoteAddr().String(),
+		"client.ws.clientManager.Len()", c.ws.clientManager.Len(),
+		"client.State", c.State,
 	}
-	newKeyValues = append(keyValues, newKeyValues...)
+	newKeyValues = append(newKeyValues, keyValues...)
 
 	switch level {
 	case "DEBUG":
@@ -120,12 +121,6 @@ func (c *Client) getMessageTypeString(messageType int) string {
 
 func (c *Client) readMessage(ctx context.Context) (messageType int, message []byte, err error) {
 	messageType, message, err = c.conn.ReadMessage()
-	c.debugLog(ctx,
-		"function", "ReadMessage",
-		"messageType", c.getMessageTypeString(messageType),
-		"message", string(message),
-		"err", err,
-	)
 	if err != nil {
 		c.close(ctx)
 	}
@@ -159,35 +154,19 @@ func (c *Client) WriteTextMessage(ctx context.Context, message []byte) (err erro
 	return
 }
 
-func (c *Client) receiveTextMessage(ctx context.Context, messageBytes []byte) (err error) {
+func (c *Client) receiveTextMessage(_ context.Context, messageBytes []byte) (err error) {
 	if len(messageBytes) == 0 {
-		c.warnLog(ctx,
-			"function", "receiveTextMessage",
-			"messageBytes.Len", 0,
-		)
+		err = errors.New("messageBytes.Len(0)")
 		return
 	}
 	var receiveMessage ReceiveMessage
 	err = json.Unmarshal(messageBytes, &receiveMessage)
 	if err != nil {
-		c.warnLog(ctx,
-			"function", "receiveTextMessage",
-			"messageBytes.Err", errors.New("parse text message failed["+err.Error()+"]"),
-		)
+		err = errors.New("parse text message failed[" + err.Error() + "]")
 		return
 	}
-	c.debugLog(ctx,
-		"function", "receiveTextMessage",
-		"process", "parse text success",
-		"receiveMessage", receiveMessage,
-	)
 	if len(receiveMessage.Scene) == 0 {
 		if len(c.State.Scene) == 0 {
-			c.warnLog(ctx,
-				"function", "receiveTextMessage",
-				"receiveMessage.Scene", receiveMessage.Scene,
-				"State.Scene", c.State.Scene,
-			)
 			err = errors.New("receiveMessage.Scene.Empty")
 			return
 		}
@@ -200,25 +179,14 @@ func (c *Client) receiveTextMessage(ctx context.Context, messageBytes []byte) (e
 	var controller TextMessageController
 	controller, err = c.ws.getTextMessageController(receiveMessage.Scene)
 	if err != nil {
-		c.warnLog(ctx,
-			"function", "receiveTextMessage",
-			"receiveMessage.Scene", receiveMessage.Scene,
-			"getTextMessageController.Err", err,
-		)
 		return
 	}
 	err = controller.ParsePayload(c, receiveMessage)
 	if err != nil {
-		c.warnLog(ctx,
-			"function", "receiveTextMessage",
-			"receiveMessage.Scene", receiveMessage.Scene,
-			"controller.ParsePayload.Err", err,
-		)
 		return
 	}
 
 	err = controller.Process()
-
 	return
 }
 
@@ -250,12 +218,13 @@ func (c *Client) readPump(ctx context.Context) {
 	}()
 
 	for {
-		mt, message, errR := c.readMessage(ctx)
+		mt, message, errR := c.conn.ReadMessage()
+		rCtx := context.WithValue(ctx, log.DefaultWebSocketLogIdKey, utils.UniqueID())
 		if errR != nil {
 			if websocket.IsUnexpectedCloseError(errR, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
-				c.warnLog(ctx,
+				c.warnLog(rCtx,
 					"function", "client.readPump",
-					"process", "readMessage",
+					"process", "c.readMessage",
 					"err", errR.Error(),
 				)
 			}
@@ -266,47 +235,53 @@ func (c *Client) readPump(ctx context.Context) {
 		begin := time.Now()
 		switch mt {
 		case websocket.TextMessage:
-			errR = c.receiveTextMessage(ctx, message)
+			errR = c.receiveTextMessage(rCtx, message)
 		case websocket.BinaryMessage:
-			errR = c.receiveBinaryMessage(ctx, message)
+			errR = c.receiveBinaryMessage(rCtx, message)
 		case websocket.CloseMessage:
-			errR = c.receiveCloseMessage(ctx, message)
+			errR = c.receiveCloseMessage(rCtx, message)
 		case websocket.PingMessage:
-			errR = c.receivePingMessage(ctx, message)
+			errR = c.receivePingMessage(rCtx, message)
 		case websocket.PongMessage:
-			errR = c.receivePongMessage(ctx, message)
+			errR = c.receivePongMessage(rCtx, message)
 		}
 
 		elapsed := time.Since(begin)
-		c.infoLog(ctx,
+		c.infoLog(rCtx,
 			"function", "client.readPump",
-			"messageType", c.getMessageTypeString(mt),
+			"process", "readMessage.receiveMessage",
 			"readMessage.Err", errR,
+			"messageType", c.getMessageTypeString(mt),
+			"message", string(message),
 			"costTime", utils.ShowDurationString(elapsed),
 		)
 
 		if errR != nil {
-			c.warnLog(ctx,
+			c.warnLog(rCtx,
 				"function", "client.readPump",
 				"process", "readMessage.receiveMessage",
-				"err", errR.Error(),
+				"readMessage.Err", errR,
 			)
 			break
 		}
 	}
 }
 
-func (c *Client) sendPing(ctx context.Context) error {
+func (c *Client) sendPingMessage(ctx context.Context) error {
 	c.debugLog(ctx,
-		"function", "sendPing",
-		"messageType", c.getMessageTypeString(websocket.PingMessage),
+		"SendMessage", "Ping",
 	)
 	return c.conn.WriteControl(websocket.PingMessage, []byte{}, time.Now().Add(writeWait))
 }
 
+func (c *Client) sendCloseMessage(ctx context.Context) error {
+	c.debugLog(ctx,
+		"SendMessage", "Close",
+	)
+	return c.conn.WriteControl(websocket.CloseMessage, []byte{}, time.Now().Add(writeWait))
+}
+
 func (c *Client) writePump(ctx context.Context) {
-	// 维持心跳
-	ticker := time.NewTicker(pingPeriod)
 	defer func() {
 		if r := recover(); r != nil {
 			c.errorLog(ctx,
@@ -317,11 +292,12 @@ func (c *Client) writePump(ctx context.Context) {
 		c.close(ctx)
 	}()
 
+	// 维持心跳
+	ticker := time.NewTicker(pingPeriod)
 	for {
 		select {
 		case message, ok := <-c.textMsgCh:
 			if !ok {
-				_ = c.conn.WriteControl(websocket.CloseMessage, []byte{}, time.Now().Add(writeWait))
 				return
 			}
 
@@ -343,13 +319,12 @@ func (c *Client) writePump(ctx context.Context) {
 			}
 			c.mu.Unlock()
 		case <-ticker.C:
-			if err := c.sendPing(ctx); err != nil {
+			if err := c.sendPingMessage(ctx); err != nil {
 				return
 			}
 			// 鉴权与心跳一个频次校验
 			if c.ws.authorizationFunc != nil {
 				if isOK := c.ws.authorizationFunc(ctx); !isOK {
-					c.close(ctx)
 					return
 				}
 			}

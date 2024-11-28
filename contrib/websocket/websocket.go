@@ -100,7 +100,7 @@ func (ws *WebSocket) getTextMessageController(scene string) (controller TextMess
 	var controllerTemplate TextMessageController
 	controllerTemplate, exist = ws.textMessageControllers[scene]
 	if !exist {
-		err = errors.New("textMessageController not register")
+		err = errors.New("TextMessageController.Not.Register")
 		return
 	}
 	controller, _ = reflect.New(reflect.TypeOf(controllerTemplate).Elem()).Interface().(TextMessageController)
@@ -140,11 +140,11 @@ func (ws *WebSocket) Handle(ctx context.Context, w http.ResponseWriter, r *http.
 	client := NewClient(conn, uuidStr)
 	client.ws = ws
 	client.ws.clientManager.Store(uuidStr, client)
+	defer client.close(ctx)
 
 	client.infoLog(ctx,
 		"Connection.Status", "Success",
 		"Connection.CostTime", utils.ShowDurationString(elapsed),
-		"client.ws.clientManager.Len()", client.ws.clientManager.Len(),
 	)
 
 	// 设置连接重要参数
@@ -157,7 +157,6 @@ func (ws *WebSocket) Handle(ctx context.Context, w http.ResponseWriter, r *http.
 			"function", "SetCloseHandler",
 			"code", code,
 			"text", text,
-			"client.ws.clientManager.Len()", client.ws.clientManager.Len(),
 		)
 		return
 	})
@@ -180,14 +179,14 @@ func (ws *WebSocket) Handle(ctx context.Context, w http.ResponseWriter, r *http.
 
 	g, gCtx := gtask.WithContext(ctx)
 
-	g.Go(func() (err error) {
+	g.Go(func() error {
 		client.readPump(gCtx)
-		return
+		return nil
 	})
 
-	g.Go(func() (err error) {
+	g.Go(func() error {
 		client.writePump(gCtx)
-		return
+		return nil
 	})
 
 	_ = g.Wait()
