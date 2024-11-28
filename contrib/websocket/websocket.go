@@ -5,8 +5,8 @@ import (
 	"errors"
 	"github.com/bpcoder16/Chestnut/core/gtask"
 	"github.com/bpcoder16/Chestnut/core/log"
+	"github.com/bpcoder16/Chestnut/core/utils"
 	"github.com/bpcoder16/Chestnut/logit"
-	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"net/http"
 	"reflect"
@@ -109,52 +109,64 @@ func (ws *WebSocket) getTextMessageController(scene string) (controller TextMess
 }
 
 func (ws *WebSocket) Handle(ctx context.Context, w http.ResponseWriter, r *http.Request, responseHeader http.Header) {
-	conn, err := ws.upgrader.Upgrade(w, r, ws.filterHeader(responseHeader))
-	if err != nil {
-		logit.Context(ctx).Warn("websocket upgrade fail:", err)
-		return
-	}
-
+	// 设置全局日志内容
 	ctx = context.WithValue(ctx, log.DefaultMessageKey, "WebSocket")
-	ctx = context.WithValue(ctx, log.DefaultLogIdKey, uuid.New().String())
-
 	var uuidStr string
 	var isOK bool
 	if uuidStr, isOK = ctx.Value(ConnUUIDCTXKey).(string); !isOK {
-		uuidStr = uuid.New().String()
+		uuidStr = utils.UniqueID()
+	}
+	ctx = context.WithValue(ctx, log.DefaultLogIdKey, uuidStr)
+	ctx = context.WithValue(ctx, log.DefaultWebSocketUUIDKey, uuidStr)
+	ctx = context.WithValue(ctx, log.DefaultWebSocketLogIdKey, utils.UniqueID())
+
+	begin := time.Now()
+	conn, err := ws.upgrader.Upgrade(w, r, ws.filterHeader(responseHeader))
+	elapsed := time.Since(begin)
+	if err != nil {
+		logit.Context(ctx).InfoW(
+			"Connection.Status", "Failed",
+			"Connection.CostTime", utils.ShowDurationString(elapsed),
+			"Websocket.Upgrade.Err", err,
+		)
+		logit.Context(ctx).WarnW(
+			"Connection.Status", "Failed",
+			"Connection.CostTime", utils.ShowDurationString(elapsed),
+			"Websocket.Upgrade.Err", err,
+		)
+		return
 	}
 
+	client := NewClient(conn, uuidStr)
+	client.infoLog(ctx,
+		"Connection.Status", "Success",
+		"Connection.CostTime", utils.ShowDurationString(elapsed),
+	)
+
+	// 设置连接重要参数
 	conn.SetReadLimit(maxMessageSize)
 	_ = conn.SetWriteDeadline(time.Now().Add(writeWait))
 	_ = conn.SetReadDeadline(time.Now().Add(readDeadlineDuration))
-
-	client := NewClient(conn, uuidStr)
-	// TODO 后续测试一下
 	conn.SetCloseHandler(func(code int, text string) (err error) {
 		client.debugLog(ctx,
-			"function", "client.readPump",
-			"process", "SetCloseHandler",
+			"function", "SetCloseHandler",
 			"code", code,
 			"text", text,
 		)
 		client.close(ctx)
 		return
 	})
-
 	conn.SetPingHandler(func(appData string) (err error) {
 		client.debugLog(ctx,
-			"function", "client.readPump",
-			"process", "SetPingHandler",
+			"function", "SetPingHandler",
 			"appData", appData,
 		)
 		_ = conn.SetReadDeadline(time.Now().Add(readDeadlineDuration))
 		return
 	})
-
 	conn.SetPongHandler(func(appData string) (err error) {
 		client.debugLog(ctx,
-			"function", "client.readPump",
-			"process", "SetPongHandler",
+			"function", "SetPongHandler",
 			"appData", appData,
 		)
 		_ = conn.SetReadDeadline(time.Now().Add(readDeadlineDuration))
@@ -163,7 +175,6 @@ func (ws *WebSocket) Handle(ctx context.Context, w http.ResponseWriter, r *http.
 
 	client.ws = ws
 	client.ws.clientManager.Store(uuidStr, client)
-	defer client.close(ctx)
 
 	g, gCtx := gtask.WithContext(ctx)
 

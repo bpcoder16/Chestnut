@@ -2,11 +2,10 @@ package gin
 
 import (
 	"bytes"
-	"fmt"
 	"github.com/bpcoder16/Chestnut/core/log"
+	"github.com/bpcoder16/Chestnut/core/utils"
 	"github.com/bpcoder16/Chestnut/logit"
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 	"io"
 	gLog "log"
 	"net"
@@ -22,7 +21,7 @@ func defaultLogger() gin.HandlerFunc {
 		begin := time.Now()
 
 		ctx.Set(log.DefaultMessageKey, "HTTP")
-		ctx.Set(log.DefaultLogIdKey, uuid.New().String())
+		ctx.Set(log.DefaultLogIdKey, utils.UniqueID())
 
 		reqBody := generateRequestBody(ctx)
 
@@ -37,7 +36,7 @@ func defaultLogger() gin.HandlerFunc {
 		elapsed := time.Since(begin)
 
 		logit.Context(ctx).InfoW(
-			"costTime", fmt.Sprintf("%.3fms", float64(elapsed.Nanoseconds())/1e6),
+			"costTime", utils.ShowDurationString(elapsed),
 			"clientIP", ctx.ClientIP(),
 			"method", ctx.Request.Method,
 			"uri", ctx.Request.URL.Path,

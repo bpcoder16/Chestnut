@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/bpcoder16/Chestnut/core/log"
+	cUtils "github.com/bpcoder16/Chestnut/core/utils"
 	"gorm.io/gorm/logger"
 	"gorm.io/gorm/utils"
 	"time"
@@ -78,7 +79,7 @@ func (l *Logger) Trace(ctx context.Context, begin time.Time, fc func() (sql stri
 		l.Helper.WithContext(ctx).ErrorW(
 			"caller", utils.FileWithLineNum(),
 			"error", err.Error(),
-			"costTime", fmt.Sprintf("%.3fms", float64(elapsed.Nanoseconds())/1e6),
+			"costTime", cUtils.ShowDurationString(elapsed),
 			"row", func() interface{} {
 				if rows == -1 {
 					return "-"
@@ -92,7 +93,7 @@ func (l *Logger) Trace(ctx context.Context, begin time.Time, fc func() (sql stri
 		l.Helper.WithContext(ctx).WarnW(
 			"caller", utils.FileWithLineNum(),
 			"error", fmt.Sprintf("SLOW SQL >= %v", l.SlowThreshold),
-			"costTime", fmt.Sprintf("%.3fms", float64(elapsed.Nanoseconds())/1e6),
+			"costTime", cUtils.ShowDurationString(elapsed),
 			"row", func() interface{} {
 				if rows == -1 {
 					return "-"
@@ -105,7 +106,7 @@ func (l *Logger) Trace(ctx context.Context, begin time.Time, fc func() (sql stri
 		sql, rows := fc()
 		l.Helper.WithContext(ctx).DebugW(
 			"caller", utils.FileWithLineNum(),
-			"costTime", fmt.Sprintf("%.3fms", float64(elapsed.Nanoseconds())/1e6),
+			"costTime", cUtils.ShowDurationString(elapsed),
 			"row", func() interface{} {
 				if rows == -1 {
 					return "-"

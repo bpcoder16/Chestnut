@@ -8,10 +8,12 @@ import (
 
 const (
 	DefaultMessageKey          = "type"
-	DefaultDownstreamKey       = "downstream"
 	DefaultLogIdKey            = "logId"
 	DefaultCallerKey           = "caller"
+	DefaultDownstreamKey       = "downstream"
 	DefaultConcurrencyLogIdKey = "concurrencyLogId"
+	DefaultWebSocketUUIDKey    = "websocketUUID"
+	DefaultWebSocketLogIdKey   = "websocketLogId"
 )
 
 type HelperOption func(*Helper)

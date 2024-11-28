@@ -2,8 +2,8 @@ package goredis
 
 import (
 	"context"
-	"fmt"
 	"github.com/bpcoder16/Chestnut/core/log"
+	"github.com/bpcoder16/Chestnut/core/utils"
 	"github.com/redis/go-redis/v9"
 	"net"
 	"time"
@@ -38,7 +38,7 @@ func (l *LoggerHook) ProcessHook(next redis.ProcessHook) redis.ProcessHook {
 		elapsed := time.Since(begin)
 		l.Helper.WithContext(ctx).DebugW(
 			"cmd", cmd.String(),
-			"costTime", fmt.Sprintf("%.3fms", float64(elapsed.Nanoseconds())/1e6),
+			"costTime", utils.ShowDurationString(elapsed),
 		)
 		return
 	}

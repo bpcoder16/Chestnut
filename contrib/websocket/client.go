@@ -5,7 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
+	"github.com/bpcoder16/Chestnut/core/utils"
 	"github.com/bpcoder16/Chestnut/logit"
 	"github.com/gorilla/websocket"
 	"sync"
@@ -52,6 +52,10 @@ func (c *Client) close(ctx context.Context) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if false == c.isClosed {
+		c.debugLog(ctx,
+			"function", "Client.close",
+			"process", "c.conn.Close()/close(c.textMsgCh)",
+		)
 		_ = c.conn.Close()
 		c.isClosed = true
 		close(c.textMsgCh)
@@ -59,6 +63,11 @@ func (c *Client) close(ctx context.Context) {
 			c.ws.clientCloseFunc(ctx, c.uuidStr)
 		}
 	}
+	c.debugLog(ctx,
+		"function", "Client.close",
+		"c.isClosed", c.isClosed,
+		"c.ws.clientManager", "Delete("+c.uuidStr+")",
+	)
 	c.ws.clientManager.Delete(c.uuidStr)
 }
 
@@ -273,7 +282,7 @@ func (c *Client) readPump(ctx context.Context) {
 			"function", "client.readPump",
 			"messageType", c.getMessageTypeString(mt),
 			"readMessage.Err", errR,
-			"costTime", fmt.Sprintf("%.3fms", float64(elapsed.Nanoseconds())/1e6),
+			"costTime", utils.ShowDurationString(elapsed),
 		)
 
 		if errR != nil {

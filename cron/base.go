@@ -3,10 +3,10 @@ package cron
 import (
 	"context"
 	"github.com/bpcoder16/Chestnut/core/log"
+	"github.com/bpcoder16/Chestnut/core/utils"
 	"github.com/bpcoder16/Chestnut/logit"
 	"github.com/bpcoder16/Chestnut/modules/concurrency"
 	"github.com/bpcoder16/Chestnut/modules/lock/nonblock"
-	"github.com/google/uuid"
 	"strconv"
 	"time"
 )
@@ -32,7 +32,7 @@ func (b *Base) Before(name, lockName string, deadLockExpireTime time.Duration, m
 			"Cron",
 		),
 		log.DefaultLogIdKey,
-		uuid.New().String(),
+		utils.UniqueID(),
 	)
 	b.name = name
 	b.lockName = lockName

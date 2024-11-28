@@ -5,7 +5,6 @@ import (
 	"github.com/bpcoder16/Chestnut/core/gtask"
 	"github.com/bpcoder16/Chestnut/core/log"
 	"github.com/bpcoder16/Chestnut/core/utils"
-	"github.com/google/uuid"
 )
 
 var (
@@ -32,7 +31,7 @@ func Manager(ctx context.Context, taskMap map[string]func(ctx context.Context) C
 		task := f
 		uniqueNameNew := uniqueName
 		g.Go(func() error {
-			ctxG := context.WithValue(ctx, log.DefaultConcurrencyLogIdKey, uuid.New().String())
+			ctxG := context.WithValue(ctx, log.DefaultConcurrencyLogIdKey, utils.UniqueID())
 			defer utils.TimeCostLog(ctxG, "concurrency.Manager."+logField+"."+uniqueNameNew)()
 			defer func() {
 				if r := recover(); r != nil {

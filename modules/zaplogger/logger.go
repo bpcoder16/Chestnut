@@ -19,24 +19,25 @@ import (
 
 func GetZapLogger(debugWriter, infoWriter, warnErrorFatalWriter io.Writer, caller log.Valuer, opts ...log.FilterOption) log.Logger {
 	kv := make([]interface{}, 0, 8)
-	kv = append(kv, log.DefaultLogIdKey,
-		func() log.Valuer {
-			return func(ctx context.Context) interface{} {
-				logId := ctx.Value(log.DefaultLogIdKey)
-				if logId == nil {
-					return "NotSetLogId"
-				}
-				return logId
-			}
-		}(),
+	kv = append(kv,
 		log.DefaultMessageKey,
 		func() log.Valuer {
 			return func(ctx context.Context) interface{} {
 				msg := ctx.Value(log.DefaultMessageKey)
 				if msg == nil {
-					return "Default"
+					return "None"
 				}
 				return msg
+			}
+		}(),
+		log.DefaultLogIdKey,
+		func() log.Valuer {
+			return func(ctx context.Context) interface{} {
+				logId := ctx.Value(log.DefaultLogIdKey)
+				if logId == nil {
+					return "None"
+				}
+				return logId
 			}
 		}(),
 		log.DefaultDownstreamKey,
@@ -53,6 +54,26 @@ func GetZapLogger(debugWriter, infoWriter, warnErrorFatalWriter io.Writer, calle
 		func() log.Valuer {
 			return func(ctx context.Context) interface{} {
 				msg := ctx.Value(log.DefaultConcurrencyLogIdKey)
+				if msg == nil {
+					return "None"
+				}
+				return msg
+			}
+		}(),
+		log.DefaultWebSocketUUIDKey,
+		func() log.Valuer {
+			return func(ctx context.Context) interface{} {
+				msg := ctx.Value(log.DefaultWebSocketUUIDKey)
+				if msg == nil {
+					return "None"
+				}
+				return msg
+			}
+		}(),
+		log.DefaultWebSocketLogIdKey,
+		func() log.Valuer {
+			return func(ctx context.Context) interface{} {
+				msg := ctx.Value(log.DefaultWebSocketLogIdKey)
 				if msg == nil {
 					return "None"
 				}

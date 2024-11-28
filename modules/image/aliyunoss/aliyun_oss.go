@@ -5,10 +5,10 @@ import (
 	"context"
 	"errors"
 	"github.com/bpcoder16/Chestnut/contrib/aliyun/oss"
+	"github.com/bpcoder16/Chestnut/core/utils"
 	"github.com/bpcoder16/Chestnut/logit"
 	"github.com/bpcoder16/Chestnut/resty"
 	goResty "github.com/go-resty/resty/v2"
-	"github.com/google/uuid"
 	"mime/multipart"
 	"path/filepath"
 )
@@ -47,7 +47,7 @@ func ImageTransfer(ctx context.Context, originURL, targetOSSPath string) (err er
 func BuildTargetOSSPath(targetDir, originURL string) string {
 	// 获取文件的扩展名
 	ext := filepath.Ext(originURL)
-	return filepath.Join(targetDir, uuid.New().String()+ext)
+	return filepath.Join(targetDir, utils.UniqueID()+ext)
 }
 
 func SimpleUpload(fileHeader *multipart.FileHeader, targetDir string) (ossPath string, err error) {

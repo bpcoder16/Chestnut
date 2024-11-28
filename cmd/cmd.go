@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"github.com/bpcoder16/Chestnut/appconfig/env"
 	"github.com/bpcoder16/Chestnut/core/log"
-	"github.com/google/uuid"
+	"github.com/bpcoder16/Chestnut/core/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -19,7 +19,7 @@ func InitRootCmd(ctx context.Context) {
 		Long:  env.AppName() + " 的命令应用列表",
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
 			ctx = context.WithValue(ctx, log.DefaultMessageKey, "Command")
-			ctx = context.WithValue(ctx, log.DefaultLogIdKey, uuid.New().String())
+			ctx = context.WithValue(ctx, log.DefaultLogIdKey, utils.UniqueID())
 			cmd.SetContext(ctx)
 		},
 	}

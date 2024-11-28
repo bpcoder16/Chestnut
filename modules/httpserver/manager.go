@@ -43,7 +43,7 @@ func (m *Manager) Run() {
 		//BaseContext: func(listener net.Listener) context.Context {
 		//	ctx := context.Background()
 		//	ctx = context.WithValue(ctx, log.DefaultMessageKey, "HTTP")
-		//	ctx = context.WithValue(ctx, log.DefaultLogIdKey, uuid.New().String())
+		//	ctx = context.WithValue(ctx, log.DefaultLogIdKey, utils.UniqueID())
 		//	return ctx
 		//},
 	}).ListenAndServe())
