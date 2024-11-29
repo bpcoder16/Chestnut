@@ -224,7 +224,7 @@ func (c *Client) readPump(ctx context.Context) {
 		mt, message, errR := c.conn.ReadMessage()
 		rCtx := context.WithValue(ctx, log.DefaultWebSocketLogIdKey, utils.UniqueID())
 		if errR != nil {
-			if !websocket.IsUnexpectedCloseError(errR, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
+			if websocket.IsUnexpectedCloseError(errR, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
 				err = errors.New("c.conn.ReadMessage().Err:" + errR.Error())
 			}
 			return
@@ -300,7 +300,7 @@ func (c *Client) writePump(ctx context.Context) {
 		select {
 		case message, ok := <-c.textMsgCh:
 			if !ok {
-				err = errors.New("<-c.textMsgCh.NotOK")
+				//err = errors.New("<-c.textMsgCh.NotOK")
 				return
 			}
 
