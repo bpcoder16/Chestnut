@@ -1,12 +1,12 @@
 package websocket
 
+import "context"
+
 type TextMessageController interface {
 	Init(base TextMessageController)
-	ParsePayload(c *Client, message ReceiveMessage) error
-	Process() error
+	ParsePayload(ctx context.Context, c *Client, message ReceiveMessage) error
+	Process(ctx context.Context) error
 }
-
-var _ TextMessageController = (*BaseTextMessageController)(nil)
 
 //	{
 //		"scene": "test",
@@ -36,7 +36,7 @@ type BaseTextMessageController struct {
 
 func (b *BaseTextMessageController) Init(_ TextMessageController) {}
 
-func (b *BaseTextMessageController) ParsePayload(client *Client, message ReceiveMessage) (err error) {
+func (b *BaseTextMessageController) ParsePayload(_ context.Context, client *Client, message ReceiveMessage) (err error) {
 	b.Client = client
 	if len(message.Scene) > 0 {
 		b.Client.State.Scene = message.Scene
@@ -49,9 +49,5 @@ func (b *BaseTextMessageController) ParsePayload(client *Client, message Receive
 	}
 	b.Action = message.Action
 	b.ActionParams = message.ActionParams
-	return
-}
-
-func (b *BaseTextMessageController) Process() (err error) {
 	return
 }

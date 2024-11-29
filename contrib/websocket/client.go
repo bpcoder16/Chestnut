@@ -49,7 +49,7 @@ func NewClient(conn *websocket.Conn, uuidStr string) *Client {
 	}
 }
 
-func (c *Client) close(ctx context.Context) {
+func (c *Client) close(ctx context.Context, sourceText string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	isClosedForLog := c.isClosed
@@ -64,6 +64,7 @@ func (c *Client) close(ctx context.Context) {
 	}
 	c.ws.clientManager.Delete(c.uuidStr)
 	c.debugLog(ctx,
+		"sourceText", sourceText,
 		"function", "Client.close",
 		"client.isClosed", isClosedForLog,
 		"client.ws.clientManager", "Delete("+c.uuidStr+")",
@@ -119,42 +120,35 @@ func (c *Client) getMessageTypeString(messageType int) string {
 	}[messageType]
 }
 
-func (c *Client) readMessage(ctx context.Context) (messageType int, message []byte, err error) {
-	messageType, message, err = c.conn.ReadMessage()
-	if err != nil {
-		c.close(ctx)
-	}
-	return
-}
-
 func (c *Client) WriteTextMessage(ctx context.Context, message []byte) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			err = errors.New("c.textMsgCh is closed")
+			err = errors.New("c.textMsgCh.Is.Closed")
+			c.close(ctx, "WriteTextMessage.Panic")
+		}
+		if err != nil {
 			c.errorLog(ctx,
 				"function", "WriteTextMessage",
-				"messageType", c.getMessageTypeString(websocket.TextMessage),
 				"message", string(message),
 				"err", err,
 			)
-			c.close(ctx)
 		}
 	}()
+	c.debugLog(ctx,
+		"client.isClosed", c.isClosed,
+		"function", "WriteTextMessage",
+		"message", string(message),
+	)
 	if !c.isClosed {
 		c.textMsgCh <- message
-		c.debugLog(ctx,
-			"function", "WriteTextMessage",
-			"messageType", c.getMessageTypeString(websocket.TextMessage),
-			"message", string(message),
-		)
 	} else {
-		err = errors.New("c.textMsgCh is closed")
+		err = errors.New("c.textMsgCh.Is.Closed")
 	}
 
 	return
 }
 
-func (c *Client) receiveTextMessage(_ context.Context, messageBytes []byte) (err error) {
+func (c *Client) receiveTextMessage(ctx context.Context, messageBytes []byte) (err error) {
 	if len(messageBytes) == 0 {
 		err = errors.New("messageBytes.Len(0)")
 		return
@@ -181,12 +175,12 @@ func (c *Client) receiveTextMessage(_ context.Context, messageBytes []byte) (err
 	if err != nil {
 		return
 	}
-	err = controller.ParsePayload(c, receiveMessage)
+	err = controller.ParsePayload(ctx, c, receiveMessage)
 	if err != nil {
 		return
 	}
 
-	err = controller.Process()
+	err = controller.Process(ctx)
 	return
 }
 
@@ -214,14 +208,14 @@ func (c *Client) readPump(ctx context.Context) {
 				"recover", r,
 			)
 		}
-		c.close(ctx)
+		c.close(ctx, "ReadPump.Defer")
 	}()
 
 	for {
 		mt, message, errR := c.conn.ReadMessage()
 		rCtx := context.WithValue(ctx, log.DefaultWebSocketLogIdKey, utils.UniqueID())
 		if errR != nil {
-			if websocket.IsUnexpectedCloseError(errR, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
+			if !websocket.IsUnexpectedCloseError(errR, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
 				c.warnLog(rCtx,
 					"function", "client.readPump",
 					"process", "c.readMessage",
@@ -230,7 +224,7 @@ func (c *Client) readPump(ctx context.Context) {
 			}
 			break
 		}
-		message = bytes.TrimSpace(bytes.Replace(message, newline, space, -1))
+		message = bytes.TrimSpace(message)
 
 		begin := time.Now()
 		switch mt {
@@ -269,65 +263,65 @@ func (c *Client) readPump(ctx context.Context) {
 
 func (c *Client) sendPingMessage(ctx context.Context) error {
 	c.debugLog(ctx,
-		"SendMessage", "Ping",
+		"SendMessageType", "Ping",
 	)
 	return c.conn.WriteControl(websocket.PingMessage, []byte{}, time.Now().Add(writeWait))
 }
 
 func (c *Client) sendCloseMessage(ctx context.Context) error {
 	c.debugLog(ctx,
-		"SendMessage", "Close",
+		"SendMessageType", "Close",
 	)
 	return c.conn.WriteControl(websocket.CloseMessage, []byte{}, time.Now().Add(writeWait))
 }
 
 func (c *Client) writePump(ctx context.Context) {
-	defer func() {
-		if r := recover(); r != nil {
-			c.errorLog(ctx,
-				"function", "client.writePump",
-				"recover", r,
-			)
-		}
-		c.close(ctx)
-	}()
+	//defer func() {
+	//	if r := recover(); r != nil {
+	//		c.errorLog(ctx,
+	//			"function", "client.writePump",
+	//			"recover", r,
+	//		)
+	//	}
+	//	c.close(ctx, "WritePump.Defer")
+	//}()
 
 	// 维持心跳
-	ticker := time.NewTicker(pingPeriod)
-	for {
-		select {
-		case message, ok := <-c.textMsgCh:
-			if !ok {
-				return
-			}
-
-			c.mu.Lock()
-			w, err := c.conn.NextWriter(websocket.TextMessage)
-			if err != nil {
-				return
-			}
-			_, _ = w.Write(message)
-
-			n := len(c.textMsgCh)
-			for i := 0; i < n; i++ {
-				_, _ = w.Write(newline)
-				_, _ = w.Write(<-c.textMsgCh)
-			}
-			if errW := w.Close(); errW != nil {
-				c.mu.Unlock()
-				return
-			}
-			c.mu.Unlock()
-		case <-ticker.C:
-			if err := c.sendPingMessage(ctx); err != nil {
-				return
-			}
-			// 鉴权与心跳一个频次校验
-			if c.ws.authorizationFunc != nil {
-				if isOK := c.ws.authorizationFunc(ctx); !isOK {
-					return
-				}
-			}
-		}
-	}
+	//ticker := time.NewTicker(pingPeriod)
+	//for {
+	//	select {
+	//	case message, ok := <-c.textMsgCh:
+	//		if !ok {
+	//			return
+	//		}
+	//
+	//		c.mu.Lock()
+	//		w, err := c.conn.NextWriter(websocket.TextMessage)
+	//		if err != nil {
+	//			return
+	//		}
+	//		_, _ = w.Write(message)
+	//
+	//		n := len(c.textMsgCh)
+	//		for i := 0; i < n; i++ {
+	//			_, _ = w.Write(newline)
+	//			_, _ = w.Write(<-c.textMsgCh)
+	//		}
+	//		if errW := w.Close(); errW != nil {
+	//			c.mu.Unlock()
+	//			return
+	//		}
+	//		c.mu.Unlock()
+	//	case <-ticker.C:
+	//		if err := c.sendPingMessage(ctx); err != nil {
+	//			return
+	//		}
+	//		// 鉴权与心跳一个频次校验
+	//		if c.ws.authorizationFunc != nil {
+	//			if isOK := c.ws.authorizationFunc(ctx); !isOK {
+	//				return
+	//			}
+	//		}
+	//	}
+	//}
 }

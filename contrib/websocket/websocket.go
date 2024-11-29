@@ -140,7 +140,7 @@ func (ws *WebSocket) Handle(ctx context.Context, w http.ResponseWriter, r *http.
 	client := NewClient(conn, uuidStr)
 	client.ws = ws
 	client.ws.clientManager.Store(uuidStr, client)
-	defer client.close(ctx)
+	defer client.close(ctx, "Handle.Defer")
 
 	client.infoLog(ctx,
 		"Connection.Status", "Success",
@@ -152,26 +152,26 @@ func (ws *WebSocket) Handle(ctx context.Context, w http.ResponseWriter, r *http.
 	_ = conn.SetWriteDeadline(time.Now().Add(writeWait))
 	_ = conn.SetReadDeadline(time.Now().Add(readDeadlineDuration))
 	conn.SetCloseHandler(func(code int, text string) (err error) {
-		client.close(ctx)
+		client.close(ctx, "SetCloseHandler")
 		client.debugLog(ctx,
-			"function", "SetCloseHandler",
 			"code", code,
 			"text", text,
+			"ReceiveMessageType", "Close",
 		)
 		return
 	})
 	conn.SetPingHandler(func(appData string) (err error) {
 		client.debugLog(ctx,
-			"function", "SetPingHandler",
 			"appData", appData,
+			"ReceiveMessageType", "Ping",
 		)
 		_ = conn.SetReadDeadline(time.Now().Add(readDeadlineDuration))
 		return
 	})
 	conn.SetPongHandler(func(appData string) (err error) {
 		client.debugLog(ctx,
-			"function", "SetPongHandler",
 			"appData", appData,
+			"ReceiveMessageType", "Pong",
 		)
 		_ = conn.SetReadDeadline(time.Now().Add(readDeadlineDuration))
 		return
