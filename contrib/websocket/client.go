@@ -31,9 +31,9 @@ type Client struct {
 }
 
 type State struct {
-	SID         string
-	Scene       string
-	SceneParams map[string]interface{}
+	SID         string                 `json:"sid,omitempty"`
+	Scene       string                 `json:"scene,omitempty"` // 场景信息
+	SceneParams map[string]interface{} `json:"-"`
 }
 
 func NewClient(conn *websocket.Conn, uuidStr string) *Client {

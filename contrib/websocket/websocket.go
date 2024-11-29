@@ -83,6 +83,10 @@ func New(configPath string) *WebSocket {
 	return ws
 }
 
+func (ws *WebSocket) GetClientManager() *ClientManager {
+	return ws.clientManager
+}
+
 func (ws *WebSocket) SetAuthorizationFunc(f func(context.Context) bool) {
 	ws.authorizationFunc = f
 }

@@ -40,6 +40,10 @@ func (r *Router) OnTextMessageController(scene string, controller websocket.Text
 	r.wsManager.OnTextMessageController(scene, controller)
 }
 
+func (r *Router) GetClientManager() *websocket.ClientManager {
+	return r.wsManager.GetClientManager()
+}
+
 func (r *Router) RegisterHandler(engine *gin.Engine) {
 	r.wsRouter.GET(r.path, func(ctx *gin.Context) {
 		r.wsManager.Handle(ctx, ctx.Writer, ctx.Request, ctx.Request.Header)
