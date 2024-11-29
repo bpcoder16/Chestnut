@@ -31,8 +31,8 @@ type Client struct {
 }
 
 type State struct {
-	Scene       string
 	SID         string
+	Scene       string
 	SceneParams map[string]interface{}
 }
 

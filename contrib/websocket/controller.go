@@ -9,6 +9,7 @@ type TextMessageController interface {
 }
 
 //	{
+//		"sid": "xxxxxxxxxxxxxx",
 //		"scene": "test",
 //		"sceneParams": {
 //			"key1": 1234,
@@ -21,8 +22,8 @@ type TextMessageController interface {
 //		}
 //	}
 type ReceiveMessage struct {
-	Scene        string                 `json:"scene"`
 	SID          string                 `json:"sid"`
+	Scene        string                 `json:"scene"`
 	SceneParams  map[string]interface{} `json:"sceneParams"`
 	Action       string                 `json:"action"`
 	ActionParams map[string]interface{} `json:"actionParams"`
