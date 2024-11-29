@@ -134,13 +134,14 @@ func (c *Client) WriteTextMessage(ctx context.Context, message []byte) (err erro
 			)
 		}
 	}()
-	c.debugLog(ctx,
-		"client.isClosed", c.isClosed,
-		"function", "WriteTextMessage",
-		"message", string(message),
-	)
 	if !c.isClosed {
 		c.textMsgCh <- message
+		c.infoLog(ctx,
+			"client.isClosed", c.isClosed,
+			"function", "WriteTextMessage",
+			"sendMessageType", c.getMessageTypeString(websocket.TextMessage),
+			"sendMessage", string(message),
+		)
 	} else {
 		err = errors.New("c.textMsgCh.Is.Closed")
 	}
@@ -201,6 +202,7 @@ func (c *Client) receivePongMessage(_ context.Context, _ []byte) (err error) {
 }
 
 func (c *Client) readPump(ctx context.Context) {
+	var err error
 	defer func() {
 		if r := recover(); r != nil {
 			c.errorLog(ctx,
@@ -209,20 +211,23 @@ func (c *Client) readPump(ctx context.Context) {
 			)
 		}
 		c.close(ctx, "ReadPump.Defer")
+		if err != nil {
+			c.warnLog(ctx,
+				"function", "client.readPump",
+				"err", err,
+			)
+		}
 	}()
 
+	_ = c.conn.SetReadDeadline(time.Now().Add(readDeadlineDuration))
 	for {
 		mt, message, errR := c.conn.ReadMessage()
 		rCtx := context.WithValue(ctx, log.DefaultWebSocketLogIdKey, utils.UniqueID())
 		if errR != nil {
 			if !websocket.IsUnexpectedCloseError(errR, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
-				c.warnLog(rCtx,
-					"function", "client.readPump",
-					"process", "c.readMessage",
-					"err", errR.Error(),
-				)
+				err = errors.New("c.conn.ReadMessage().Err:" + errR.Error())
 			}
-			break
+			return
 		}
 		message = bytes.TrimSpace(message)
 
@@ -244,19 +249,15 @@ func (c *Client) readPump(ctx context.Context) {
 		c.infoLog(rCtx,
 			"function", "client.readPump",
 			"process", "readMessage.receiveMessage",
-			"readMessage.Err", errR,
-			"messageType", c.getMessageTypeString(mt),
-			"message", string(message),
+			"err", errR,
+			"ReceiveMessageType", c.getMessageTypeString(mt),
+			"ReceiveMessage", string(message),
 			"costTime", utils.ShowDurationString(elapsed),
 		)
 
 		if errR != nil {
-			c.warnLog(rCtx,
-				"function", "client.readPump",
-				"process", "readMessage.receiveMessage",
-				"readMessage.Err", errR,
-			)
-			break
+			err = errors.New("ReadMessage.ReceiveMessage.Err:" + errR.Error())
+			return
 		}
 	}
 }
@@ -276,52 +277,65 @@ func (c *Client) sendCloseMessage(ctx context.Context) error {
 }
 
 func (c *Client) writePump(ctx context.Context) {
-	//defer func() {
-	//	if r := recover(); r != nil {
-	//		c.errorLog(ctx,
-	//			"function", "client.writePump",
-	//			"recover", r,
-	//		)
-	//	}
-	//	c.close(ctx, "WritePump.Defer")
-	//}()
+	var err error
+	defer func() {
+		if r := recover(); r != nil {
+			c.errorLog(ctx,
+				"function", "client.writePump",
+				"recover", r,
+			)
+		}
+		c.close(ctx, "WritePump.Defer")
+		if err != nil {
+			c.warnLog(ctx,
+				"function", "client.writePump",
+				"err", err,
+			)
+		}
+	}()
 
 	// 维持心跳
-	//ticker := time.NewTicker(pingPeriod)
-	//for {
-	//	select {
-	//	case message, ok := <-c.textMsgCh:
-	//		if !ok {
-	//			return
-	//		}
-	//
-	//		c.mu.Lock()
-	//		w, err := c.conn.NextWriter(websocket.TextMessage)
-	//		if err != nil {
-	//			return
-	//		}
-	//		_, _ = w.Write(message)
-	//
-	//		n := len(c.textMsgCh)
-	//		for i := 0; i < n; i++ {
-	//			_, _ = w.Write(newline)
-	//			_, _ = w.Write(<-c.textMsgCh)
-	//		}
-	//		if errW := w.Close(); errW != nil {
-	//			c.mu.Unlock()
-	//			return
-	//		}
-	//		c.mu.Unlock()
-	//	case <-ticker.C:
-	//		if err := c.sendPingMessage(ctx); err != nil {
-	//			return
-	//		}
-	//		// 鉴权与心跳一个频次校验
-	//		if c.ws.authorizationFunc != nil {
-	//			if isOK := c.ws.authorizationFunc(ctx); !isOK {
-	//				return
-	//			}
-	//		}
-	//	}
-	//}
+	ticker := time.NewTicker(pingPeriod)
+	for {
+		select {
+		case message, ok := <-c.textMsgCh:
+			if !ok {
+				err = errors.New("<-c.textMsgCh.NotOK")
+				return
+			}
+
+			c.mu.Lock()
+			_ = c.conn.SetWriteDeadline(time.Now().Add(writeWait))
+			w, errW := c.conn.NextWriter(websocket.TextMessage)
+			if errW != nil {
+				err = errors.New("c.conn.NextWriter.Err:" + errW.Error())
+				return
+			}
+			_, _ = w.Write(message)
+
+			n := len(c.textMsgCh)
+			for i := 0; i < n; i++ {
+				_, _ = w.Write(newline)
+				_, _ = w.Write(<-c.textMsgCh)
+			}
+			if errC := w.Close(); errC != nil {
+				err = errors.New("w.Close().Err:" + errC.Error())
+				c.mu.Unlock()
+				return
+			}
+			c.mu.Unlock()
+		case <-ticker.C:
+			if errS := c.sendPingMessage(ctx); errS != nil {
+				err = errors.New("c.sendPingMessage.Err:" + errS.Error())
+				return
+			}
+			// 鉴权与心跳一个频次校验
+			if c.ws.authorizationFunc != nil {
+				if isOK := c.ws.authorizationFunc(ctx); !isOK {
+					err = errors.New("c.ws.authorizationFunc.NotOK")
+					return
+				}
+			}
+		}
+	}
 }

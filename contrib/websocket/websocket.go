@@ -149,8 +149,6 @@ func (ws *WebSocket) Handle(ctx context.Context, w http.ResponseWriter, r *http.
 
 	// 设置连接重要参数
 	conn.SetReadLimit(maxMessageSize)
-	_ = conn.SetWriteDeadline(time.Now().Add(writeWait))
-	_ = conn.SetReadDeadline(time.Now().Add(readDeadlineDuration))
 	conn.SetCloseHandler(func(code int, text string) (err error) {
 		client.close(ctx, "SetCloseHandler")
 		client.debugLog(ctx,
@@ -183,7 +181,6 @@ func (ws *WebSocket) Handle(ctx context.Context, w http.ResponseWriter, r *http.
 		client.readPump(gCtx)
 		return nil
 	})
-
 	g.Go(func() error {
 		client.writePump(gCtx)
 		return nil
