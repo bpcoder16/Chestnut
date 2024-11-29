@@ -2,6 +2,7 @@ package websocket
 
 import (
 	"context"
+	"github.com/bpcoder16/Chestnut/core/log"
 	"github.com/bpcoder16/Chestnut/core/utils"
 	"github.com/redis/go-redis/v9"
 )
@@ -16,7 +17,8 @@ func NewRedisPubSub(channels ...string) *RedisPubSub {
 	}
 }
 
-func (r *RedisPubSub) Subscribe(ctx context.Context, redisClient *redis.Client, f func(*redis.Message)) error {
+func (r *RedisPubSub) Subscribe(ctx context.Context, redisClient *redis.Client, f func(context.Context, *redis.Message)) error {
+	ctx = context.WithValue(ctx, log.DefaultMessageKey, "RedisPubSub.Subscribe")
 	pubSub := redisClient.Subscribe(ctx, r.channels...)
 	defer func() {
 		_ = pubSub.Close()
@@ -26,7 +28,8 @@ func (r *RedisPubSub) Subscribe(ctx context.Context, redisClient *redis.Client, 
 		if errR != nil {
 			return errR
 		}
-		f(msg)
+		ctx = context.WithValue(ctx, log.DefaultLogIdKey, utils.UniqueID())
+		f(ctx, msg)
 	}
 }
 

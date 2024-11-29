@@ -136,7 +136,8 @@ func (c *Client) WriteTextMessage(ctx context.Context, message []byte) (err erro
 	}()
 	if !c.isClosed {
 		c.textMsgCh <- message
-		c.infoLog(ctx,
+		c.infoLog(
+			context.WithValue(ctx, log.DefaultWebSocketUUIDKey, c.uuidStr),
 			"client.isClosed", c.isClosed,
 			"function", "WriteTextMessage",
 			"sendMessageType", c.getMessageTypeString(websocket.TextMessage),
