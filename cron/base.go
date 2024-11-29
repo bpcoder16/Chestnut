@@ -7,12 +7,14 @@ import (
 	"github.com/bpcoder16/Chestnut/logit"
 	"github.com/bpcoder16/Chestnut/modules/concurrency"
 	"github.com/bpcoder16/Chestnut/modules/lock/nonblock"
+	"github.com/redis/go-redis/v9"
 	"strconv"
 	"time"
 )
 
 type Base struct {
-	Ctx context.Context
+	Ctx         context.Context
+	RedisClient *redis.Client
 
 	lockName           string
 	isRun              bool
@@ -61,7 +63,7 @@ func (b *Base) Run() {
 }
 
 func (b *Base) Defer() {
-	defer nonblock.RedisUnlock(b.Ctx, b.lockName)
+	defer nonblock.RedisUnlock(b.Ctx, b.RedisClient, b.lockName)
 	if r := recover(); r != nil {
 		logit.Context(b.Ctx).ErrorW(b.name+".Err", r)
 	} else {
@@ -74,7 +76,7 @@ func (b *Base) Defer() {
 }
 
 func (b *Base) GetIsRun() bool {
-	b.isRun = nonblock.RedisLock(b.Ctx, b.lockName, b.deadLockExpireTime)
+	b.isRun = nonblock.RedisLock(b.Ctx, b.RedisClient, b.lockName, b.deadLockExpireTime)
 	return b.isRun
 }
 
