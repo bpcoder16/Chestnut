@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/bpcoder16/Chestnut/appconfig/env"
 	"github.com/bpcoder16/Chestnut/core/log"
+	"github.com/bpcoder16/Chestnut/core/utils"
 	"github.com/go-co-op/gocron/v2"
 	"reflect"
 	"time"
@@ -34,7 +35,8 @@ func getCron(cronConfig ConfigItem) (cron Interface, err error) {
 	return
 }
 
-func Run(ctx context.Context) {
+func Run(ctx context.Context, configPath string) {
+	config := loadConfig(configPath)
 	if !config.IsRunCron {
 		return
 	}
@@ -67,17 +69,18 @@ func Run(ctx context.Context) {
 			}
 			_, _ = s.NewJob(
 				job,
-				gocron.NewTask(func(ctx context.Context, task Interface, configItem ConfigItem, lockPreName string) {
+				gocron.NewTask(func(taskCtx context.Context, task Interface, configItem ConfigItem, lockPreName string) {
+					taskCtx = context.WithValue(taskCtx, log.DefaultLogIdKey, utils.UniqueID())
 					task.Before(
 						configItem.Name,
 						env.AppName()+":"+lockPreName+":"+configItem.Name,
 						time.Duration(configItem.DeadLockExpireMillisecond)*time.Millisecond,
 						configItem.MaxConcurrencyCnt,
 					)
-					defer task.Defer()
-					if task.GetIsRun() {
-						task.Process()
-						task.Run()
+					defer task.Defer(taskCtx)
+					if task.GetIsRun(taskCtx) {
+						task.Process(taskCtx)
+						task.Run(taskCtx)
 					}
 				}, ctx, cronController, cronConfigNew, config.LockPreName),
 			)
