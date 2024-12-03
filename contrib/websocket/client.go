@@ -9,6 +9,7 @@ import (
 	"github.com/bpcoder16/Chestnut/core/utils"
 	"github.com/bpcoder16/Chestnut/logit"
 	"github.com/gorilla/websocket"
+	"net/http"
 	"sync"
 	"time"
 )
@@ -202,7 +203,7 @@ func (c *Client) receivePongMessage(_ context.Context, _ []byte) (err error) {
 	return
 }
 
-func (c *Client) readPump(ctx context.Context) {
+func (c *Client) readPump(ctx context.Context, _ *http.Request, _ http.ResponseWriter) {
 	var err error
 	defer func() {
 		if r := recover(); r != nil {
@@ -277,7 +278,7 @@ func (c *Client) sendCloseMessage(ctx context.Context) error {
 	return c.conn.WriteControl(websocket.CloseMessage, []byte{}, time.Now().Add(writeWait))
 }
 
-func (c *Client) writePump(ctx context.Context) {
+func (c *Client) writePump(ctx context.Context, r *http.Request, w http.ResponseWriter) {
 	var err error
 	defer func() {
 		if r := recover(); r != nil {
@@ -332,7 +333,7 @@ func (c *Client) writePump(ctx context.Context) {
 			}
 			// 鉴权与心跳一个频次校验
 			if c.ws.authorizationFunc != nil {
-				if isOK := c.ws.authorizationFunc(ctx); !isOK {
+				if _, isOK := c.ws.authorizationFunc(ctx, r, w); !isOK {
 					err = errors.New("c.ws.authorizationFunc.NotOK")
 					return
 				}

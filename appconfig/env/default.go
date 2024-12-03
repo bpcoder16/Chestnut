@@ -30,3 +30,7 @@ func LocalIPV4() string {
 func TimeLocation() *time.Location {
 	return Default.TimeLocation()
 }
+
+func ConfigDirPath() string {
+	return Default.ConfigDirPath()
+}

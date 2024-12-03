@@ -20,15 +20,11 @@ type Router struct {
 	path      string
 }
 
-func (r *Router) SetAuthorizationFunc(f func(context.Context) bool) {
-	r.wsRouter.Use(func(ctx *gin.Context) {
-		if !f(ctx) {
-			ctx.String(http.StatusForbidden, "")
-			ctx.Abort()
-			return
-		}
-		ctx.Next()
-	})
+func (r *Router) SetBeforeFunc(f func(ctx context.Context, r *http.Request, w http.ResponseWriter) (returnCtx context.Context, isAuthorized bool)) {
+	r.wsManager.SetBeforeFunc(f)
+}
+
+func (r *Router) SetAuthorizationFunc(f func(ctx context.Context, r *http.Request, w http.ResponseWriter) (returnCtx context.Context, isAuthorized bool)) {
 	r.wsManager.SetAuthorizationFunc(f)
 }
 
@@ -46,7 +42,7 @@ func (r *Router) GetClientManager() *websocket.ClientManager {
 
 func (r *Router) RegisterHandler(engine *gin.Engine) {
 	r.wsRouter.GET(r.path, func(ctx *gin.Context) {
-		r.wsManager.Handle(ctx, ctx.Writer, ctx.Request, ctx.Request.Header)
+		r.wsManager.Handle(ctx, ctx.Request, ctx.Writer)
 	})
 	r.wsRouter.RegisterHandler(engine)
 }

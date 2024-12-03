@@ -9,8 +9,6 @@ import (
 )
 
 type AppConfig struct {
-	ConfPath string
-
 	Env env.Option
 
 	FilterKeys []string
@@ -45,7 +43,6 @@ func ParseConfig(confPath string, configPtr *AppConfig) (err error) {
 			err = configPtr.Check()
 		}
 	}
-	configPtr.ConfPath = confPath
 	if len(configPtr.LogDir) == 0 {
 		configPtr.LogDir = path.Join(utils.RootPath(), "log")
 	}

@@ -3,7 +3,7 @@ package bootstrap
 import (
 	"context"
 	"github.com/bpcoder16/Chestnut/appconfig"
-	env2 "github.com/bpcoder16/Chestnut/appconfig/env"
+	"github.com/bpcoder16/Chestnut/appconfig/env"
 	"github.com/bpcoder16/Chestnut/clickhouse"
 	"github.com/bpcoder16/Chestnut/contrib/aliyun/oss"
 	"github.com/bpcoder16/Chestnut/core/log"
@@ -21,9 +21,9 @@ import (
 func MustInit(ctx context.Context, config *appconfig.AppConfig, funcList ...func(ctx context.Context, debugWriter, infoWriter, warnErrorFatalWriter io.Writer)) {
 	var debugWriter, infoWriter, warnErrorFatalWriter io.Writer
 	if config.NotUseRotateLog {
-		debugWriter, infoWriter, warnErrorFatalWriter = zaplogger.GetStandardWriters(config.LogDir, env2.AppName(), env2.AppName())
+		debugWriter, infoWriter, warnErrorFatalWriter = zaplogger.GetStandardWriters(config.LogDir, env.AppName(), env.AppName())
 	} else {
-		debugWriter, infoWriter, warnErrorFatalWriter = zaplogger.GetFileRotateLogWriters(config.LogDir, env2.AppName(), env2.AppName())
+		debugWriter, infoWriter, warnErrorFatalWriter = zaplogger.GetFileRotateLogWriters(config.LogDir, env.AppName(), env.AppName())
 	}
 	if config.StdRedirectFileSupport {
 		zaplogger.StdRedirectFile(config.LogDir)
@@ -60,7 +60,7 @@ func initLoggers(_ context.Context, config *appconfig.AppConfig, debugWriter, in
 		log.FileWithLineNumCaller(),
 		log.FilterKey(config.FilterKeys...),
 		log.FilterLevel(func() log.Level {
-			if env2.RunMode() == env2.RunModeRelease {
+			if env.RunMode() == env.RunModeRelease {
 				return log.LevelInfo
 			}
 			return log.LevelDebug
@@ -72,16 +72,16 @@ func initLoggers(_ context.Context, config *appconfig.AppConfig, debugWriter, in
 }
 
 func initAliyunOSS() {
-	oss.InitAliyunOSS(path.Join(env2.RootPath(), "conf/aliyun.json"))
+	oss.InitAliyunOSS(path.Join(env.ConfigDirPath(), "aliyun.json"))
 }
 
 func initMongoDB(ctx context.Context, debugWriter, infoWriter, warnErrorFatalWriter io.Writer) {
-	mongodb.SetManager(ctx, path.Join(env2.RootPath(), "conf/mongodb.json"), log.NewHelper(
+	mongodb.SetManager(ctx, path.Join(env.ConfigDirPath(), "mongodb.json"), log.NewHelper(
 		zaplogger.GetZapLogger(
 			debugWriter, infoWriter, warnErrorFatalWriter,
 			log.FileWithLineNumCaller(),
 			log.FilterLevel(func() log.Level {
-				if env2.RunMode() == env2.RunModeRelease {
+				if env.RunMode() == env.RunModeRelease {
 					return log.LevelInfo
 				}
 				return log.LevelDebug
@@ -94,12 +94,12 @@ func initMongoDB(ctx context.Context, debugWriter, infoWriter, warnErrorFatalWri
 }
 
 func initUseLRUCache(_ context.Context, debugWriter, infoWriter, warnErrorFatalWriter io.Writer) {
-	lru.SetManager(path.Join(env2.RootPath(), "conf/lru.json"), log.NewHelper(
+	lru.SetManager(path.Join(env.ConfigDirPath(), "lru.json"), log.NewHelper(
 		zaplogger.GetZapLogger(
 			debugWriter, infoWriter, warnErrorFatalWriter,
 			log.FileWithLineNumCaller(),
 			log.FilterLevel(func() log.Level {
-				if env2.RunMode() == env2.RunModeRelease {
+				if env.RunMode() == env.RunModeRelease {
 					return log.LevelInfo
 				}
 				return log.LevelDebug
@@ -112,12 +112,12 @@ func initUseLRUCache(_ context.Context, debugWriter, infoWriter, warnErrorFatalW
 }
 
 func initRedis(debugWriter, infoWriter, warnErrorFatalWriter io.Writer) {
-	redis.SetManager(path.Join(env2.RootPath(), "conf/redis.json"), log.NewHelper(
+	redis.SetManager(path.Join(env.ConfigDirPath(), "redis.json"), log.NewHelper(
 		zaplogger.GetZapLogger(
 			debugWriter, infoWriter, warnErrorFatalWriter,
 			log.FileWithLineNumCallerRedis(),
 			log.FilterLevel(func() log.Level {
-				if env2.RunMode() == env2.RunModeRelease {
+				if env.RunMode() == env.RunModeRelease {
 					return log.LevelInfo
 				}
 				return log.LevelDebug
@@ -130,12 +130,12 @@ func initRedis(debugWriter, infoWriter, warnErrorFatalWriter io.Writer) {
 }
 
 func initMySQL(debugWriter, infoWriter, warnErrorFatalWriter io.Writer) {
-	mysql.SetManager(env2.RootPath()+"/conf/mysql.json", log.NewHelper(
+	mysql.SetManager(path.Join(env.ConfigDirPath(), "mysql.json"), log.NewHelper(
 		zaplogger.GetZapLogger(
 			debugWriter, infoWriter, warnErrorFatalWriter,
 			nil,
 			log.FilterLevel(func() log.Level {
-				if env2.RunMode() == env2.RunModeRelease {
+				if env.RunMode() == env.RunModeRelease {
 					return log.LevelInfo
 				}
 				return log.LevelDebug
@@ -148,12 +148,12 @@ func initMySQL(debugWriter, infoWriter, warnErrorFatalWriter io.Writer) {
 }
 
 func initClickhouse(debugWriter, infoWriter, warnErrorFatalWriter io.Writer) {
-	clickhouse.SetManager(env2.RootPath()+"/conf/clickhouse.json", log.NewHelper(
+	clickhouse.SetManager(path.Join(env.ConfigDirPath(), "clickhouse.json"), log.NewHelper(
 		zaplogger.GetZapLogger(
 			debugWriter, infoWriter, warnErrorFatalWriter,
 			nil,
 			log.FilterLevel(func() log.Level {
-				if env2.RunMode() == env2.RunModeRelease {
+				if env.RunMode() == env.RunModeRelease {
 					return log.LevelInfo
 				}
 				return log.LevelDebug

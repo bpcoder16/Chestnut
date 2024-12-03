@@ -2,7 +2,8 @@
   "env": {
     "appName": "Chestnut",
     "runMode": "debug",
-    "timeLocation": "Asia/Shanghai"
+    "timeLocation": "Asia/Shanghai",
+    "configDirName": ""
   },
   "filterKeys": [
     "password"

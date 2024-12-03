@@ -25,8 +25,8 @@ func NewManager(configPath string, handler http.Handler) *Manager {
 	return manager
 }
 
-func (m *Manager) Run() {
-	panic((&http.Server{
+func (m *Manager) Run() error {
+	return (&http.Server{
 		Addr:              ":" + m.config.Port,
 		Handler:           m.handler,
 		ReadTimeout:       m.config.ReadTimeoutMillisecond * time.Millisecond,
@@ -46,7 +46,7 @@ func (m *Manager) Run() {
 		//	ctx = context.WithValue(ctx, log.DefaultLogIdKey, utils.UniqueID())
 		//	return ctx
 		//},
-	}).ListenAndServe())
+	}).ListenAndServe()
 }
 
 func connStateHandler(conn net.Conn, state http.ConnState) {

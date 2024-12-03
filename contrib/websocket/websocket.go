@@ -64,7 +64,8 @@ type WebSocket struct {
 	upgrader *websocket.Upgrader
 
 	textMessageControllers map[string]TextMessageController
-	authorizationFunc      func(context.Context) bool
+	authorizationFunc      func(ctx context.Context, r *http.Request, w http.ResponseWriter) (returnCtx context.Context, isAuthorized bool)
+	beforeFunc             func(ctx context.Context, r *http.Request, w http.ResponseWriter) (returnCtx context.Context, isAuthorized bool)
 	clientCloseFunc        func(ctx context.Context, uuidStr string)
 	clientManager          *ClientManager
 }
@@ -78,6 +79,7 @@ func New(configPath string) *WebSocket {
 		textMessageControllers: make(map[string]TextMessageController),
 		authorizationFunc:      nil,
 		clientCloseFunc:        nil,
+		beforeFunc:             nil,
 		clientManager:          NewClientManager(),
 	}
 	return ws
@@ -87,7 +89,11 @@ func (ws *WebSocket) GetClientManager() *ClientManager {
 	return ws.clientManager
 }
 
-func (ws *WebSocket) SetAuthorizationFunc(f func(context.Context) bool) {
+func (ws *WebSocket) SetBeforeFunc(f func(ctx context.Context, r *http.Request, w http.ResponseWriter) (returnCtx context.Context, isAuthorized bool)) {
+	ws.beforeFunc = f
+}
+
+func (ws *WebSocket) SetAuthorizationFunc(f func(ctx context.Context, r *http.Request, w http.ResponseWriter) (returnCtx context.Context, isAuthorized bool)) {
 	ws.authorizationFunc = f
 }
 
@@ -112,20 +118,33 @@ func (ws *WebSocket) getTextMessageController(scene string) (controller TextMess
 	return
 }
 
-func (ws *WebSocket) Handle(ctx context.Context, w http.ResponseWriter, r *http.Request, responseHeader http.Header) {
-	// 设置全局日志内容
-	ctx = context.WithValue(ctx, log.DefaultMessageKey, "WebSocket")
-	var uuidStr string
+func (ws *WebSocket) before(ctx context.Context, r *http.Request, w http.ResponseWriter) (ctxNew context.Context, uuidStr string, isAuthorized bool) {
+	ctxNew = context.WithValue(ctx, log.DefaultMessageKey, "WebSocket")
+	ctxNew = context.WithValue(ctxNew, log.DefaultWebSocketLogIdKey, utils.UniqueID())
+	ctxNew = context.WithValue(ctxNew, log.DefaultLogIdKey, utils.UniqueID())
+	if ws.beforeFunc != nil {
+		ctxNew, isAuthorized = ws.beforeFunc(ctxNew, r, w)
+		if !isAuthorized {
+			http.Error(w, "Forbidden", http.StatusForbidden)
+			return
+		}
+	}
 	var isOK bool
-	if uuidStr, isOK = ctx.Value(ConnUUIDCTXKey).(string); !isOK {
+	if uuidStr, isOK = ctxNew.Value(ConnUUIDCTXKey).(string); !isOK {
 		uuidStr = utils.UniqueID()
 	}
-	ctx = context.WithValue(ctx, log.DefaultLogIdKey, uuidStr)
-	ctx = context.WithValue(ctx, log.DefaultWebSocketUUIDKey, uuidStr)
-	ctx = context.WithValue(ctx, log.DefaultWebSocketLogIdKey, utils.UniqueID())
+	ctxNew = context.WithValue(ctxNew, log.DefaultWebSocketUUIDKey, uuidStr)
+	return
+}
+
+func (ws *WebSocket) Handle(ctx context.Context, r *http.Request, w http.ResponseWriter) {
+	ctx, uuidStr, isAuthorized := ws.before(ctx, r, w)
+	if !isAuthorized {
+		return
+	}
 
 	begin := time.Now()
-	conn, err := ws.upgrader.Upgrade(w, r, ws.filterHeader(responseHeader))
+	conn, err := ws.upgrader.Upgrade(w, r, ws.filterHeader(r.Header))
 	elapsed := time.Since(begin)
 	if err != nil {
 		logit.Context(ctx).InfoW(
@@ -182,11 +201,11 @@ func (ws *WebSocket) Handle(ctx context.Context, w http.ResponseWriter, r *http.
 	g, gCtx := gtask.WithContext(ctx)
 
 	g.Go(func() error {
-		client.readPump(gCtx)
+		client.readPump(gCtx, r, w)
 		return nil
 	})
 	g.Go(func() error {
-		client.writePump(gCtx)
+		client.writePump(gCtx, r, w)
 		return nil
 	})
 

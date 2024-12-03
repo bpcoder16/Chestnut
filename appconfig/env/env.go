@@ -2,6 +2,7 @@ package env
 
 import (
 	"github.com/bpcoder16/Chestnut/core/utils"
+	"path"
 	"time"
 )
 
@@ -28,6 +29,8 @@ type Option struct {
 	RunMode string
 
 	TimeLocation string
+
+	ConfigDirName string
 }
 
 // AppEnv 应用环境信息完整的接口定义
@@ -43,6 +46,8 @@ type AppEnv interface {
 	LocalIPV4() string
 
 	TimeLocation() *time.Location
+
+	ConfigDirPath() string
 }
 
 // AppNameEnv 应用名称
@@ -58,11 +63,12 @@ type RunModeEnv interface {
 var _ AppEnv = (*appEnv)(nil)
 
 type appEnv struct {
-	appName      string
-	runMode      string
-	rootPath     string
-	localIPV4    string
-	timeLocation *time.Location
+	appName       string
+	runMode       string
+	rootPath      string
+	configDirPath string
+	localIPV4     string
+	timeLocation  *time.Location
 }
 
 func (a *appEnv) AppName() string {
@@ -83,6 +89,10 @@ func (a *appEnv) RootPath() string {
 	return a.rootPath
 }
 
+func (a *appEnv) ConfigDirPath() string {
+	return a.configDirPath
+}
+
 func (a *appEnv) LocalIPV4() string {
 	return a.localIPV4
 }
@@ -99,8 +109,8 @@ func (a *appEnv) setRunMode(mod string) {
 	setValue(&a.runMode, mod, "RunMode")
 }
 
-func (a *appEnv) setRootPath(path string) {
-	setValue(&a.rootPath, path, "RootPath")
+func (a *appEnv) setConfigDirPath(path string) {
+	setValue(&a.configDirPath, path, "ConfigDirPath")
 }
 
 func setValue(addr *string, value string, fieldName string) {
@@ -125,7 +135,6 @@ func New(opt Option) AppEnv {
 		panic(ipErr)
 	}
 
-	//env.timeLocation, timeLocationErr := time.LoadLocation(opt.TimeLocation)
 	if len(opt.TimeLocation) == 0 {
 		opt.TimeLocation = "Asia/Shanghai"
 	}
@@ -133,6 +142,12 @@ func New(opt Option) AppEnv {
 	env.timeLocation, timeLocationErr = time.LoadLocation(opt.TimeLocation)
 	if timeLocationErr != nil {
 		panic(timeLocationErr)
+	}
+
+	if len(opt.ConfigDirName) == 0 {
+		env.configDirPath = path.Join(env.rootPath, "config")
+	} else {
+		env.configDirPath = path.Join(env.rootPath, opt.ConfigDirName)
 	}
 
 	return env
