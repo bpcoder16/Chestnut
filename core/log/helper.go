@@ -14,6 +14,7 @@ const (
 	DefaultConcurrencyLogIdKey = "concurrencyLogId"
 	DefaultWebSocketUUIDKey    = "websocketUUID"
 	DefaultWebSocketLogIdKey   = "websocketLogId"
+	DefaultCronActionKey       = "cronAction"
 )
 
 type HelperOption func(*Helper)

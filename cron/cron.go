@@ -71,6 +71,7 @@ func Run(ctx context.Context, configPath string) {
 				job,
 				gocron.NewTask(func(taskCtx context.Context, task Interface, configItem ConfigItem, lockPreName string) {
 					taskCtx = context.WithValue(taskCtx, log.DefaultLogIdKey, utils.UniqueID())
+					taskCtx = context.WithValue(taskCtx, log.DefaultCronActionKey, configItem.Name)
 					task.Before(
 						configItem.Name,
 						env.AppName()+":"+lockPreName+":"+configItem.Name,
