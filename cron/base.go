@@ -44,7 +44,7 @@ func (b *Base) Init(_ Interface) {
 	b.baseTaskList = make([]func(context.Context), 0, 100)
 }
 
-func (b *Base) Process() {}
+func (b *Base) Process(context.Context) {}
 
 func (b *Base) Run(ctx context.Context) {
 	b.taskPoolRun(ctx, append(b.baseTaskList, b.processAddTaskList...))
