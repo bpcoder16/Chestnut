@@ -11,15 +11,21 @@ type taskData struct {
 	f      func(context.Context) error
 	errMsg string
 	cnt    int
+	logId  any
 }
 
 var fChan = make(chan taskData, 10000)
 
-func AddQueue(f func(context.Context) error, errMsg string) {
+func AddQueue(ctx context.Context, f func(context.Context) error, errMsg string) {
+	logId := ctx.Value(log.DefaultLogIdKey)
+	if logId == nil {
+		logId = utils.UniqueID()
+	}
 	fChan <- taskData{
 		f:      f,
 		errMsg: errMsg,
 		cnt:    0,
+		logId:  logId,
 	}
 }
 
@@ -36,7 +42,7 @@ func Consumer(ctx context.Context) error {
 }
 
 func task(ctx context.Context, t taskData) {
-	ctx = context.WithValue(ctx, log.DefaultLogIdKey, utils.UniqueID())
+	ctx = context.WithValue(ctx, log.DefaultLogIdKey, t.logId)
 	defer func() {
 		if r := recover(); r != nil {
 			logit.Context(ctx).ErrorW("async.task", t.errMsg, "async.task.panic", r)

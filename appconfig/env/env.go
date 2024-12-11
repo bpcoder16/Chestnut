@@ -145,7 +145,7 @@ func New(opt Option) AppEnv {
 	}
 
 	if len(opt.ConfigDirName) == 0 {
-		env.configDirPath = path.Join(env.rootPath, "config")
+		env.configDirPath = path.Join(env.rootPath, "conf")
 	} else {
 		env.configDirPath = path.Join(env.rootPath, opt.ConfigDirName)
 	}
