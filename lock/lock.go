@@ -8,8 +8,8 @@ import (
 
 var LocalManager *local.LockManager
 
-func init() {
-	LocalManager = local.NewLocalLockManager()
+func InitLocalManager(size int) {
+	LocalManager = local.NewLocalLockManager(size)
 }
 
 func CleanupLockManager(ctx context.Context) {

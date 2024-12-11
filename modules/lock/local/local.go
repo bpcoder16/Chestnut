@@ -33,9 +33,9 @@ type LockManager struct {
 	lm map[string]*lock
 }
 
-func NewLocalLockManager() *LockManager {
+func NewLocalLockManager(size int) *LockManager {
 	return &LockManager{
-		lm: make(map[string]*lock, 10000),
+		lm: make(map[string]*lock, size),
 		m:  new(sync.RWMutex),
 	}
 }

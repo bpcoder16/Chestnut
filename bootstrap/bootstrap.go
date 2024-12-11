@@ -7,6 +7,7 @@ import (
 	"github.com/bpcoder16/Chestnut/clickhouse"
 	"github.com/bpcoder16/Chestnut/contrib/aliyun/oss"
 	"github.com/bpcoder16/Chestnut/core/log"
+	"github.com/bpcoder16/Chestnut/lock"
 	"github.com/bpcoder16/Chestnut/logit"
 	"github.com/bpcoder16/Chestnut/lru"
 	"github.com/bpcoder16/Chestnut/modules/zaplogger"
@@ -19,6 +20,7 @@ import (
 )
 
 func MustInit(ctx context.Context, config *appconfig.AppConfig, funcList ...func(ctx context.Context, debugWriter, infoWriter, warnErrorFatalWriter io.Writer)) {
+	lock.InitLocalManager(10000)
 	var debugWriter, infoWriter, warnErrorFatalWriter io.Writer
 	if config.NotUseRotateLog {
 		debugWriter, infoWriter, warnErrorFatalWriter = zaplogger.GetStandardWriters(config.LogDir, env.AppName(), env.AppName())
