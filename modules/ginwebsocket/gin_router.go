@@ -42,7 +42,7 @@ func (r *Router) GetClientManager() *websocket.ClientManager {
 
 func (r *Router) RegisterHandler(engine *gin.Engine) {
 	r.wsRouter.GET(r.path, func(ctx *gin.Context) {
-		r.wsManager.Handle(ctx, ctx.Request, ctx.Writer)
+		r.wsManager.Handle(ctx, r.path, ctx.Request, ctx.Writer)
 	})
 	r.wsRouter.RegisterHandler(engine)
 }

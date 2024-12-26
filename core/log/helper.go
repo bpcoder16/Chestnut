@@ -15,6 +15,7 @@ const (
 	DefaultWebSocketUUIDKey    = "websocketUUID"
 	DefaultWebSocketLogIdKey   = "websocketLogId"
 	DefaultCronActionKey       = "cronAction"
+	DefaultWebSocketPathKey    = "websocketPath"
 )
 
 type HelperOption func(*Helper)

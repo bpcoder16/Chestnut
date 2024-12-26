@@ -90,6 +90,16 @@ func GetZapLogger(debugWriter, infoWriter, warnErrorFatalWriter io.Writer, calle
 				return msg
 			}
 		}(),
+		log.DefaultWebSocketPathKey,
+		func() log.Valuer {
+			return func(ctx context.Context) interface{} {
+				msg := ctx.Value(log.DefaultWebSocketPathKey)
+				if msg == nil {
+					return "None"
+				}
+				return msg
+			}
+		}(),
 	)
 	if caller != nil {
 		kv = append(kv, log.DefaultCallerKey, caller)

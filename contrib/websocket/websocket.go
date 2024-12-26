@@ -118,8 +118,9 @@ func (ws *WebSocket) getTextMessageController(scene string) (controller TextMess
 	return
 }
 
-func (ws *WebSocket) before(ctx context.Context, r *http.Request, w http.ResponseWriter) (ctxNew context.Context, uuidStr string, isAuthorized bool) {
+func (ws *WebSocket) before(ctx context.Context, path string, r *http.Request, w http.ResponseWriter) (ctxNew context.Context, uuidStr string, isAuthorized bool) {
 	ctxNew = context.WithValue(ctx, log.DefaultMessageKey, "WebSocket")
+	ctxNew = context.WithValue(ctxNew, log.DefaultWebSocketPathKey, path)
 	ctxNew = context.WithValue(ctxNew, log.DefaultWebSocketLogIdKey, utils.UniqueID())
 	ctxNew = context.WithValue(ctxNew, log.DefaultLogIdKey, utils.UniqueID())
 	if ws.beforeFunc != nil {
@@ -137,8 +138,8 @@ func (ws *WebSocket) before(ctx context.Context, r *http.Request, w http.Respons
 	return
 }
 
-func (ws *WebSocket) Handle(ctx context.Context, r *http.Request, w http.ResponseWriter) {
-	ctx, uuidStr, isAuthorized := ws.before(ctx, r, w)
+func (ws *WebSocket) Handle(ctx context.Context, path string, r *http.Request, w http.ResponseWriter) {
+	ctx, uuidStr, isAuthorized := ws.before(ctx, path, r, w)
 	if !isAuthorized {
 		return
 	}
