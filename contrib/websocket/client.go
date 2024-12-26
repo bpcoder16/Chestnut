@@ -79,6 +79,7 @@ func (c *Client) log(ctx context.Context, level string, keyValues ...interface{}
 		"remoteAddr", c.conn.RemoteAddr().String(),
 		"client.ws.clientManager.Len()", c.ws.clientManager.Len(),
 		"client.State", c.State,
+		"client.State.SceneParams", c.State.SceneParams,
 	}
 	newKeyValues = append(newKeyValues, keyValues...)
 
