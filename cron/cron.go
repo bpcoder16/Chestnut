@@ -78,8 +78,8 @@ func Run(ctx context.Context, configPath string) {
 						time.Duration(configItem.DeadLockExpireMillisecond)*time.Millisecond,
 						configItem.MaxConcurrencyCnt,
 					)
-					defer task.Defer(taskCtx)
 					if task.GetIsRun(taskCtx) {
+						defer task.Defer(taskCtx)
 						task.Process(taskCtx)
 						task.Run(taskCtx)
 					}
