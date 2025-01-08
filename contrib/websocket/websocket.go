@@ -64,8 +64,8 @@ type WebSocket struct {
 	upgrader *websocket.Upgrader
 
 	textMessageControllers map[string]TextMessageController
-	authorizationFunc      func(ctx context.Context, r *http.Request, w http.ResponseWriter) (returnCtx context.Context, isAuthorized bool)
-	beforeFunc             func(ctx context.Context, r *http.Request, w http.ResponseWriter) (returnCtx context.Context, isAuthorized bool)
+	authorizationFunc      func(ctx context.Context, r *http.Request, w http.ResponseWriter) (returnCtx context.Context, isAuthorized bool, userId int64)
+	beforeFunc             func(ctx context.Context, r *http.Request, w http.ResponseWriter) (returnCtx context.Context, isAuthorized bool, userId int64)
 	clientCloseFunc        func(ctx context.Context, uuidStr string)
 	clientManager          *ClientManager
 }
@@ -89,11 +89,11 @@ func (ws *WebSocket) GetClientManager() *ClientManager {
 	return ws.clientManager
 }
 
-func (ws *WebSocket) SetBeforeFunc(f func(ctx context.Context, r *http.Request, w http.ResponseWriter) (returnCtx context.Context, isAuthorized bool)) {
+func (ws *WebSocket) SetBeforeFunc(f func(ctx context.Context, r *http.Request, w http.ResponseWriter) (returnCtx context.Context, isAuthorized bool, userId int64)) {
 	ws.beforeFunc = f
 }
 
-func (ws *WebSocket) SetAuthorizationFunc(f func(ctx context.Context, r *http.Request, w http.ResponseWriter) (returnCtx context.Context, isAuthorized bool)) {
+func (ws *WebSocket) SetAuthorizationFunc(f func(ctx context.Context, r *http.Request, w http.ResponseWriter) (returnCtx context.Context, isAuthorized bool, userId int64)) {
 	ws.authorizationFunc = f
 }
 
@@ -118,13 +118,13 @@ func (ws *WebSocket) getTextMessageController(scene string) (controller TextMess
 	return
 }
 
-func (ws *WebSocket) before(ctx context.Context, path string, r *http.Request, w http.ResponseWriter) (ctxNew context.Context, uuidStr string, isAuthorized bool) {
+func (ws *WebSocket) before(ctx context.Context, path string, r *http.Request, w http.ResponseWriter) (ctxNew context.Context, uuidStr string, isAuthorized bool, userId int64) {
 	ctxNew = context.WithValue(ctx, log.DefaultMessageKey, "WebSocket")
 	ctxNew = context.WithValue(ctxNew, log.DefaultWebSocketPathKey, path)
 	ctxNew = context.WithValue(ctxNew, log.DefaultWebSocketLogIdKey, utils.UniqueID())
 	ctxNew = context.WithValue(ctxNew, log.DefaultLogIdKey, utils.UniqueID())
 	if ws.beforeFunc != nil {
-		ctxNew, isAuthorized = ws.beforeFunc(ctxNew, r, w)
+		ctxNew, isAuthorized, userId = ws.beforeFunc(ctxNew, r, w)
 		if !isAuthorized {
 			http.Error(w, "Forbidden", http.StatusForbidden)
 			return
@@ -139,7 +139,7 @@ func (ws *WebSocket) before(ctx context.Context, path string, r *http.Request, w
 }
 
 func (ws *WebSocket) Handle(ctx context.Context, path string, r *http.Request, w http.ResponseWriter) {
-	ctx, uuidStr, isAuthorized := ws.before(ctx, path, r, w)
+	ctx, uuidStr, isAuthorized, userId := ws.before(ctx, path, r, w)
 	if !isAuthorized {
 		return
 	}
@@ -161,7 +161,7 @@ func (ws *WebSocket) Handle(ctx context.Context, path string, r *http.Request, w
 		return
 	}
 
-	client := NewClient(conn, uuidStr)
+	client := NewClient(conn, uuidStr, userId)
 	client.ws = ws
 	client.ws.clientManager.Store(uuidStr, client)
 	defer client.close(ctx, "Handle.Defer")

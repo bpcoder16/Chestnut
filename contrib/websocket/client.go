@@ -26,6 +26,7 @@ type Client struct {
 	textMsgCh chan []byte
 	isClosed  bool
 	uuidStr   string
+	UserId    int64
 	State     State // 客户端状态信息
 
 	mu sync.RWMutex
@@ -37,7 +38,7 @@ type State struct {
 	SceneParams map[string]interface{} `json:"-"`
 }
 
-func NewClient(conn *websocket.Conn, uuidStr string) *Client {
+func NewClient(conn *websocket.Conn, uuidStr string, userId int64) *Client {
 	return &Client{
 		conn: conn,
 
@@ -47,6 +48,7 @@ func NewClient(conn *websocket.Conn, uuidStr string) *Client {
 		State: State{
 			SceneParams: make(map[string]interface{}),
 		},
+		UserId: userId,
 	}
 }
 
@@ -334,7 +336,7 @@ func (c *Client) writePump(ctx context.Context, r *http.Request, w http.Response
 			}
 			// 鉴权与心跳一个频次校验
 			if c.ws.authorizationFunc != nil {
-				if _, isOK := c.ws.authorizationFunc(ctx, r, w); !isOK {
+				if _, isOK, _ := c.ws.authorizationFunc(ctx, r, w); !isOK {
 					err = errors.New("c.ws.authorizationFunc.NotOK")
 					return
 				}

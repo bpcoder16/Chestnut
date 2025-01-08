@@ -20,11 +20,11 @@ type Router struct {
 	path      string
 }
 
-func (r *Router) SetBeforeFunc(f func(ctx context.Context, r *http.Request, w http.ResponseWriter) (returnCtx context.Context, isAuthorized bool)) {
+func (r *Router) SetBeforeFunc(f func(ctx context.Context, r *http.Request, w http.ResponseWriter) (returnCtx context.Context, isAuthorized bool, userId int64)) {
 	r.wsManager.SetBeforeFunc(f)
 }
 
-func (r *Router) SetAuthorizationFunc(f func(ctx context.Context, r *http.Request, w http.ResponseWriter) (returnCtx context.Context, isAuthorized bool)) {
+func (r *Router) SetAuthorizationFunc(f func(ctx context.Context, r *http.Request, w http.ResponseWriter) (returnCtx context.Context, isAuthorized bool, userId int64)) {
 	r.wsManager.SetAuthorizationFunc(f)
 }
 
