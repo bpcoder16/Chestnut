@@ -2,9 +2,9 @@ package cron
 
 import (
 	"context"
-	"github.com/bpcoder16/Chestnut/logit"
-	"github.com/bpcoder16/Chestnut/modules/concurrency"
-	"github.com/bpcoder16/Chestnut/modules/lock/nonblock"
+	"github.com/bpcoder16/Chestnut/v2/logit"
+	"github.com/bpcoder16/Chestnut/v2/modules/concurrency"
+	"github.com/bpcoder16/Chestnut/v2/modules/lock/nonblock"
 	"github.com/redis/go-redis/v9"
 	"strconv"
 	"time"

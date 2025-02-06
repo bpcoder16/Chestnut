@@ -3,7 +3,7 @@ package utils
 import (
 	"context"
 	"fmt"
-	"github.com/bpcoder16/Chestnut/logit"
+	"github.com/bpcoder16/Chestnut/v2/logit"
 	"strconv"
 	"time"
 )

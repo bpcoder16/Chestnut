@@ -2,7 +2,7 @@ package oss
 
 import (
 	"github.com/aliyun/aliyun-oss-go-sdk/oss"
-	"github.com/bpcoder16/Chestnut/contrib/aliyun"
+	"github.com/bpcoder16/Chestnut/v2/contrib/aliyun"
 )
 
 var Bucket *oss.Bucket

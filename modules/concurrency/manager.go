@@ -2,9 +2,9 @@ package concurrency
 
 import (
 	"context"
-	"github.com/bpcoder16/Chestnut/core/gtask"
-	"github.com/bpcoder16/Chestnut/core/log"
-	"github.com/bpcoder16/Chestnut/core/utils"
+	"github.com/bpcoder16/Chestnut/v2/core/gtask"
+	"github.com/bpcoder16/Chestnut/v2/core/log"
+	"github.com/bpcoder16/Chestnut/v2/core/utils"
 )
 
 var (

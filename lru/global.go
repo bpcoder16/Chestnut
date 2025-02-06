@@ -1,8 +1,8 @@
 package lru
 
 import (
-	"github.com/bpcoder16/Chestnut/contrib/lru"
-	"github.com/bpcoder16/Chestnut/core/log"
+	"github.com/bpcoder16/Chestnut/v2/contrib/lru"
+	"github.com/bpcoder16/Chestnut/v2/core/log"
 	gLRU "github.com/hashicorp/golang-lru/v2"
 	"github.com/hashicorp/golang-lru/v2/expirable"
 )

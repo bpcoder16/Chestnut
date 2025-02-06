@@ -1,7 +1,7 @@
 package cron
 
 import (
-	"github.com/bpcoder16/Chestnut/core/utils"
+	"github.com/bpcoder16/Chestnut/v2/core/utils"
 )
 
 func loadConfig(configPath string) *Config {

@@ -2,9 +2,9 @@ package gin
 
 import (
 	"bytes"
-	"github.com/bpcoder16/Chestnut/core/log"
-	"github.com/bpcoder16/Chestnut/core/utils"
-	"github.com/bpcoder16/Chestnut/logit"
+	"github.com/bpcoder16/Chestnut/v2/core/log"
+	"github.com/bpcoder16/Chestnut/v2/core/utils"
+	"github.com/bpcoder16/Chestnut/v2/logit"
 	"github.com/gin-gonic/gin"
 	"io"
 	gLog "log"

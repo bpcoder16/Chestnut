@@ -2,8 +2,8 @@ package mongodb
 
 import (
 	"context"
-	"github.com/bpcoder16/Chestnut/contrib/gomongodb"
-	"github.com/bpcoder16/Chestnut/core/log"
+	"github.com/bpcoder16/Chestnut/v2/contrib/gomongodb"
+	"github.com/bpcoder16/Chestnut/v2/core/log"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 

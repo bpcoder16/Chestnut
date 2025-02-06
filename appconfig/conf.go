@@ -2,8 +2,8 @@ package appconfig
 
 import (
 	"errors"
-	"github.com/bpcoder16/Chestnut/appconfig/env"
-	"github.com/bpcoder16/Chestnut/core/utils"
+	"github.com/bpcoder16/Chestnut/v2/appconfig/env"
+	"github.com/bpcoder16/Chestnut/v2/core/utils"
 	"path"
 	"path/filepath"
 )

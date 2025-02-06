@@ -2,8 +2,8 @@ package zaplogger
 
 import (
 	"context"
-	"github.com/bpcoder16/Chestnut/contrib/log/zap"
-	"github.com/bpcoder16/Chestnut/core/log"
+	"github.com/bpcoder16/Chestnut/v2/contrib/log/zap"
+	"github.com/bpcoder16/Chestnut/v2/core/log"
 	"io"
 )
 

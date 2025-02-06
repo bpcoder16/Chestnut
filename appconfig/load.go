@@ -1,8 +1,8 @@
 package appconfig
 
 import (
-	"github.com/bpcoder16/Chestnut/appconfig/env"
-	"github.com/bpcoder16/Chestnut/core/utils"
+	"github.com/bpcoder16/Chestnut/v2/appconfig/env"
+	"github.com/bpcoder16/Chestnut/v2/core/utils"
 )
 
 // 配置文件使用 json 格式

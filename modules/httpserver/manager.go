@@ -2,7 +2,7 @@ package httpserver
 
 import (
 	"context"
-	"github.com/bpcoder16/Chestnut/logit"
+	"github.com/bpcoder16/Chestnut/v2/logit"
 	"net"
 	"net/http"
 	"time"

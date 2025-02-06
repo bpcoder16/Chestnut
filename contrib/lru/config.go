@@ -1,7 +1,7 @@
 package lru
 
 import (
-	"github.com/bpcoder16/Chestnut/core/utils"
+	"github.com/bpcoder16/Chestnut/v2/core/utils"
 )
 
 type Config struct {

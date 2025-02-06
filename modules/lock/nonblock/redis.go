@@ -2,7 +2,7 @@ package nonblock
 
 import (
 	"context"
-	"github.com/bpcoder16/Chestnut/logit"
+	"github.com/bpcoder16/Chestnut/v2/logit"
 	"github.com/redis/go-redis/v9"
 	"strconv"
 	"time"

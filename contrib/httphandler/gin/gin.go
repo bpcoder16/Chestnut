@@ -1,8 +1,8 @@
 package gin
 
 import (
-	"github.com/bpcoder16/Chestnut/appconfig/env"
-	"github.com/bpcoder16/Chestnut/contrib/validator"
+	"github.com/bpcoder16/Chestnut/v2/appconfig/env"
+	"github.com/bpcoder16/Chestnut/v2/contrib/validator"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"net/http"

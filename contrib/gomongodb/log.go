@@ -3,7 +3,7 @@ package gomongodb
 import (
 	"context"
 	"fmt"
-	"github.com/bpcoder16/Chestnut/core/log"
+	"github.com/bpcoder16/Chestnut/v2/core/log"
 	"go.mongodb.org/mongo-driver/event"
 )
 

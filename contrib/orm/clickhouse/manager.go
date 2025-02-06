@@ -1,8 +1,8 @@
 package clickhouse
 
 import (
-	"github.com/bpcoder16/Chestnut/core/log"
-	"github.com/bpcoder16/Chestnut/core/utils"
+	"github.com/bpcoder16/Chestnut/v2/core/log"
+	"github.com/bpcoder16/Chestnut/v2/core/utils"
 	"gorm.io/driver/clickhouse"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"

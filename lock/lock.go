@@ -2,8 +2,8 @@ package lock
 
 import (
 	"context"
-	"github.com/bpcoder16/Chestnut/logit"
-	"github.com/bpcoder16/Chestnut/modules/lock/local"
+	"github.com/bpcoder16/Chestnut/v2/logit"
+	"github.com/bpcoder16/Chestnut/v2/modules/lock/local"
 )
 
 var LocalManager *local.LockManager

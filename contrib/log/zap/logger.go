@@ -2,7 +2,7 @@ package zap
 
 import (
 	"fmt"
-	"github.com/bpcoder16/Chestnut/core/log"
+	"github.com/bpcoder16/Chestnut/v2/core/log"
 	"go.uber.org/zap"
 	"io"
 )

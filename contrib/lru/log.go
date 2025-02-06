@@ -3,8 +3,8 @@ package lru
 import (
 	"context"
 	"encoding/json"
-	"github.com/bpcoder16/Chestnut/appconfig/env"
-	"github.com/bpcoder16/Chestnut/core/log"
+	"github.com/bpcoder16/Chestnut/v2/appconfig/env"
+	"github.com/bpcoder16/Chestnut/v2/core/log"
 )
 
 func defaultOnEvictedFunc(l *log.Helper) func(key string, value any) {

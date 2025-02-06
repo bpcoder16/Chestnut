@@ -3,7 +3,7 @@ package goredis
 import (
 	"context"
 	"errors"
-	"github.com/bpcoder16/Chestnut/core/log"
+	"github.com/bpcoder16/Chestnut/v2/core/log"
 	"github.com/redis/go-redis/v9"
 	"strconv"
 	"time"

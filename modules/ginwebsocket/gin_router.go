@@ -2,8 +2,8 @@ package ginwebsocket
 
 import (
 	"context"
-	ginHandler "github.com/bpcoder16/Chestnut/contrib/httphandler/gin"
-	"github.com/bpcoder16/Chestnut/contrib/websocket"
+	ginHandler "github.com/bpcoder16/Chestnut/v2/contrib/httphandler/gin"
+	"github.com/bpcoder16/Chestnut/v2/contrib/websocket"
 	"github.com/gin-gonic/gin"
 	"net/http"
 )

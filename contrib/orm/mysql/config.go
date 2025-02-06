@@ -1,6 +1,6 @@
 package mysql
 
-import "github.com/bpcoder16/Chestnut/core/utils"
+import "github.com/bpcoder16/Chestnut/v2/core/utils"
 
 type ConfigItem struct {
 	Host         string `json:"host"`
