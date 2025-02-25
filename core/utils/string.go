@@ -2,6 +2,7 @@ package utils
 
 import (
 	"crypto/md5"
+	"crypto/sha256"
 	"encoding/hex"
 	"github.com/google/uuid"
 )
@@ -19,4 +20,12 @@ func MD5String(plaintext string) string {
 
 func UniqueID() string {
 	return uuid.New().String()
+}
+
+func SHA265String(plaintext string) string {
+	hash := sha256.New()
+	hash.Write([]byte(plaintext))
+	hashedSum := hash.Sum(nil)
+	// 将哈希值转换为十六进制字符串
+	return hex.EncodeToString(hashedSum)
 }

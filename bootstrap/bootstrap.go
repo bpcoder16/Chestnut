@@ -50,7 +50,7 @@ func MustInit(ctx context.Context, config *appconfig.AppConfig, funcList ...func
 	if config.DefaultClickhouseSupport {
 		initClickhouse(debugWriter, infoWriter, warnErrorFatalWriter)
 	}
-	initHTTPClient()
+	initHTTPClient(debugWriter, infoWriter, warnErrorFatalWriter)
 	for _, fn := range funcList {
 		fn(ctx, debugWriter, infoWriter, warnErrorFatalWriter)
 	}
@@ -167,6 +167,17 @@ func initClickhouse(debugWriter, infoWriter, warnErrorFatalWriter io.Writer) {
 	))
 }
 
-func initHTTPClient() {
-	resty.SetClient()
+func initHTTPClient(debugWriter, infoWriter, warnErrorFatalWriter io.Writer) {
+	resty.SetClient(log.NewHelper(
+		zaplogger.GetZapLogger(
+			debugWriter, infoWriter, warnErrorFatalWriter,
+			nil,
+			log.FilterLevel(func() log.Level {
+				return log.LevelDebug
+			}()),
+			//log.FilterFunc(func(level log.Level, keyValues ...interface{}) bool {
+			//	return false
+			//}),
+		),
+	))
 }
