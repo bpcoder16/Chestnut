@@ -7,6 +7,7 @@ import (
 )
 
 const (
+	DefaultUserIdKey           = "userId"
 	DefaultMessageKey          = "type"
 	DefaultLogIdKey            = "logId"
 	DefaultCallerKey           = "caller"
