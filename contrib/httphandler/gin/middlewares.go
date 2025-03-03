@@ -109,3 +109,35 @@ func recoveryWithWriter(out io.Writer) gin.HandlerFunc {
 		c.Next()
 	}
 }
+
+func corsPreCheckRequest() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		if ctx.Request.Method == http.MethodOptions {
+			ctx.Header("Access-Control-Allow-Origin", "*")
+			// 允许的 HTTP 方法
+			ctx.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+			// 允许的请求头
+			ctx.Header("Access-Control-Allow-Headers", "Authorization, Content-Type, If-Match, If-Modified-Since, If-None-Match, If-Unmodified-Since, X-CSRF-TOKEN, X-Requested-With, Token")
+			// 预检请求的缓存时间
+			ctx.Header("Access-Control-Max-Age", "86400")
+
+			ctx.AbortWithStatus(http.StatusNoContent)
+			return
+		}
+		ctx.Next()
+	}
+}
+
+func CORS() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		ctx.Header("Access-Control-Allow-Origin", "*")
+		// 允许的 HTTP 方法
+		ctx.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		// 允许的请求头
+		ctx.Header("Access-Control-Allow-Headers", "Authorization, Content-Type, If-Match, If-Modified-Since, If-None-Match, If-Unmodified-Since, X-CSRF-TOKEN, X-Requested-With, Token")
+		// 预检请求的缓存时间
+		ctx.Header("Access-Control-Max-Age", "86400")
+
+		ctx.Next()
+	}
+}
