@@ -40,6 +40,7 @@ func HTTPHandler(routers ...Router) http.Handler {
 	initGinConfig()
 	h := gin.New()
 	h.Use(
+		corsPreCheckRequest(),
 		recoveryWithWriter(os.Stderr),
 	)
 	for _, router := range routers {
