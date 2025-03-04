@@ -2,8 +2,8 @@ package resty
 
 import (
 	"context"
-	"github.com/bpcoder16/Chestnut/core/log"
-	"github.com/bpcoder16/Chestnut/core/utils"
+	"github.com/bpcoder16/Chestnut/v2/core/log"
+	"github.com/bpcoder16/Chestnut/v2/core/utils"
 	"github.com/go-resty/resty/v2"
 	"time"
 )
