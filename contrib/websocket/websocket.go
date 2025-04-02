@@ -145,7 +145,7 @@ func (ws *WebSocket) Handle(ctx context.Context, path string, r *http.Request, w
 	}
 
 	begin := time.Now()
-	conn, err := ws.upgrader.Upgrade(w, r, ws.filterHeader(r.Header))
+	conn, err := ws.upgrader.Upgrade(w, r, w.Header())
 	elapsed := time.Since(begin)
 	if err != nil {
 		logit.Context(ctx).InfoW(
