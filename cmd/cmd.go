@@ -41,10 +41,11 @@ func generateServiceCommands() {
 			Short: service.Description(),
 			Run: func(svc Service) func(cmd *cobra.Command, args []string) {
 				return func(cmd *cobra.Command, args []string) {
-					svc.Run(cmd.Context(), args)
+					svc.Run(cmd.Context(), cmd, args)
 				}
 			}(service),
 		}
+		service.SetFlags(cmd.Flags())
 		rootCmd.AddCommand(cmd)
 	}
 }
