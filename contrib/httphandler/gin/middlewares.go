@@ -117,7 +117,7 @@ func corsPreCheckRequest() gin.HandlerFunc {
 			// 允许的 HTTP 方法
 			ctx.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 			// 允许的请求头
-			ctx.Header("Access-Control-Allow-Headers", "Authorization, Content-Type, If-Match, If-Modified-Since, If-None-Match, If-Unmodified-Since, X-CSRF-TOKEN, X-Requested-With, Token")
+			ctx.Header("Access-Control-Allow-Headers", "Authorization, Content-Type, If-Match, If-Modified-Since, If-None-Match, If-Unmodified-Since, X-CSRF-TOKEN, X-Requested-With, Token, equipmentType, pseudoUniqueID")
 			// 预检请求的缓存时间
 			ctx.Header("Access-Control-Max-Age", "86400")
 
@@ -134,7 +134,7 @@ func CORS() gin.HandlerFunc {
 		// 允许的 HTTP 方法
 		ctx.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		// 允许的请求头
-		ctx.Header("Access-Control-Allow-Headers", "Authorization, Content-Type, If-Match, If-Modified-Since, If-None-Match, If-Unmodified-Since, X-CSRF-TOKEN, X-Requested-With, Token")
+		ctx.Header("Access-Control-Allow-Headers", "Authorization, Content-Type, If-Match, If-Modified-Since, If-None-Match, If-Unmodified-Since, X-CSRF-TOKEN, X-Requested-With, Token, equipmentType, pseudoUniqueID")
 		// 预检请求的缓存时间
 		ctx.Header("Access-Control-Max-Age", "86400")
 
