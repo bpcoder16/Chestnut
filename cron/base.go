@@ -14,7 +14,6 @@ type Base struct {
 	RedisClient *redis.Client
 
 	LockName           string
-	IsRun              bool
 	name               string
 	deadLockExpireTime time.Duration
 	maxConcurrencyCnt  int
@@ -54,18 +53,11 @@ func (b *Base) Defer(ctx context.Context) {
 	defer nonblock.RedisUnlock(ctx, b.RedisClient, b.LockName)
 	if r := recover(); r != nil {
 		logit.Context(ctx).ErrorW(b.name+".Err", r)
-	} else {
-		if b.IsRun {
-			logit.Context(ctx).DebugW(b.name+".Status", "Run")
-		} else {
-			logit.Context(ctx).DebugW(b.name+".Status", "NotRun")
-		}
 	}
 }
 
 func (b *Base) GetIsRun(ctx context.Context) bool {
-	b.IsRun = nonblock.RedisLock(ctx, b.RedisClient, b.LockName, b.deadLockExpireTime)
-	return b.IsRun
+	return nonblock.RedisLock(ctx, b.RedisClient, b.LockName, b.deadLockExpireTime)
 }
 
 func (b *Base) taskPoolRun(ctx context.Context, taskList []func(context.Context)) {

@@ -7,6 +7,7 @@ import (
 	"github.com/bpcoder16/Chestnut/v2/appconfig/env"
 	"github.com/bpcoder16/Chestnut/v2/core/log"
 	"github.com/bpcoder16/Chestnut/v2/core/utils"
+	"github.com/bpcoder16/Chestnut/v2/logit"
 	"github.com/go-co-op/gocron/v2"
 	"reflect"
 	"time"
@@ -82,6 +83,9 @@ func Run(ctx context.Context, configPath string) {
 						defer task.Defer(taskCtx)
 						task.Process(taskCtx)
 						task.Run(taskCtx)
+						logit.Context(ctx).DebugW(configItem.Name+".Status", "Run")
+					} else {
+						logit.Context(ctx).DebugW(configItem.Name+".Status", "NotRun")
 					}
 				}, ctx, cronController, cronConfigNew, config.LockPreName),
 			)
