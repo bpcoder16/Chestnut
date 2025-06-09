@@ -83,9 +83,9 @@ func Run(ctx context.Context, configPath string) {
 						defer task.Defer(taskCtx)
 						task.Process(taskCtx)
 						task.Run(taskCtx)
-						logit.Context(ctx).DebugW(configItem.Name+".Status", "Run")
+						logit.Context(taskCtx).DebugW(configItem.Name+".Status", "Run")
 					} else {
-						logit.Context(ctx).DebugW(configItem.Name+".Status", "NotRun")
+						logit.Context(taskCtx).DebugW(configItem.Name+".Status", "NotRun")
 					}
 				}, ctx, cronController, cronConfigNew, config.LockPreName),
 			)
