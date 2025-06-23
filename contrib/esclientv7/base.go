@@ -15,6 +15,40 @@ type Document struct {
 	Content any
 }
 
+func (m *Manager) GetByID(ctx context.Context, index, id string, dest any) error {
+	req := esapi.GetRequest{
+		Index:      index,
+		DocumentID: id,
+	}
+	res, errR := req.Do(ctx, m.client)
+	if errR != nil {
+		return fmt.Errorf("request error: %w", errR)
+	}
+	defer res.Body.Close()
+
+	if res.IsError() {
+		if res.StatusCode == 404 {
+			return fmt.Errorf("document not found: index=%s id=%s", index, id)
+		}
+		body, _ := io.ReadAll(res.Body)
+		return fmt.Errorf("es error: %s", string(body))
+	}
+
+	var result struct {
+		Source json.RawMessage `json:"_source"`
+	}
+
+	if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
+		return fmt.Errorf("decode response failed: %w", err)
+	}
+
+	if err := json.Unmarshal(result.Source, dest); err != nil {
+		return fmt.Errorf("unmarshal _source failed: %w", err)
+	}
+
+	return nil
+}
+
 func (m *Manager) InsertDocument(ctx context.Context, index string, doc Document) error {
 	data, errJ := json.Marshal(doc.Content)
 	if errJ != nil {
