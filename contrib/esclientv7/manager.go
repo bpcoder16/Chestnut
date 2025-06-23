@@ -35,7 +35,10 @@ func (m *Manager) connect() {
 	}
 
 	if m.config.EnableDebug {
-		cfg.Logger = &Logger{}
+		cfg.Logger = &Logger{
+			Helper:      m.logger,
+			EnableDebug: m.config.EnableDebug,
+		}
 	}
 	var err error
 	m.client, err = elasticsearch.NewClient(cfg)
