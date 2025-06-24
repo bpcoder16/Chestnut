@@ -15,6 +15,11 @@ type Document struct {
 	Content any
 }
 
+type Total struct {
+	Value    uint64 `json:"value"`
+	Relation string `json:"relation"`
+}
+
 func (m *Manager) GetByID(ctx context.Context, index, id string, dest any) error {
 	req := esapi.GetRequest{
 		Index:      index,
@@ -34,19 +39,63 @@ func (m *Manager) GetByID(ctx context.Context, index, id string, dest any) error
 		return fmt.Errorf("es error: %s", string(body))
 	}
 
-	var result struct {
-		Source json.RawMessage `json:"_source"`
-	}
-
-	if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
+	if err := json.NewDecoder(res.Body).Decode(dest); err != nil {
 		return fmt.Errorf("decode response failed: %w", err)
 	}
 
-	if err := json.Unmarshal(result.Source, dest); err != nil {
-		return fmt.Errorf("unmarshal _source failed: %w", err)
+	return nil
+}
+
+func (m *Manager) Search(ctx context.Context, index string, dsl map[string]any, dest any, o ...func(*esapi.SearchRequest)) (total Total, maxScore float64, err error) {
+	var buf bytes.Buffer
+	if err = json.NewEncoder(&buf).Encode(dsl); err != nil {
+		return
 	}
 
-	return nil
+	searchParams := make([]func(*esapi.SearchRequest), 0, 3)
+	searchParams = append(searchParams,
+		m.client.Search.WithContext(ctx),
+		m.client.Search.WithIndex(index),
+		m.client.Search.WithBody(&buf),
+		//m.client.Search.WithTrackTotalHits(true),
+		//m.client.Search.WithPretty(),
+	)
+	if len(o) > 0 {
+		searchParams = append(searchParams, o...)
+	}
+
+	var res *esapi.Response
+	res, err = m.client.Search(searchParams...)
+	if err != nil {
+		return
+	}
+	defer res.Body.Close()
+
+	if res.IsError() {
+		err = fmt.Errorf("search error: %s", res.String())
+		return
+	}
+
+	// 解析结果
+	var result struct {
+		Hits struct {
+			Total    Total           `json:"total"`
+			MaxScore float64         `json:"max_score"`
+			Hits     json.RawMessage `json:"hits"`
+		} `json:"hits"`
+	}
+	if err = json.NewDecoder(res.Body).Decode(&result); err != nil {
+		err = fmt.Errorf("decode response failed: %w", err)
+		return
+	}
+	total = result.Hits.Total
+	maxScore = result.Hits.MaxScore
+
+	if err = json.Unmarshal(result.Hits.Hits, dest); err != nil {
+		err = fmt.Errorf("unmarshal hits failed: %w", err)
+	}
+
+	return
 }
 
 func (m *Manager) InsertDocument(ctx context.Context, index string, doc Document) error {
