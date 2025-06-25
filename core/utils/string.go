@@ -4,7 +4,10 @@ import (
 	"crypto/md5"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
+	"fmt"
 	"github.com/google/uuid"
+	"strings"
 )
 
 func MD5String(plaintext string) string {
@@ -28,4 +31,32 @@ func SHA265String(plaintext string) string {
 	hashedSum := hash.Sum(nil)
 	// 将哈希值转换为十六进制字符串
 	return hex.EncodeToString(hashedSum)
+}
+
+func ToString(val any) string {
+	switch v := val.(type) {
+	case nil:
+		return ""
+	case string:
+		return v
+	case bool:
+		if v {
+			return "true"
+		}
+		return "false"
+	case float32, float64:
+		// 去掉无意义小数点
+		return strings.TrimRight(strings.TrimRight(fmt.Sprintf("%.6f", v), "0"), ".")
+	case int, int8, int16, int32, int64:
+		return fmt.Sprintf("%d", v)
+	case uint, uint8, uint16, uint32, uint64:
+		return fmt.Sprintf("%d", v)
+	case []interface{}, map[string]interface{}:
+		bs, _ := json.Marshal(v)
+		return string(bs)
+	default:
+		// 兜底处理
+		bs, _ := json.Marshal(v)
+		return string(bs)
+	}
 }

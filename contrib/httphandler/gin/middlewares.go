@@ -2,6 +2,10 @@ package gin
 
 import (
 	"bytes"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"github.com/bpcoder16/Chestnut/v2/core/log"
 	"github.com/bpcoder16/Chestnut/v2/core/utils"
 	"github.com/bpcoder16/Chestnut/v2/logit"
@@ -11,7 +15,10 @@ import (
 	"net"
 	"net/http"
 	"net/http/httputil"
+	"net/url"
 	"os"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -137,6 +144,112 @@ func CORS() gin.HandlerFunc {
 		ctx.Header("Access-Control-Allow-Headers", "*")
 		// 预检请求的缓存时间
 		ctx.Header("Access-Control-Max-Age", "86400")
+
+		ctx.Next()
+	}
+}
+
+func SignAuthMiddleware(secretKeyMap map[string]string, timeWindow time.Duration, toStringFunc func(any) string) gin.HandlerFunc {
+	buildSortedParamString := func(params map[string]any, toStringFunc func(any) string) string {
+		var keys []string
+		for k := range params {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+
+		pairs := url.Values{}
+		for _, key := range keys {
+			pairs.Set(key, toStringFunc(params[key]))
+		}
+
+		return pairs.Encode()
+	}
+	absDuration := func(d time.Duration) time.Duration {
+		if d < 0 {
+			return -d
+		}
+		return d
+	}
+
+	return func(ctx *gin.Context) {
+		appID := ctx.GetHeader("X-APP-ID")
+		signature := ctx.GetHeader("X-Signature")
+		timestampStr := ctx.GetHeader("X-Timestamp")
+
+		var secretKey string
+		var isExist bool
+		if secretKey, isExist = secretKeyMap[appID]; !isExist {
+			ctx.JSON(http.StatusUnauthorized, gin.H{
+				"code":  http.StatusUnauthorized,
+				"error": "验签不通过",
+			})
+			ctx.Abort()
+			return
+		}
+
+		if signature == "" || timestampStr == "" {
+			ctx.JSON(http.StatusUnauthorized, gin.H{
+				"code":  http.StatusUnauthorized,
+				"error": "缺少签名或时间戳",
+			})
+			ctx.Abort()
+			return
+		}
+
+		// 时间戳校验
+		timestamp, err := strconv.ParseInt(timestampStr, 10, 64)
+		if err != nil {
+			ctx.JSON(http.StatusUnauthorized, gin.H{
+				"code":  http.StatusUnauthorized,
+				"error": "时间戳无效或超时",
+			})
+			ctx.Abort()
+			return
+		}
+		reqTime := time.Unix(timestamp, 0)
+		if absDuration(time.Now().Sub(reqTime)) > timeWindow {
+			ctx.JSON(http.StatusUnauthorized, gin.H{
+				"code":  http.StatusUnauthorized,
+				"error": "时间戳无效或超时",
+			})
+			ctx.Abort()
+			return
+		}
+
+		// 读取原始 body
+		reqBody := generateRequestBody(ctx)
+
+		// 解析 JSON 并排序为字符串
+		var params map[string]interface{}
+		if errJ := json.Unmarshal(reqBody, &params); errJ != nil {
+			ctx.JSON(http.StatusBadRequest, gin.H{
+				"code":  http.StatusBadRequest,
+				"error": "JSON 解析失败",
+			})
+			ctx.Abort()
+			return
+		}
+		// 加入时间戳
+		params["timestamp"] = timestamp
+		signStr := buildSortedParamString(params, toStringFunc)
+
+		// 计算 HMAC-SHA256 签名
+		mac := hmac.New(sha256.New, []byte(secretKey))
+		mac.Write([]byte(signStr))
+		expectedSign := hex.EncodeToString(mac.Sum(nil))
+
+		if expectedSign != signature {
+			ctx.JSON(http.StatusUnauthorized, gin.H{
+				"code":  http.StatusUnauthorized,
+				"error": "验签不通过",
+			})
+			logit.Context(ctx).ErrorW(
+				"signStr", signStr,
+				"expectedSign", expectedSign,
+			)
+			ctx.Abort()
+			return
+		}
 
 		ctx.Next()
 	}
