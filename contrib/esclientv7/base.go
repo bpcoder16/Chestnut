@@ -46,7 +46,45 @@ func (m *Manager) GetByID(ctx context.Context, index, id string, dest any) error
 	return nil
 }
 
-func (m *Manager) Search(ctx context.Context, index string, dsl map[string]any, dest any, o ...func(*esapi.SearchRequest)) (total Total, maxScore float64, err error) {
+type DSLParams struct {
+	From  int                 `json:"from"`
+	Size  int                 `json:"size,omitempty"`
+	Query DSLParamsQuery      `json:"query"`
+	Sort  []map[string]string `json:"sort,omitempty"`
+}
+
+type DSLParamsQuery struct {
+	Bool DSLParamsQueryBool `json:"bool"`
+}
+
+type DSLParamsQueryBool struct {
+	Must               []any `json:"must,omitempty"`
+	Filter             []any `json:"filter,omitempty"`
+	MustNot            []any `json:"must_not,omitempty"`
+	Should             []any `json:"should,omitempty"`
+	MinimumShouldMatch uint8 `json:"minimum_should_match,omitempty"`
+}
+
+func (m *Manager) GetDefaultDSLParams() DSLParams {
+	return DSLParams{
+		Query: DSLParamsQuery{
+			Bool: DSLParamsQueryBool{
+				Must:               make([]any, 0, 2),
+				Filter:             make([]any, 0, 2),
+				MustNot:            make([]any, 0, 2),
+				Should:             make([]any, 0, 2),
+				MinimumShouldMatch: 0,
+			},
+		},
+		Sort: make([]map[string]string, 0, 2),
+	}
+}
+
+func (m *Manager) DefaultSearch(ctx context.Context, index string, params DSLParams, dest any, o ...func(*esapi.SearchRequest)) (total Total, maxScore float64, err error) {
+	return m.Search(ctx, index, params, dest, o...)
+}
+
+func (m *Manager) Search(ctx context.Context, index string, dsl any, dest any, o ...func(*esapi.SearchRequest)) (total Total, maxScore float64, err error) {
 	var buf bytes.Buffer
 	if err = json.NewEncoder(&buf).Encode(dsl); err != nil {
 		return
