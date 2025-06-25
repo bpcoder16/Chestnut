@@ -53,3 +53,11 @@ func RandFloat64() float64 {
 	defer randMu.Unlock()
 	return randGenerate.Float64()
 }
+
+func Shuffle[T any](list []T) {
+	n := len(list)
+	for i := n - 1; i > 0; i-- {
+		j := RandIntN(i + 1) // 注意 i + 1，确保 [0, i] 闭区间
+		list[i], list[j] = list[j], list[i]
+	}
+}
