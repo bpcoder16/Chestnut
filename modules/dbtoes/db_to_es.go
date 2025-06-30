@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"github.com/bpcoder16/Chestnut/v2/contrib/esclientv7"
+	"time"
 )
 
 type ESCommonItem interface {
@@ -12,10 +13,11 @@ type ESCommonItem interface {
 
 const limitNum = 2000
 
-func TimePeriod(ctx context.Context, esManager *esclientv7.Manager, index string, esDataListFunc func(limit, offset int) ([]any, error)) error {
-	startOffset := 0
+func TimePeriod(ctx context.Context, esManager *esclientv7.Manager, index string, lastTime time.Time, lastId uint64, esDataListFunc func(lastTime time.Time, lastId uint64, limit int) (time.Time, uint64, []any, error)) error {
+	var dataList []any
+	var err error
 	for {
-		dataList, err := esDataListFunc(limitNum, startOffset*limitNum)
+		lastTime, lastId, dataList, err = esDataListFunc(lastTime, lastId, limitNum)
 		if err != nil {
 			return err
 		}
@@ -38,7 +40,6 @@ func TimePeriod(ctx context.Context, esManager *esclientv7.Manager, index string
 		if errES := esManager.BulkUpsert(ctx, index, documentList); errES != nil {
 			return errES
 		}
-		startOffset++
 	}
 
 	return nil
