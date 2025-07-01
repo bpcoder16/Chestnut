@@ -1,7 +1,6 @@
 package clickhouse
 
 import (
-	"github.com/bpcoder16/Chestnut/v2/appconfig/env"
 	"github.com/bpcoder16/Chestnut/v2/core/log"
 	"github.com/bpcoder16/Chestnut/v2/core/utils"
 	"gorm.io/driver/clickhouse"
@@ -50,7 +49,6 @@ func (m *Manager) connect(config *ConfigItem) *gorm.DB {
 	params := url.Values{}
 	params.Set("dial_timeout", "10s")
 	params.Set("read_timeout", "20s")
-	params.Set("location", env.TimeLocation().String())
 	dsn := "clickhouse://" + config.Username + ":" + config.Password + "@" +
 		config.Host + ":" + strconv.Itoa(config.Port) + "/" + config.Database + "?" + params.Encode()
 	db, err := gorm.Open(clickhouse.Open(dsn), &gorm.Config{
