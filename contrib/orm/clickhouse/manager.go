@@ -1,11 +1,13 @@
 package clickhouse
 
 import (
+	"github.com/bpcoder16/Chestnut/v2/appconfig/env"
 	"github.com/bpcoder16/Chestnut/v2/core/log"
 	"github.com/bpcoder16/Chestnut/v2/core/utils"
 	"gorm.io/driver/clickhouse"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
+	"net/url"
 	"strconv"
 	"time"
 )
@@ -45,8 +47,12 @@ func (m *Manager) SlaveDB() *gorm.DB {
 }
 
 func (m *Manager) connect(config *ConfigItem) *gorm.DB {
+	params := url.Values{}
+	params.Set("dial_timeout", "10s")
+	params.Set("read_timeout", "20s")
+	params.Set("location", env.TimeLocation().String())
 	dsn := "clickhouse://" + config.Username + ":" + config.Password + "@" +
-		config.Host + ":" + strconv.Itoa(config.Port) + "/" + config.Database + "?dial_timeout=10s&read_timeout=20s"
+		config.Host + ":" + strconv.Itoa(config.Port) + "/" + config.Database + "?" + params.Encode()
 	db, err := gorm.Open(clickhouse.Open(dsn), &gorm.Config{
 		Logger: NewLogger(m.logger, logger.Config{
 			SlowThreshold:             200 * time.Millisecond, // Slow SQL threshold

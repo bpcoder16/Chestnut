@@ -1,11 +1,13 @@
 package mysql
 
 import (
+	"github.com/bpcoder16/Chestnut/v2/appconfig/env"
 	"github.com/bpcoder16/Chestnut/v2/core/log"
 	"github.com/bpcoder16/Chestnut/v2/core/utils"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
+	"net/url"
 	"strconv"
 	"time"
 )
@@ -45,9 +47,13 @@ func (m *Manager) SlaveDB() *gorm.DB {
 }
 
 func (m *Manager) connect(config *ConfigItem) *gorm.DB {
+	params := url.Values{}
+	params.Set("charset", "utf8")
+	params.Set("parseTime", "true")
+	params.Set("loc", env.TimeLocation().String())
 	dsn := config.Username + ":" + config.Password +
 		"@tcp(" + config.Host + ":" + strconv.Itoa(config.Port) + ")/" + config.Database +
-		"?charset=utf8mb4&parseTime=True&loc=Local"
+		"?" + params.Encode()
 	db, err := gorm.Open(mysql.New(mysql.Config{
 		DSN: dsn, // DSN data source name
 		//DefaultStringSize:         256,   // string 类型字段的默认长度

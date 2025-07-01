@@ -17,9 +17,11 @@ import (
 	"github.com/bpcoder16/Chestnut/v2/resty"
 	"io"
 	"path"
+	"time"
 )
 
 func MustInit(ctx context.Context, config *appconfig.AppConfig, funcList ...func(ctx context.Context, debugWriter, infoWriter, warnErrorFatalWriter io.Writer)) {
+	time.Local = env.TimeLocation()
 	lock.InitLocalManager(10000)
 	var debugWriter, infoWriter, warnErrorFatalWriter io.Writer
 	if config.NotUseRotateLog {
