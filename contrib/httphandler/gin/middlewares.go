@@ -2,6 +2,7 @@ package gin
 
 import (
 	"bytes"
+	"encoding/json"
 	"github.com/bpcoder16/Chestnut/v2/core/log"
 	"github.com/bpcoder16/Chestnut/v2/core/signauth"
 	"github.com/bpcoder16/Chestnut/v2/core/utils"
@@ -198,19 +199,20 @@ func SignAuthMiddleware(secretKeyMap map[string]string, timeWindow time.Duration
 		}
 
 		// 读取原始 body
-		reqBody := generateRequestBody(ctx)
+		reqBodyBytes := generateRequestBody(ctx)
 
-		expectedSign, errS := signauth.Signature(secretKey, reqBody, timestamp, toStringFunc)
-		if errS != nil {
+		// 解析 JSON 并排序为字符串
+		var reqBody map[string]any
+		if errJ := json.Unmarshal(reqBodyBytes, &reqBody); errJ != nil {
 			ctx.JSON(http.StatusBadRequest, gin.H{
 				"code":  http.StatusBadRequest,
-				"error": errS.Error(),
+				"error": "JSON 解析失败",
 			})
 			ctx.Abort()
 			return
 		}
 
-		if expectedSign != signature {
+		if signauth.Signature(secretKey, reqBody, timestamp, toStringFunc) != signature {
 			ctx.JSON(http.StatusUnauthorized, gin.H{
 				"code":  http.StatusUnauthorized,
 				"error": "验签不通过",

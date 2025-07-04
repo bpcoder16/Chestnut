@@ -4,7 +4,6 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"net/url"
 	"sort"
 )
@@ -24,16 +23,10 @@ func buildSortedParamString(params map[string]any, toStringFunc func(any) string
 	return pairs.Encode()
 }
 
-func Signature(secretKey string, reqBody []byte, timestamp int64, toStringFunc func(any) string) (signStr string, err error) {
-	// 解析 JSON 并排序为字符串
-	var params map[string]interface{}
-	if err = json.Unmarshal(reqBody, &params); err != nil {
-		return
-	}
-
+func Signature(secretKey string, reqBody map[string]any, timestamp int64, toStringFunc func(any) string) (signStr string) {
 	// 加入时间戳
-	params["timestamp"] = timestamp
-	sortedParamStr := buildSortedParamString(params, toStringFunc)
+	reqBody["timestamp"] = timestamp
+	sortedParamStr := buildSortedParamString(reqBody, toStringFunc)
 
 	// 计算 HMAC-SHA256 签名
 	mac := hmac.New(sha256.New, []byte(secretKey))
