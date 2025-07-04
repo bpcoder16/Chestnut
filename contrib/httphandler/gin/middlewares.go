@@ -2,11 +2,8 @@ package gin
 
 import (
 	"bytes"
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/hex"
-	"encoding/json"
 	"github.com/bpcoder16/Chestnut/v2/core/log"
+	"github.com/bpcoder16/Chestnut/v2/core/signauth"
 	"github.com/bpcoder16/Chestnut/v2/core/utils"
 	"github.com/bpcoder16/Chestnut/v2/logit"
 	"github.com/gin-gonic/gin"
@@ -15,9 +12,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httputil"
-	"net/url"
 	"os"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -150,20 +145,6 @@ func CORS() gin.HandlerFunc {
 }
 
 func SignAuthMiddleware(secretKeyMap map[string]string, timeWindow time.Duration, toStringFunc func(any) string) gin.HandlerFunc {
-	buildSortedParamString := func(params map[string]any, toStringFunc func(any) string) string {
-		var keys []string
-		for k := range params {
-			keys = append(keys, k)
-		}
-		sort.Strings(keys)
-
-		pairs := url.Values{}
-		for _, key := range keys {
-			pairs.Set(key, toStringFunc(params[key]))
-		}
-
-		return pairs.Encode()
-	}
 	absDuration := func(d time.Duration) time.Duration {
 		if d < 0 {
 			return -d
@@ -219,34 +200,21 @@ func SignAuthMiddleware(secretKeyMap map[string]string, timeWindow time.Duration
 		// 读取原始 body
 		reqBody := generateRequestBody(ctx)
 
-		// 解析 JSON 并排序为字符串
-		var params map[string]interface{}
-		if errJ := json.Unmarshal(reqBody, &params); errJ != nil {
+		expectedSign, errS := signauth.Signature(secretKey, reqBody, timestamp, toStringFunc)
+		if errS != nil {
 			ctx.JSON(http.StatusBadRequest, gin.H{
 				"code":  http.StatusBadRequest,
-				"error": "JSON 解析失败",
+				"error": errS.Error(),
 			})
 			ctx.Abort()
 			return
 		}
-		// 加入时间戳
-		params["timestamp"] = timestamp
-		signStr := buildSortedParamString(params, toStringFunc)
-
-		// 计算 HMAC-SHA256 签名
-		mac := hmac.New(sha256.New, []byte(secretKey))
-		mac.Write([]byte(signStr))
-		expectedSign := hex.EncodeToString(mac.Sum(nil))
 
 		if expectedSign != signature {
 			ctx.JSON(http.StatusUnauthorized, gin.H{
 				"code":  http.StatusUnauthorized,
 				"error": "验签不通过",
 			})
-			logit.Context(ctx).ErrorW(
-				"signStr", signStr,
-				"expectedSign", expectedSign,
-			)
 			ctx.Abort()
 			return
 		}
