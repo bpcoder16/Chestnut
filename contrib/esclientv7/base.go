@@ -227,3 +227,57 @@ func (m *Manager) BulkUpsert(ctx context.Context, index string, docs []Document)
 
 	return nil
 }
+
+type AnalyzeParams struct {
+	Analyzer string `json:"analyzer"`
+}
+
+type AnalyzeResponse struct {
+	Tokens []AnalyzeResponseToken `json:"tokens"`
+}
+
+type AnalyzeResponseToken struct {
+	Token          string `json:"token"`
+	StartOffset    int    `json:"start_offset"`
+	EndOffset      int    `json:"end_offset"`
+	Type           string `json:"type"`
+	Position       int    `json:"position"`
+	PositionLength int    `json:"positionLength"`
+}
+
+func (m *Manager) Analyze(ctx context.Context, index, text string, params AnalyzeParams) (result AnalyzeResponse, err error) {
+	reqBody := map[string]any{
+		"text": text,
+	}
+	if len(params.Analyzer) > 0 {
+		reqBody["analyzer"] = params.Analyzer
+	}
+	var buf bytes.Buffer
+	if err = json.NewEncoder(&buf).Encode(reqBody); err != nil {
+		return
+	}
+
+	var res *esapi.Response
+	res, err = m.client.Indices.Analyze(
+		m.client.Indices.Analyze.WithContext(ctx),
+		m.client.Indices.Analyze.WithIndex(index),
+		m.client.Indices.Analyze.WithBody(&buf),
+	)
+	if err != nil {
+		return
+	}
+	defer res.Body.Close()
+
+	if res.IsError() {
+		err = fmt.Errorf("analyze error: %s", res.String())
+		return
+	}
+
+	// 解析结果
+	if err = json.NewDecoder(res.Body).Decode(&result); err != nil {
+		err = fmt.Errorf("decode response failed: %w", err)
+		return
+	}
+
+	return
+}
