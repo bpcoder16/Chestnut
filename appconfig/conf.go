@@ -23,6 +23,8 @@ type AppConfig struct {
 	DefaultMongoDBSupport    bool
 	AliyunOSSSupport         bool
 	UseLRUCache              bool
+	QueueSize                int
+	ConsumerSize             int
 }
 
 func (c *AppConfig) Check() (err error) {

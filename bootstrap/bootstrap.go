@@ -6,6 +6,7 @@ import (
 	"github.com/bpcoder16/Chestnut/v2/appconfig/env"
 	"github.com/bpcoder16/Chestnut/v2/clickhouse"
 	"github.com/bpcoder16/Chestnut/v2/contrib/aliyun/oss"
+	"github.com/bpcoder16/Chestnut/v2/core/asynctask"
 	"github.com/bpcoder16/Chestnut/v2/core/log"
 	"github.com/bpcoder16/Chestnut/v2/lock"
 	"github.com/bpcoder16/Chestnut/v2/logit"
@@ -51,6 +52,9 @@ func MustInit(ctx context.Context, config *appconfig.AppConfig, funcList ...func
 	}
 	if config.DefaultClickhouseSupport {
 		initClickhouse(debugWriter, infoWriter, warnErrorFatalWriter)
+	}
+	if config.QueueSize > 0 {
+		asynctask.Init(config.QueueSize)
 	}
 	initHTTPClient(debugWriter, infoWriter, warnErrorFatalWriter)
 	for _, fn := range funcList {
