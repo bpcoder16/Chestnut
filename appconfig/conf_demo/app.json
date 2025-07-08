@@ -16,5 +16,7 @@
   "DefaultRedisSupport": true,
   "DefaultMongoDBSupport": true,
   "AliyunOSSSupport": true,
-  "UseLRUCache": false
+  "UseLRUCache": false,
+  "QueueSize": 10000,
+  "ConsumerSize": 1000
 }
