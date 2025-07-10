@@ -1,6 +1,7 @@
 package mysql
 
 import (
+	"github.com/bpcoder16/Chestnut/v2/appconfig/env"
 	"github.com/bpcoder16/Chestnut/v2/core/log"
 	"github.com/bpcoder16/Chestnut/v2/core/utils"
 	"gorm.io/driver/mysql"
@@ -49,6 +50,7 @@ func (m *Manager) connect(config *ConfigItem) *gorm.DB {
 	params := url.Values{}
 	params.Set("charset", "utf8")
 	params.Set("parseTime", "true")
+	params.Set("loc", env.TimeLocation().String())
 	dsn := config.Username + ":" + config.Password +
 		"@tcp(" + config.Host + ":" + strconv.Itoa(config.Port) + ")/" + config.Database +
 		"?" + params.Encode()
@@ -67,6 +69,9 @@ func (m *Manager) connect(config *ConfigItem) *gorm.DB {
 			ParameterizedQueries:      false,                  // Don't include params in the SQL log
 			Colorful:                  false,
 		}),
+		//NowFunc: func() time.Time {
+		//	return time.Now().In(env.TimeLocation())
+		//},
 	})
 	if err != nil {
 		panic(dsn + ", failed to connect database: " + err.Error())
