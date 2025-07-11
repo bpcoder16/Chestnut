@@ -3,6 +3,7 @@ package gin
 import (
 	"bytes"
 	"encoding/json"
+	"github.com/bpcoder16/Chestnut/v2/appconfig/env"
 	"github.com/bpcoder16/Chestnut/v2/core/log"
 	"github.com/bpcoder16/Chestnut/v2/core/signauth"
 	"github.com/bpcoder16/Chestnut/v2/core/utils"
@@ -163,7 +164,7 @@ func SignAuthMiddleware(secretKeyMap map[string]string, timeWindow time.Duration
 		if secretKey, isExist = secretKeyMap[appID]; !isExist {
 			ctx.JSON(http.StatusUnauthorized, gin.H{
 				"code":  http.StatusUnauthorized,
-				"error": "验签不通过",
+				"error": "验签不存在",
 			})
 			ctx.Abort()
 			return
@@ -213,9 +214,13 @@ func SignAuthMiddleware(secretKeyMap map[string]string, timeWindow time.Duration
 		}
 
 		if signauth.Signature(secretKey, reqBody, timestamp, toStringFunc) != signature {
+			errMsg := "验签不通过"
+			if env.RunMode() == env.RunModeDebug {
+				errMsg += "[sortedParamStr:" + signauth.BuildSortedParamString(reqBody, toStringFunc) + "]"
+			}
 			ctx.JSON(http.StatusUnauthorized, gin.H{
 				"code":  http.StatusUnauthorized,
-				"error": "验签不通过",
+				"error": errMsg,
 			})
 			ctx.Abort()
 			return

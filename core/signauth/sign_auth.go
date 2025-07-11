@@ -8,7 +8,7 @@ import (
 	"sort"
 )
 
-func buildSortedParamString(params map[string]any, toStringFunc func(any) string) string {
+func BuildSortedParamString(params map[string]any, toStringFunc func(any) string) string {
 	var keys []string
 	for k := range params {
 		keys = append(keys, k)
@@ -26,7 +26,7 @@ func buildSortedParamString(params map[string]any, toStringFunc func(any) string
 func Signature(secretKey string, reqBody map[string]any, timestamp int64, toStringFunc func(any) string) (signStr string) {
 	// 加入时间戳
 	reqBody["timestamp"] = timestamp
-	sortedParamStr := buildSortedParamString(reqBody, toStringFunc)
+	sortedParamStr := BuildSortedParamString(reqBody, toStringFunc)
 
 	// 计算 HMAC-SHA256 签名
 	mac := hmac.New(sha256.New, []byte(secretKey))
