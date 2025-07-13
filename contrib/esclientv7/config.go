@@ -13,7 +13,7 @@ type Config struct {
 
 func loadConfig(configPath string) *Config {
 	var config Config
-	err := utils.ParseJSONFile(configPath, &config)
+	err := utils.ParseFile(configPath, &config)
 	if err != nil {
 		panic("load elasticsearch conf err:" + err.Error())
 	}

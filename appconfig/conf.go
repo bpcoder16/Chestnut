@@ -41,7 +41,7 @@ func (c *AppConfig) Check() (err error) {
 
 func ParseConfig(confPath string, configPtr *AppConfig) (err error) {
 	if confPath, err = filepath.Abs(confPath); err == nil {
-		if err = utils.ParseJSONFile(confPath, configPtr); err == nil {
+		if err = utils.ParseFile(confPath, configPtr); err == nil {
 			err = configPtr.Check()
 		}
 	}
