@@ -80,11 +80,11 @@ func initLoggers(_ context.Context, config *appconfig.AppConfig, debugWriter, in
 }
 
 func initAliyunOSS() {
-	oss.InitAliyunOSS(path.Join(env.ConfigDirPath(), "aliyun.json"))
+	oss.InitAliyunOSS(path.Join(env.ConfigDirPath(), "aliyun.yaml"))
 }
 
 func initMongoDB(ctx context.Context, debugWriter, infoWriter, warnErrorFatalWriter io.Writer) {
-	mongodb.SetManager(ctx, path.Join(env.ConfigDirPath(), "mongodb.json"), log.NewHelper(
+	mongodb.SetManager(ctx, path.Join(env.ConfigDirPath(), "mongodb.yaml"), log.NewHelper(
 		zaplogger.GetZapLogger(
 			debugWriter, infoWriter, warnErrorFatalWriter,
 			log.FileWithLineNumCaller(),
@@ -102,7 +102,7 @@ func initMongoDB(ctx context.Context, debugWriter, infoWriter, warnErrorFatalWri
 }
 
 func initUseLRUCache(_ context.Context, debugWriter, infoWriter, warnErrorFatalWriter io.Writer) {
-	lru.SetManager(path.Join(env.ConfigDirPath(), "lru.json"), log.NewHelper(
+	lru.SetManager(path.Join(env.ConfigDirPath(), "lru.yaml"), log.NewHelper(
 		zaplogger.GetZapLogger(
 			debugWriter, infoWriter, warnErrorFatalWriter,
 			log.FileWithLineNumCaller(),
@@ -120,7 +120,7 @@ func initUseLRUCache(_ context.Context, debugWriter, infoWriter, warnErrorFatalW
 }
 
 func initRedis(debugWriter, infoWriter, warnErrorFatalWriter io.Writer) {
-	redis.SetManager(path.Join(env.ConfigDirPath(), "redis.json"), log.NewHelper(
+	redis.SetManager(path.Join(env.ConfigDirPath(), "redis.yaml"), log.NewHelper(
 		zaplogger.GetZapLogger(
 			debugWriter, infoWriter, warnErrorFatalWriter,
 			log.FileWithLineNumCallerRedis(),
@@ -138,7 +138,7 @@ func initRedis(debugWriter, infoWriter, warnErrorFatalWriter io.Writer) {
 }
 
 func initMySQL(debugWriter, infoWriter, warnErrorFatalWriter io.Writer) {
-	mysql.SetManager(path.Join(env.ConfigDirPath(), "mysql.json"), log.NewHelper(
+	mysql.SetManager(path.Join(env.ConfigDirPath(), "mysql.yaml"), log.NewHelper(
 		zaplogger.GetZapLogger(
 			debugWriter, infoWriter, warnErrorFatalWriter,
 			nil,
@@ -156,7 +156,7 @@ func initMySQL(debugWriter, infoWriter, warnErrorFatalWriter io.Writer) {
 }
 
 func initClickhouse(debugWriter, infoWriter, warnErrorFatalWriter io.Writer) {
-	clickhouse.SetManager(path.Join(env.ConfigDirPath(), "clickhouse.json"), log.NewHelper(
+	clickhouse.SetManager(path.Join(env.ConfigDirPath(), "clickhouse.yaml"), log.NewHelper(
 		zaplogger.GetZapLogger(
 			debugWriter, infoWriter, warnErrorFatalWriter,
 			nil,

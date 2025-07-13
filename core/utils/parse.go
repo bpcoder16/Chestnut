@@ -14,14 +14,14 @@ func ParseFile(filePath string, resPtr interface{}) (err error) {
 	v := viper.New()
 	v.SetConfigFile(filePath)
 	switch ext {
-	case "json":
+	case ".json":
 		v.SetConfigType("json")
-	case "yaml", "yml":
+	case ".yaml", ".yml":
 		v.SetConfigType("yaml")
-	case "toml":
+	case ".toml":
 		v.SetConfigType("toml")
 	default:
-		err = errors.New("不支持的配置类型")
+		err = errors.New("不支持的配置类型：" + ext)
 		return
 	}
 	err = v.ReadInConfig()

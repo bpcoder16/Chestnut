@@ -1,0 +1,20 @@
+env:
+  appName: "Chestnut"
+  runMode: "debug"
+  timeLocation: "Asia/Shanghai"
+  configDirName: ""
+
+filterKeys:
+  - "password"
+
+logDir: ""
+notUseRotateLog: false
+StdRedirectFileSupport: true
+DefaultMySQLSupport: true
+DefaultClickhouseSupport: true
+DefaultRedisSupport: true
+DefaultMongoDBSupport: true
+AliyunOSSSupport: true
+UseLRUCache: false
+QueueSize: 10000
+ConsumerSize: 1000

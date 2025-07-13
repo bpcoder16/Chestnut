@@ -1,0 +1,17 @@
+master:
+  host: ""
+  port: 9000
+  database: ""
+  username: ""
+  password: ""
+  maxIdleConns: 10
+  maxOpenConns: 100
+
+slaves:
+  - host: ""
+    port: 9000
+    database: ""
+    username: ""
+    password: ""
+    maxIdleConns: 10
+    maxOpenConns: 100
