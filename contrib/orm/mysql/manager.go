@@ -48,7 +48,11 @@ func (m *Manager) SlaveDB() *gorm.DB {
 
 func (m *Manager) connect(config *ConfigItem) *gorm.DB {
 	params := url.Values{}
-	params.Set("charset", "utf8")
+	if len(config.Charset) > 0 {
+		params.Set("charset", config.Charset)
+	} else {
+		params.Set("charset", "utf8mb4")
+	}
 	params.Set("parseTime", "true")
 	params.Set("loc", env.TimeLocation().String())
 	dsn := config.Username + ":" + config.Password +

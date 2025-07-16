@@ -6,6 +6,7 @@ type ConfigItem struct {
 	Host         string `json:"host"`
 	Port         int    `json:"port"`
 	Database     string `json:"database"`
+	Charset      string `json:"charset"`
 	Username     string `json:"username"`
 	Password     string `json:"password"`
 	MaxIdleConns int    `json:"maxIdleConns"`
