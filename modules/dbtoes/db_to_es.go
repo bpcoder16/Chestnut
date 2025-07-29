@@ -12,6 +12,48 @@ type ESCommonItem interface {
 }
 
 const limitNum = 2000
+const defaultRetryTimes = 3
+
+func TimePeriodRetry(ctx context.Context, esManager *esclientv7.Manager, index string, lastTime time.Time, lastId uint64, esDataListFunc func(lastTime time.Time, lastId uint64, limit int) (time.Time, uint64, []any, error), retryTimes uint8) error {
+	if retryTimes == 0 {
+		retryTimes = defaultRetryTimes
+	}
+	var dataList []any
+	var err error
+	var realRetryTimes uint8
+	for {
+		lastTime, lastId, dataList, err = esDataListFunc(lastTime, lastId, limitNum)
+		if err != nil {
+			if realRetryTimes >= retryTimes {
+				return err
+			}
+			retryTimes++
+			continue
+		}
+		if len(dataList) == 0 {
+			break
+		}
+		documentList := make([]esclientv7.Document, 0, len(dataList))
+		for _, v := range dataList {
+			esData := v
+			if esCommonItem, ok := esData.(ESCommonItem); ok {
+				documentList = append(documentList, esclientv7.Document{
+					ID:      esCommonItem.GetDocId(),
+					Content: esData,
+				})
+			}
+		}
+		if len(documentList) == 0 {
+			return errors.New("documentList.Empty")
+		}
+		if errES := esManager.BulkUpsert(ctx, index, documentList); errES != nil {
+			return errES
+		}
+		realRetryTimes = 0
+	}
+
+	return nil
+}
 
 func TimePeriod(ctx context.Context, esManager *esclientv7.Manager, index string, lastTime time.Time, lastId uint64, esDataListFunc func(lastTime time.Time, lastId uint64, limit int) (time.Time, uint64, []any, error)) error {
 	var dataList []any
