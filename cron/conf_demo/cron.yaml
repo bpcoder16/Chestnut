@@ -1,5 +1,5 @@
 lockPreName: "cron:lock:v1"
-isRunCron: true
+isRunCron: false
 cronList:
   - name: "Demo1"
     deadLockExpireMillisecond: 2000

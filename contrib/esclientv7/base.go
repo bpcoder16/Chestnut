@@ -47,9 +47,9 @@ func (m *Manager) GetByID(ctx context.Context, index, id string, dest any) error
 }
 
 type DSLParams struct {
-	From  int                 `json:"from"`
+	From  int                 `json:"from,omitempty"`
 	Size  int                 `json:"size,omitempty"`
-	Query DSLParamsQuery      `json:"query"`
+	Query DSLParamsQuery      `json:"query,omitempty"`
 	Sort  []map[string]string `json:"sort,omitempty"`
 }
 
@@ -132,6 +132,53 @@ func (m *Manager) Search(ctx context.Context, index string, dsl any, dest any, o
 	if err = json.Unmarshal(result.Hits.Hits, dest); err != nil {
 		err = fmt.Errorf("unmarshal hits failed: %w", err)
 	}
+
+	return
+}
+
+func (m *Manager) DefaultCount(ctx context.Context, index string, params DSLParams, o ...func(*esapi.CountRequest)) (count int64, err error) {
+	return m.Count(ctx, index, params, o...)
+}
+
+func (m *Manager) Count(ctx context.Context, index string, dsl any, o ...func(*esapi.CountRequest)) (count int64, err error) {
+	var buf bytes.Buffer
+	if err = json.NewEncoder(&buf).Encode(dsl); err != nil {
+		return
+	}
+
+	searchParams := make([]func(request *esapi.CountRequest), 0, 3)
+	searchParams = append(searchParams,
+		m.client.Count.WithContext(ctx),
+		m.client.Count.WithIndex(index),
+		m.client.Count.WithBody(&buf),
+		//m.client.Count.WithPretty(),
+	)
+	if len(o) > 0 {
+		searchParams = append(searchParams, o...)
+	}
+
+	var res *esapi.Response
+	res, err = m.client.Count(searchParams...)
+	if err != nil {
+		return
+	}
+	defer res.Body.Close()
+
+	if res.IsError() {
+		err = fmt.Errorf("count error: %s", res.String())
+		return
+	}
+
+	// 解析结果
+	var result struct {
+		Count int64 `json:"count"`
+	}
+	if err = json.NewDecoder(res.Body).Decode(&result); err != nil {
+		err = fmt.Errorf("decode response failed: %w", err)
+		return
+	}
+
+	count = result.Count
 
 	return
 }
