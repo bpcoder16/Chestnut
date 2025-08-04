@@ -19,15 +19,16 @@ func BatchInsertData[T comparable](ctx context.Context, db *gorm.DB, list []T, b
 	}
 }
 
-func LoopedReadData[T comparable](ctx context.Context, db *gorm.DB, where, order string, limit int) (result []T, err error) {
+func LoopedReadData[T comparable](ctx context.Context, db *gorm.DB, result []T, order string, limit int, whereQuery any, whereArgs ...any) (resultNew []T, err error) {
 	page := 0
-	result = make([]T, 0, limit*2)
+	resultNew = make([]T, 0, len(result)*2)
+	resultNew = append(resultNew, result...)
 	for {
 		var resultTmp []T
-		if err = db.WithContext(ctx).Where(where).Order(order).Limit(limit).Offset(page * limit).Find(&resultTmp).Error; err != nil || len(resultTmp) == 0 {
+		if err = db.WithContext(ctx).Where(whereQuery, whereArgs...).Order(order).Limit(limit).Offset(page * limit).Find(&resultTmp).Error; err != nil || len(resultTmp) == 0 {
 			return
 		}
-		result = append(result, resultTmp...)
+		resultNew = append(resultNew, resultTmp...)
 		page++
 	}
 }
