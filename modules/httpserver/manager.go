@@ -2,8 +2,12 @@ package httpserver
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/bpcoder16/Chestnut/v2/logit"
@@ -16,38 +20,61 @@ type Router interface {
 type Manager struct {
 	config  *Config
 	handler http.Handler
+	server  *http.Server
 }
 
 func NewManager(configPath string, handler http.Handler) *Manager {
+	config := loadConfig(configPath)
 	manager := &Manager{
-		config:  loadConfig(configPath),
+		config:  config,
 		handler: handler,
+		server: &http.Server{
+			Addr:              ":" + config.Port,
+			Handler:           handler,
+			ReadTimeout:       config.ReadTimeoutMillisecond * time.Millisecond,
+			ReadHeaderTimeout: config.ReadHeaderTimeoutMillisecond * time.Millisecond,
+			WriteTimeout:      config.WriteTimeoutMillisecond * time.Millisecond,
+			IdleTimeout:       config.IdleTimeoutMillisecond * time.Millisecond,
+			MaxHeaderBytes:    config.MaxHeaderBytes,
+			ConnState: func() func(conn net.Conn, state http.ConnState) {
+				if config.IsOpenConnStateTraceLog {
+					return connStateHandler
+				}
+				return nil
+			}(),
+			//BaseContext: func(listener net.Listener) context.Context {
+			//	ctx := context.Background()
+			//	ctx = context.WithValue(ctx, log.DefaultMessageKey, "HTTP")
+			//	ctx = context.WithValue(ctx, log.DefaultLogIdKey, utils.UniqueID())
+			//	return ctx
+			//},
+		},
 	}
 	return manager
 }
 
-func (m *Manager) Run() error {
-	return (&http.Server{
-		Addr:              ":" + m.config.Port,
-		Handler:           m.handler,
-		ReadTimeout:       m.config.ReadTimeoutMillisecond * time.Millisecond,
-		ReadHeaderTimeout: m.config.ReadHeaderTimeoutMillisecond * time.Millisecond,
-		WriteTimeout:      m.config.WriteTimeoutMillisecond * time.Millisecond,
-		IdleTimeout:       m.config.IdleTimeoutMillisecond * time.Millisecond,
-		MaxHeaderBytes:    m.config.MaxHeaderBytes,
-		ConnState: func() func(conn net.Conn, state http.ConnState) {
-			if m.config.IsOpenConnStateTraceLog {
-				return connStateHandler
-			}
-			return nil
-		}(),
-		//BaseContext: func(listener net.Listener) context.Context {
-		//	ctx := context.Background()
-		//	ctx = context.WithValue(ctx, log.DefaultMessageKey, "HTTP")
-		//	ctx = context.WithValue(ctx, log.DefaultLogIdKey, utils.UniqueID())
-		//	return ctx
-		//},
-	}).ListenAndServe()
+func (m *Manager) Run(ctx context.Context) error {
+	go func() {
+		// 捕获系统信号以优雅地关闭调度器
+		sigChan := make(chan os.Signal, 1)
+		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+
+		select {
+		case <-ctx.Done():
+			logit.Context(ctx).InfoW("httpServer.Manager.Run", "Context cancelled, HttpServer preparing to shutdown")
+		case sig := <-sigChan:
+			logit.Context(ctx).InfoW("httpServer.Manager.Run", fmt.Sprintf("Received signal: %v, HttpServer preparing to shutdown", sig))
+		}
+
+		logit.Context(ctx).InfoW("httpServer.Manager.Run", "HttpServer shutdown...")
+		if err := m.server.Shutdown(ctx); err != nil {
+			logit.Context(ctx).ErrorW("httpServer.Manager.Run", "HttpServer shutdown failed:"+err.Error())
+		}
+		logit.Context(ctx).InfoW("httpServer.Manager.Run", "HttpServer shutdown completed, exited")
+	}()
+
+	logit.Context(ctx).InfoW("httpServer.Manager.Run", "HttpServer started")
+	return m.server.ListenAndServe()
 }
 
 func connStateHandler(conn net.Conn, state http.ConnState) {
