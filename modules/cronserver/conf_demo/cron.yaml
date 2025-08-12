@@ -1,0 +1,18 @@
+isRunCron: false
+cronList:
+  - name: "Demo1"
+    maxConcurrencyCnt: 1
+    jobType: "CronJob"
+    cronJobParams:
+      crontab: "*/2 * * * * *"
+  - name: "Demo2"
+    maxConcurrencyCnt: 1
+    jobType: "DurationJob"
+    durationJobParams:
+      everyMillisecond: 5000
+  - name: "Demo3"
+    maxConcurrencyCnt: 1
+    jobType: "DurationRandomJob"
+    durationRandomJobParams:
+      minMillisecond: 1000
+      maxMillisecond: 5000

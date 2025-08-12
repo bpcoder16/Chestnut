@@ -1,10 +1,11 @@
 package gin
 
 import (
-	"github.com/gin-gonic/gin"
 	"math"
 	"net/http"
 	"path"
+
+	"github.com/gin-gonic/gin"
 )
 
 // abortIndex represents a typical value used in abort functions.

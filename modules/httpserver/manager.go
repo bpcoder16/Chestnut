@@ -2,10 +2,11 @@ package httpserver
 
 import (
 	"context"
-	"github.com/bpcoder16/Chestnut/v2/logit"
 	"net"
 	"net/http"
 	"time"
+
+	"github.com/bpcoder16/Chestnut/v2/logit"
 )
 
 type Router interface {
