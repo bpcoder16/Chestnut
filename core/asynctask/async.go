@@ -2,10 +2,16 @@ package asynctask
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"os"
+	"os/signal"
+	"sync"
+	"syscall"
+
 	"github.com/bpcoder16/Chestnut/v2/core/log"
 	"github.com/bpcoder16/Chestnut/v2/core/utils"
 	"github.com/bpcoder16/Chestnut/v2/logit"
-	"sync"
 )
 
 var once sync.Once
@@ -55,11 +61,17 @@ func StartConsumerPool(ctx context.Context, consumerCount int, goFunc func(f fun
 
 func Consumer(ctx context.Context) error {
 	Init(defaultQueueSize)
+	// 捕获系统信号以优雅地关闭调度器
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM, syscall.SIGKILL)
+
 	ctx = context.WithValue(ctx, log.DefaultMessageKey, "AsyncTask")
 	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
+		case sig := <-sigChan:
+			return errors.New(fmt.Sprintf("Received signal: %v, Consumer shutdown", sig))
 		case f := <-fChan:
 			task(ctx, f)
 		}
