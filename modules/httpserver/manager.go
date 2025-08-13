@@ -66,9 +66,10 @@ func (m *Manager) Run(ctx context.Context) error {
 			logit.Context(ctx).InfoW("httpServer.Manager.Run", fmt.Sprintf("Received signal: %v, HttpServer preparing to shutdown", sig))
 		}
 
-		logit.Context(ctx).InfoW("httpServer.Manager.Run", "HttpServer shutdown...")
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
+
+		logit.Context(ctx).InfoW("httpServer.Manager.Run", "HttpServer shutdown...")
 		if err := m.server.Shutdown(shutdownCtx); err != nil {
 			logit.Context(ctx).ErrorW("httpServer.Manager.Run", "HttpServer shutdown failed: "+err.Error())
 		}
