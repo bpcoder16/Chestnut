@@ -72,7 +72,10 @@ func Consumer(ctx context.Context) error {
 			return ctx.Err()
 		case sig := <-sigChan:
 			return errors.New(fmt.Sprintf("Received signal: %v, Consumer shutdown", sig))
-		case f := <-fChan:
+		case f, ok := <-fChan:
+			if !ok {
+				return errors.New("consumer Channel closed")
+			}
 			task(ctx, f)
 		}
 	}

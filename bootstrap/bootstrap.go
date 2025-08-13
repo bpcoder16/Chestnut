@@ -2,6 +2,10 @@ package bootstrap
 
 import (
 	"context"
+	"io"
+	"path"
+	"time"
+
 	"github.com/bpcoder16/Chestnut/v2/appconfig"
 	"github.com/bpcoder16/Chestnut/v2/appconfig/env"
 	"github.com/bpcoder16/Chestnut/v2/clickhouse"
@@ -16,9 +20,7 @@ import (
 	"github.com/bpcoder16/Chestnut/v2/mysql"
 	"github.com/bpcoder16/Chestnut/v2/redis"
 	"github.com/bpcoder16/Chestnut/v2/resty"
-	"io"
-	"path"
-	"time"
+	"github.com/bpcoder16/Chestnut/v2/sqlite"
 )
 
 func MustInit(ctx context.Context, config *appconfig.AppConfig, funcList ...func(ctx context.Context, debugWriter, infoWriter, warnErrorFatalWriter io.Writer)) {
@@ -49,6 +51,9 @@ func MustInit(ctx context.Context, config *appconfig.AppConfig, funcList ...func
 	}
 	if config.DefaultMySQLSupport {
 		initMySQL(debugWriter, infoWriter, warnErrorFatalWriter)
+	}
+	if config.DefaultSQLiteSupport {
+		initSQLite(debugWriter, infoWriter, warnErrorFatalWriter)
 	}
 	if config.DefaultClickhouseSupport {
 		initClickhouse(debugWriter, infoWriter, warnErrorFatalWriter)
@@ -139,6 +144,24 @@ func initRedis(debugWriter, infoWriter, warnErrorFatalWriter io.Writer) {
 
 func initMySQL(debugWriter, infoWriter, warnErrorFatalWriter io.Writer) {
 	mysql.SetManager(path.Join(env.ConfigDirPath(), "mysql.yaml"), log.NewHelper(
+		zaplogger.GetZapLogger(
+			debugWriter, infoWriter, warnErrorFatalWriter,
+			nil,
+			log.FilterLevel(func() log.Level {
+				if env.RunMode() == env.RunModeRelease {
+					return log.LevelInfo
+				}
+				return log.LevelDebug
+			}()),
+			//log.FilterFunc(func(level log.Level, keyValues ...interface{}) bool {
+			//	return false
+			//}),
+		),
+	))
+}
+
+func initSQLite(debugWriter, infoWriter, warnErrorFatalWriter io.Writer) {
+	sqlite.SetManager(path.Join(env.ConfigDirPath(), "sqlite.yaml"), log.NewHelper(
 		zaplogger.GetZapLogger(
 			debugWriter, infoWriter, warnErrorFatalWriter,
 			nil,

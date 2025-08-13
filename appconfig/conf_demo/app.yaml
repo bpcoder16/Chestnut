@@ -11,6 +11,7 @@ logDir: ""
 notUseRotateLog: false
 StdRedirectFileSupport: true
 DefaultMySQLSupport: true
+DefaultSQLiteSupport: false
 DefaultClickhouseSupport: true
 DefaultRedisSupport: true
 DefaultMongoDBSupport: true

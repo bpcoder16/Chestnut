@@ -2,10 +2,11 @@ package appconfig
 
 import (
 	"errors"
-	"github.com/bpcoder16/Chestnut/v2/appconfig/env"
-	"github.com/bpcoder16/Chestnut/v2/core/utils"
 	"path"
 	"path/filepath"
+
+	"github.com/bpcoder16/Chestnut/v2/appconfig/env"
+	"github.com/bpcoder16/Chestnut/v2/core/utils"
 )
 
 type AppConfig struct {
@@ -18,6 +19,7 @@ type AppConfig struct {
 
 	StdRedirectFileSupport   bool
 	DefaultMySQLSupport      bool
+	DefaultSQLiteSupport     bool
 	DefaultClickhouseSupport bool
 	DefaultRedisSupport      bool
 	DefaultMongoDBSupport    bool

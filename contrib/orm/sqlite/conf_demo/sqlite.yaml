@@ -1,0 +1,3 @@
+DSN: "./data/test.db"
+maxIdleConns: 1
+maxOpenConns: 2
