@@ -69,7 +69,7 @@ func Run(ctx context.Context) {
 
 	// 捕获系统信号以优雅地关闭调度器
 	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM, syscall.SIGKILL)
 
 	select {
 	case <-ctx.Done():
