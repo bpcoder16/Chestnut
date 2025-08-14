@@ -26,3 +26,4 @@ asyncService:
   Support: false
   QueueSize: 10000
   ConsumerSize: 1000
+  TaskMaxRetryCnt: 3
