@@ -15,7 +15,7 @@ var rootCmd *cobra.Command
 func InitRootCmd(ctx context.Context) {
 	// rootCmd 是主命令。
 	rootCmd = &cobra.Command{
-		Use:   env.AppName() + "-Cli",
+		Use:   env.AppName() + "-cmd",
 		Short: "命令应用列表",
 		Long:  env.AppName() + " 的命令应用列表",
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {

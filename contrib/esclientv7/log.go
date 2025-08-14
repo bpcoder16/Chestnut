@@ -11,7 +11,7 @@ import (
 
 type Logger struct {
 	*log.Helper
-	EnableDebug bool
+	Log Log
 }
 
 func (l *Logger) LogRoundTrip(req *http.Request, resp *http.Response, err error, _ time.Time, duration time.Duration) error {
@@ -37,9 +37,9 @@ func (l *Logger) LogRoundTrip(req *http.Request, resp *http.Response, err error,
 }
 
 func (l *Logger) RequestBodyEnabled() bool {
-	return l.EnableDebug
+	return l.Log.RequestBodyEnabled
 }
 
 func (l *Logger) ResponseBodyEnabled() bool {
-	return l.EnableDebug
+	return l.Log.ResponseBodyEnabled
 }

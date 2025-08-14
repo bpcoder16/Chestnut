@@ -34,10 +34,10 @@ func (m *Manager) connect() {
 		//Transport: &http.Transport{},
 	}
 
-	if m.config.EnableDebug {
+	if m.config.Log.Enabled {
 		cfg.Logger = &Logger{
-			Helper:      m.logger,
-			EnableDebug: m.config.EnableDebug,
+			Helper: m.logger,
+			Log:    m.config.Log,
 		}
 	}
 	var err error

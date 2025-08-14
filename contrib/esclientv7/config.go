@@ -5,10 +5,16 @@ import (
 )
 
 type Config struct {
-	Addresses   []string // A list of Elasticsearch nodes to use.
-	Username    string   // Username for HTTP Basic Authentication.
-	Password    string   // Password for HTTP Basic Authentication.
-	EnableDebug bool
+	Addresses []string // A list of Elasticsearch nodes to use.
+	Username  string   // Username for HTTP Basic Authentication.
+	Password  string   // Password for HTTP Basic Authentication.
+	Log       Log
+}
+
+type Log struct {
+	Enabled             bool
+	RequestBodyEnabled  bool
+	ResponseBodyEnabled bool
 }
 
 func loadConfig(configPath string) *Config {
