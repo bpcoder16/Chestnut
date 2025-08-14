@@ -2,6 +2,10 @@ package validator
 
 import (
 	"errors"
+	"reflect"
+	"strings"
+	"sync"
+
 	"github.com/gin-gonic/gin/binding"
 	"github.com/go-playground/locales/en"
 	"github.com/go-playground/locales/zh"
@@ -9,9 +13,6 @@ import (
 	"github.com/go-playground/validator/v10"
 	enTranslations "github.com/go-playground/validator/v10/translations/en"
 	zhTranslations "github.com/go-playground/validator/v10/translations/zh"
-	"reflect"
-	"strings"
-	"sync"
 )
 
 type MultiLangValidator struct {
