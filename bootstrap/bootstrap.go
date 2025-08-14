@@ -8,63 +8,49 @@ import (
 
 	"github.com/bpcoder16/Chestnut/v2/appconfig"
 	"github.com/bpcoder16/Chestnut/v2/appconfig/env"
-	"github.com/bpcoder16/Chestnut/v2/clickhouse"
 	"github.com/bpcoder16/Chestnut/v2/contrib/aliyun/oss"
-	"github.com/bpcoder16/Chestnut/v2/core/asynctask"
 	"github.com/bpcoder16/Chestnut/v2/core/log"
+	"github.com/bpcoder16/Chestnut/v2/default/clickhouse"
+	"github.com/bpcoder16/Chestnut/v2/default/lru"
+	"github.com/bpcoder16/Chestnut/v2/default/mongodb"
+	"github.com/bpcoder16/Chestnut/v2/default/mysql"
+	"github.com/bpcoder16/Chestnut/v2/default/redis"
+	"github.com/bpcoder16/Chestnut/v2/default/resty"
+	"github.com/bpcoder16/Chestnut/v2/default/sqlite"
 	"github.com/bpcoder16/Chestnut/v2/lock"
 	"github.com/bpcoder16/Chestnut/v2/logit"
-	"github.com/bpcoder16/Chestnut/v2/lru"
 	"github.com/bpcoder16/Chestnut/v2/modules/zaplogger"
-	"github.com/bpcoder16/Chestnut/v2/mongodb"
-	"github.com/bpcoder16/Chestnut/v2/mysql"
-	"github.com/bpcoder16/Chestnut/v2/redis"
-	"github.com/bpcoder16/Chestnut/v2/resty"
-	"github.com/bpcoder16/Chestnut/v2/sqlite"
 )
 
 func MustInit(ctx context.Context, config *appconfig.AppConfig, funcList ...func(ctx context.Context, debugWriter, infoWriter, warnErrorFatalWriter io.Writer)) {
 	time.Local = env.TimeLocation()
+
+	// TODO 后续修改
 	lock.InitLocalManager(10000)
-	var debugWriter, infoWriter, warnErrorFatalWriter io.Writer
-	if config.NotUseRotateLog {
-		debugWriter, infoWriter, warnErrorFatalWriter = zaplogger.GetStandardWriters(config.LogDir, env.AppName(), env.AppName())
-	} else {
-		debugWriter, infoWriter, warnErrorFatalWriter = zaplogger.GetFileRotateLogWriters(config.LogDir, env.AppName(), env.AppName())
+
+	if config.Log.StdRedirectFileSupport {
+		zaplogger.StdRedirectFile(config.Log.LogDir)
 	}
-	if config.StdRedirectFileSupport {
-		zaplogger.StdRedirectFile(config.LogDir)
-	}
+	debugWriter, infoWriter, warnErrorFatalWriter := getWriters(config)
+
 	initLoggers(ctx, config, debugWriter, infoWriter, warnErrorFatalWriter)
 
-	if config.AliyunOSSSupport {
-		initAliyunOSS()
-	}
-	if config.DefaultMongoDBSupport {
-		initMongoDB(ctx, debugWriter, infoWriter, warnErrorFatalWriter)
-	}
-	if config.DefaultRedisSupport {
-		initRedis(debugWriter, infoWriter, warnErrorFatalWriter)
-	}
-	if config.UseLRUCache {
-		initUseLRUCache(ctx, debugWriter, infoWriter, warnErrorFatalWriter)
-	}
-	if config.DefaultMySQLSupport {
-		initMySQL(debugWriter, infoWriter, warnErrorFatalWriter)
-	}
-	if config.DefaultSQLiteSupport {
-		initSQLite(debugWriter, infoWriter, warnErrorFatalWriter)
-	}
-	if config.DefaultClickhouseSupport {
-		initClickhouse(debugWriter, infoWriter, warnErrorFatalWriter)
-	}
-	if config.QueueSize > 0 {
-		asynctask.Init(config.QueueSize)
-	}
+	initDefault(ctx, config, debugWriter, infoWriter, warnErrorFatalWriter)
+
 	initHTTPClient(debugWriter, infoWriter, warnErrorFatalWriter)
+
 	for _, fn := range funcList {
 		fn(ctx, debugWriter, infoWriter, warnErrorFatalWriter)
 	}
+}
+
+func getWriters(config *appconfig.AppConfig) (debugWriter, infoWriter, warnErrorFatalWriter io.Writer) {
+	if config.Log.UseRotateLog {
+		debugWriter, infoWriter, warnErrorFatalWriter = zaplogger.GetFileRotateLogWriters(config.Log.LogDir, env.AppName(), env.AppName())
+	} else {
+		debugWriter, infoWriter, warnErrorFatalWriter = zaplogger.GetStandardWriters(config.Log.LogDir, env.AppName(), env.AppName())
+	}
+	return
 }
 
 func initLoggers(_ context.Context, config *appconfig.AppConfig, debugWriter, infoWriter, warnErrorFatalWriter io.Writer) {
@@ -84,129 +70,95 @@ func initLoggers(_ context.Context, config *appconfig.AppConfig, debugWriter, in
 	))
 }
 
+func initDefault(ctx context.Context, config *appconfig.AppConfig, debugWriter, infoWriter, warnErrorFatalWriter io.Writer) {
+	if config.Default.MySQLSupport {
+		initMySQL(debugWriter, infoWriter, warnErrorFatalWriter)
+	}
+	if config.Default.SQLiteSupport {
+		initSQLite(debugWriter, infoWriter, warnErrorFatalWriter)
+	}
+	if config.Default.ClickhouseSupport {
+		initClickhouse(debugWriter, infoWriter, warnErrorFatalWriter)
+	}
+	if config.Default.RedisSupport {
+		initRedis(debugWriter, infoWriter, warnErrorFatalWriter)
+	}
+	if config.Default.MongoDBSupport {
+		initMongoDB(ctx, debugWriter, infoWriter, warnErrorFatalWriter)
+	}
+	if config.Default.LRUCacheSupport {
+		initLRUCache(debugWriter, infoWriter, warnErrorFatalWriter)
+	}
+	if config.Default.AliyunOSSSupport {
+		initAliyunOSS()
+	}
+}
+
+func DefaultHelper(debugWriter, infoWriter, warnErrorFatalWriter io.Writer, caller log.Valuer) *log.Helper {
+	return log.NewHelper(
+		zaplogger.GetZapLogger(
+			debugWriter, infoWriter, warnErrorFatalWriter,
+			caller,
+			log.FilterLevel(func() log.Level {
+				if env.RunMode() == env.RunModeRelease {
+					return log.LevelInfo
+				}
+				return log.LevelDebug
+			}()),
+			//log.FilterFunc(func(level log.Level, keyValues ...interface{}) bool {
+			//	return false
+			//}),
+		),
+	)
+}
+
+func initMySQL(debugWriter, infoWriter, warnErrorFatalWriter io.Writer) {
+	mysql.SetManager(
+		path.Join(env.ConfigDirPath(), "mysql.yaml"),
+		DefaultHelper(debugWriter, infoWriter, warnErrorFatalWriter, nil),
+	)
+}
+
+func initSQLite(debugWriter, infoWriter, warnErrorFatalWriter io.Writer) {
+	sqlite.SetManager(
+		path.Join(env.ConfigDirPath(), "sqlite.yaml"),
+		DefaultHelper(debugWriter, infoWriter, warnErrorFatalWriter, nil),
+	)
+}
+
+func initClickhouse(debugWriter, infoWriter, warnErrorFatalWriter io.Writer) {
+	clickhouse.SetManager(
+		path.Join(env.ConfigDirPath(), "clickhouse.yaml"),
+		DefaultHelper(debugWriter, infoWriter, warnErrorFatalWriter, nil),
+	)
+}
+
+func initRedis(debugWriter, infoWriter, warnErrorFatalWriter io.Writer) {
+	redis.SetManager(
+		path.Join(env.ConfigDirPath(), "redis.yaml"),
+		DefaultHelper(debugWriter, infoWriter, warnErrorFatalWriter, log.FileWithLineNumCallerRedis()),
+	)
+}
+
+func initMongoDB(ctx context.Context, debugWriter, infoWriter, warnErrorFatalWriter io.Writer) {
+	mongodb.SetManager(
+		ctx,
+		path.Join(env.ConfigDirPath(), "mongodb.yaml"),
+		DefaultHelper(debugWriter, infoWriter, warnErrorFatalWriter, log.FileWithLineNumCaller()),
+	)
+}
+
+func initLRUCache(debugWriter, infoWriter, warnErrorFatalWriter io.Writer) {
+	lru.SetManager(
+		path.Join(env.ConfigDirPath(), "lru.yaml"),
+		DefaultHelper(debugWriter, infoWriter, warnErrorFatalWriter, log.FileWithLineNumCaller()),
+	)
+}
+
 func initAliyunOSS() {
 	oss.InitAliyunOSS(path.Join(env.ConfigDirPath(), "aliyun.yaml"))
 }
 
-func initMongoDB(ctx context.Context, debugWriter, infoWriter, warnErrorFatalWriter io.Writer) {
-	mongodb.SetManager(ctx, path.Join(env.ConfigDirPath(), "mongodb.yaml"), log.NewHelper(
-		zaplogger.GetZapLogger(
-			debugWriter, infoWriter, warnErrorFatalWriter,
-			log.FileWithLineNumCaller(),
-			log.FilterLevel(func() log.Level {
-				if env.RunMode() == env.RunModeRelease {
-					return log.LevelInfo
-				}
-				return log.LevelDebug
-			}()),
-			//log.FilterFunc(func(level log.Level, keyValues ...interface{}) bool {
-			//	return false
-			//}),
-		),
-	))
-}
-
-func initUseLRUCache(_ context.Context, debugWriter, infoWriter, warnErrorFatalWriter io.Writer) {
-	lru.SetManager(path.Join(env.ConfigDirPath(), "lru.yaml"), log.NewHelper(
-		zaplogger.GetZapLogger(
-			debugWriter, infoWriter, warnErrorFatalWriter,
-			log.FileWithLineNumCaller(),
-			log.FilterLevel(func() log.Level {
-				if env.RunMode() == env.RunModeRelease {
-					return log.LevelInfo
-				}
-				return log.LevelDebug
-			}()),
-			//log.FilterFunc(func(level log.Level, keyValues ...interface{}) bool {
-			//	return false
-			//}),
-		),
-	))
-}
-
-func initRedis(debugWriter, infoWriter, warnErrorFatalWriter io.Writer) {
-	redis.SetManager(path.Join(env.ConfigDirPath(), "redis.yaml"), log.NewHelper(
-		zaplogger.GetZapLogger(
-			debugWriter, infoWriter, warnErrorFatalWriter,
-			log.FileWithLineNumCallerRedis(),
-			log.FilterLevel(func() log.Level {
-				if env.RunMode() == env.RunModeRelease {
-					return log.LevelInfo
-				}
-				return log.LevelDebug
-			}()),
-			//log.FilterFunc(func(level log.Level, keyValues ...interface{}) bool {
-			//	return false
-			//}),
-		),
-	))
-}
-
-func initMySQL(debugWriter, infoWriter, warnErrorFatalWriter io.Writer) {
-	mysql.SetManager(path.Join(env.ConfigDirPath(), "mysql.yaml"), log.NewHelper(
-		zaplogger.GetZapLogger(
-			debugWriter, infoWriter, warnErrorFatalWriter,
-			nil,
-			log.FilterLevel(func() log.Level {
-				if env.RunMode() == env.RunModeRelease {
-					return log.LevelInfo
-				}
-				return log.LevelDebug
-			}()),
-			//log.FilterFunc(func(level log.Level, keyValues ...interface{}) bool {
-			//	return false
-			//}),
-		),
-	))
-}
-
-func initSQLite(debugWriter, infoWriter, warnErrorFatalWriter io.Writer) {
-	sqlite.SetManager(path.Join(env.ConfigDirPath(), "sqlite.yaml"), log.NewHelper(
-		zaplogger.GetZapLogger(
-			debugWriter, infoWriter, warnErrorFatalWriter,
-			nil,
-			log.FilterLevel(func() log.Level {
-				if env.RunMode() == env.RunModeRelease {
-					return log.LevelInfo
-				}
-				return log.LevelDebug
-			}()),
-			//log.FilterFunc(func(level log.Level, keyValues ...interface{}) bool {
-			//	return false
-			//}),
-		),
-	))
-}
-
-func initClickhouse(debugWriter, infoWriter, warnErrorFatalWriter io.Writer) {
-	clickhouse.SetManager(path.Join(env.ConfigDirPath(), "clickhouse.yaml"), log.NewHelper(
-		zaplogger.GetZapLogger(
-			debugWriter, infoWriter, warnErrorFatalWriter,
-			nil,
-			log.FilterLevel(func() log.Level {
-				if env.RunMode() == env.RunModeRelease {
-					return log.LevelInfo
-				}
-				return log.LevelDebug
-			}()),
-			//log.FilterFunc(func(level log.Level, keyValues ...interface{}) bool {
-			//	return false
-			//}),
-		),
-	))
-}
-
 func initHTTPClient(debugWriter, infoWriter, warnErrorFatalWriter io.Writer) {
-	resty.SetClient(log.NewHelper(
-		zaplogger.GetZapLogger(
-			debugWriter, infoWriter, warnErrorFatalWriter,
-			nil,
-			log.FilterLevel(func() log.Level {
-				return log.LevelDebug
-			}()),
-			//log.FilterFunc(func(level log.Level, keyValues ...interface{}) bool {
-			//	return false
-			//}),
-		),
-	))
+	resty.SetClient(DefaultHelper(debugWriter, infoWriter, warnErrorFatalWriter, nil))
 }

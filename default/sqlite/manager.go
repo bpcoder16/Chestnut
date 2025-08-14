@@ -12,6 +12,6 @@ func SetManager(configPath string, logger *log.Helper) {
 	defaultManager = sqlite.NewManager(configPath, logger)
 }
 
-func DB() *gorm.DB {
+func DefaultClient() *gorm.DB {
 	return defaultManager.DB()
 }

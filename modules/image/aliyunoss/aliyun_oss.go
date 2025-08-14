@@ -4,13 +4,14 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"github.com/bpcoder16/Chestnut/v2/contrib/aliyun/oss"
-	"github.com/bpcoder16/Chestnut/v2/core/utils"
-	"github.com/bpcoder16/Chestnut/v2/logit"
-	"github.com/bpcoder16/Chestnut/v2/resty"
-	goResty "github.com/go-resty/resty/v2"
 	"mime/multipart"
 	"path/filepath"
+
+	"github.com/bpcoder16/Chestnut/v2/contrib/aliyun/oss"
+	"github.com/bpcoder16/Chestnut/v2/core/utils"
+	"github.com/bpcoder16/Chestnut/v2/default/resty"
+	"github.com/bpcoder16/Chestnut/v2/logit"
+	goResty "github.com/go-resty/resty/v2"
 )
 
 const (

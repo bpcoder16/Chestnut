@@ -14,8 +14,6 @@ import (
 	"github.com/bpcoder16/Chestnut/v2/logit"
 )
 
-var once sync.Once
-
 type taskData struct {
 	f      func(context.Context) error
 	errMsg string
@@ -23,22 +21,41 @@ type taskData struct {
 	logId  any
 }
 
-var fChan chan taskData
+var (
+	once             sync.Once
+	fChan            chan taskData
+	fQueueSize       int
+	qTaskMaxRetryCnt int
+)
 
-const defaultQueueSize = 10000
+func SetQueueSize(queueSize int) {
+	fQueueSize = queueSize
+}
 
-func Init(queueSize int) {
+const (
+	defaultQueueSize       = 10000
+	defaultTaskMaxRetryCnt = 3
+)
+
+func lazyInit() {
 	once.Do(func() {
-		if queueSize <= defaultQueueSize {
-			fChan = make(chan taskData, defaultQueueSize)
+		if fQueueSize > 0 {
+			fChan = make(chan taskData, fQueueSize)
 		} else {
-			fChan = make(chan taskData, queueSize)
+			fChan = make(chan taskData, defaultQueueSize)
 		}
 	})
 }
 
+func getTaskMaxRetryCnt() int {
+	if qTaskMaxRetryCnt <= 0 {
+		return defaultTaskMaxRetryCnt
+	}
+	return qTaskMaxRetryCnt
+}
+
 func AddQueue(ctx context.Context, f func(context.Context) error, errMsg string) {
-	Init(defaultQueueSize)
+	lazyInit()
 	logId := ctx.Value(log.DefaultLogIdKey)
 	if logId == nil {
 		logId = utils.UniqueID()
@@ -51,16 +68,18 @@ func AddQueue(ctx context.Context, f func(context.Context) error, errMsg string)
 	}
 }
 
-func StartConsumerPool(ctx context.Context, consumerCount int, goFunc func(f func() error)) {
-	for i := 0; i < consumerCount; i++ {
+func StartConsumerPool(ctx context.Context, queueSize, consumerSize, taskMaxRetryCnt int, goFunc func(f func() error)) {
+	qTaskMaxRetryCnt = taskMaxRetryCnt
+	SetQueueSize(queueSize)
+	lazyInit()
+	for i := 0; i < consumerSize; i++ {
 		goFunc(func() error {
-			return Consumer(ctx)
+			return consumer(ctx)
 		})
 	}
 }
 
-func Consumer(ctx context.Context) error {
-	Init(defaultQueueSize)
+func consumer(ctx context.Context) error {
 	// 捕获系统信号以优雅地关闭调度器
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM, syscall.SIGKILL)
@@ -90,7 +109,7 @@ func task(ctx context.Context, t taskData) {
 	}()
 	if err := t.f(ctx); err != nil {
 		t.cnt++
-		if t.cnt >= 3 {
+		if t.cnt >= getTaskMaxRetryCnt() {
 			logit.Context(ctx).ErrorW("async.task", t.errMsg, "async.task.err", err, "cnt", t.cnt)
 			return
 		}

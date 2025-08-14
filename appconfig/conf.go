@@ -12,21 +12,33 @@ import (
 type AppConfig struct {
 	Env env.Option
 
-	FilterKeys []string
+	FilterKeys   []string
+	Log          Log
+	Default      Default
+	AsyncService AsyncService
+}
 
-	LogDir          string
-	NotUseRotateLog bool
+type Log struct {
+	LogDir                 string
+	UseRotateLog           bool
+	StdRedirectFileSupport bool
+}
 
-	StdRedirectFileSupport   bool
-	DefaultMySQLSupport      bool
-	DefaultSQLiteSupport     bool
-	DefaultClickhouseSupport bool
-	DefaultRedisSupport      bool
-	DefaultMongoDBSupport    bool
-	AliyunOSSSupport         bool
-	UseLRUCache              bool
-	QueueSize                int
-	ConsumerSize             int
+type Default struct {
+	MySQLSupport      bool
+	SQLiteSupport     bool
+	ClickhouseSupport bool
+	RedisSupport      bool
+	MongoDBSupport    bool
+	LRUCacheSupport   bool
+	AliyunOSSSupport  bool
+}
+
+type AsyncService struct {
+	Support         bool
+	QueueSize       int
+	ConsumerSize    int
+	TaskMaxRetryCnt int
 }
 
 func (c *AppConfig) Check() (err error) {
@@ -47,8 +59,8 @@ func ParseConfig(confPath string, configPtr *AppConfig) (err error) {
 			err = configPtr.Check()
 		}
 	}
-	if len(configPtr.LogDir) == 0 {
-		configPtr.LogDir = path.Join(utils.RootPath(), "log")
+	if len(configPtr.Log.LogDir) == 0 {
+		configPtr.Log.LogDir = path.Join(utils.RootPath(), "log")
 	}
 	return
 }
