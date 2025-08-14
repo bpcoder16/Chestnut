@@ -1,11 +1,12 @@
 package zap
 
 import (
+	"io"
+	"time"
+
 	"github.com/bpcoder16/Chestnut/v2/core/log"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"io"
-	"time"
 )
 
 type EncoderType int8

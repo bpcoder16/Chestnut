@@ -2,11 +2,12 @@ package goredis
 
 import (
 	"context"
+	"net"
+	"time"
+
 	"github.com/bpcoder16/Chestnut/v2/core/log"
 	"github.com/bpcoder16/Chestnut/v2/core/utils"
 	"github.com/redis/go-redis/v9"
-	"net"
-	"time"
 )
 
 type LoggerHook struct {

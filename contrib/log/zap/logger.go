@@ -2,9 +2,10 @@ package zap
 
 import (
 	"fmt"
+	"io"
+
 	"github.com/bpcoder16/Chestnut/v2/core/log"
 	"go.uber.org/zap"
-	"io"
 )
 
 var _ log.Logger = (*Logger)(nil)

@@ -1,11 +1,12 @@
 package esclientv7
 
 import (
-	"github.com/bpcoder16/Chestnut/v2/core/log"
 	"io"
 	"net/http"
 	"strconv"
 	"time"
+
+	"github.com/bpcoder16/Chestnut/v2/core/log"
 )
 
 type Logger struct {

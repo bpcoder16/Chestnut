@@ -5,9 +5,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/elastic/go-elasticsearch/v7/esapi"
 	"io"
 	"strings"
+
+	"github.com/elastic/go-elasticsearch/v7/esapi"
 )
 
 type Document struct {
@@ -29,7 +30,9 @@ func (m *Manager) GetByID(ctx context.Context, index, id string, dest any) error
 	if errR != nil {
 		return fmt.Errorf("request error: %w", errR)
 	}
-	defer res.Body.Close()
+	defer func() {
+		_ = res.Body.Close()
+	}()
 
 	if res.IsError() {
 		if res.StatusCode == 404 {
@@ -107,7 +110,9 @@ func (m *Manager) Search(ctx context.Context, index string, dsl any, dest any, o
 	if err != nil {
 		return
 	}
-	defer res.Body.Close()
+	defer func() {
+		_ = res.Body.Close()
+	}()
 
 	if res.IsError() {
 		err = fmt.Errorf("search error: %s", res.String())
@@ -162,7 +167,9 @@ func (m *Manager) Count(ctx context.Context, index string, dsl any, o ...func(*e
 	if err != nil {
 		return
 	}
-	defer res.Body.Close()
+	defer func() {
+		_ = res.Body.Close()
+	}()
 
 	if res.IsError() {
 		err = fmt.Errorf("count error: %s", res.String())
@@ -200,7 +207,9 @@ func (m *Manager) InsertDocument(ctx context.Context, index string, doc Document
 	if errR != nil {
 		return errR
 	}
-	defer res.Body.Close()
+	defer func() {
+		_ = res.Body.Close()
+	}()
 
 	if res.IsError() {
 		body, _ := io.ReadAll(res.Body)
@@ -245,7 +254,9 @@ func (m *Manager) BulkUpsert(ctx context.Context, index string, docs []Document)
 	if errB != nil {
 		return fmt.Errorf("bulk request failed: %w", errB)
 	}
-	defer res.Body.Close()
+	defer func() {
+		_ = res.Body.Close()
+	}()
 
 	if res.IsError() {
 		return fmt.Errorf("bulk response error: %s", res.String())
@@ -313,7 +324,9 @@ func (m *Manager) Analyze(ctx context.Context, index, text string, params Analyz
 	if err != nil {
 		return
 	}
-	defer res.Body.Close()
+	defer func() {
+		_ = res.Body.Close()
+	}()
 
 	if res.IsError() {
 		err = fmt.Errorf("analyze error: %s", res.String())
