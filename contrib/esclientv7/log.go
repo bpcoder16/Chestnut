@@ -17,11 +17,11 @@ type Logger struct {
 func (l *Logger) LogRoundTrip(req *http.Request, resp *http.Response, err error, _ time.Time, duration time.Duration) error {
 	// 打印请求 Body
 	var reqBody []byte
-	if req.Body != nil {
+	if l.Log.RequestBodyEnabled && req.Body != nil {
 		reqBody, _ = io.ReadAll(req.Body)
 	}
 	var respBody []byte
-	if resp.Body != nil {
+	if l.Log.ResponseBodyEnabled && resp.Body != nil {
 		respBody, _ = io.ReadAll(resp.Body)
 	}
 
