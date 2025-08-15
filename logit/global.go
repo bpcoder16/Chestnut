@@ -2,8 +2,9 @@ package logit
 
 import (
 	"context"
-	"github.com/bpcoder16/Chestnut/v2/core/log"
 	"sync"
+
+	"github.com/bpcoder16/Chestnut/v2/core/log"
 )
 
 var global = &loggerAppliance{}

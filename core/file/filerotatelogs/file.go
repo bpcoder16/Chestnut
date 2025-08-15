@@ -1,9 +1,10 @@
 package filerotatelogs
 
 import (
-	"github.com/lestrrat-go/file-rotatelogs"
 	"io"
 	"time"
+
+	"github.com/lestrrat-go/file-rotatelogs"
 )
 
 func NewWriter(filePath string, maxAge, rotationTime time.Duration) io.Writer {

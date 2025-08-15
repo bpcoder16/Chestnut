@@ -1,9 +1,10 @@
 package zaplogger
 
 import (
+	"path"
+
 	"github.com/bpcoder16/Chestnut/v2/core/file/standard"
 	"golang.org/x/sys/unix"
-	"path"
 )
 
 // hookStderr 劫持 Stderr

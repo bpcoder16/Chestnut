@@ -2,8 +2,9 @@ package log
 
 import (
 	"bytes"
-	"golang.org/x/sync/errgroup"
 	"testing"
+
+	"golang.org/x/sync/errgroup"
 )
 
 func TestStdLogger(t *testing.T) {

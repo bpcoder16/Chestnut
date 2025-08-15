@@ -4,9 +4,10 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/bpcoder16/Chestnut/v2/core/log"
 	"strings"
 	"testing"
+
+	"github.com/bpcoder16/Chestnut/v2/core/log"
 )
 
 func TestGlobalLog(t *testing.T) {

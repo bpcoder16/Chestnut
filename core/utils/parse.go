@@ -2,9 +2,10 @@ package utils
 
 import (
 	"errors"
-	"github.com/spf13/viper"
 	"path/filepath"
 	"strings"
+
+	"github.com/spf13/viper"
 )
 
 func ParseFile(filePath string, resPtr interface{}) (err error) {

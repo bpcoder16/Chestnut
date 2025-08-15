@@ -3,10 +3,11 @@ package log
 import (
 	"bytes"
 	"context"
-	"golang.org/x/sync/errgroup"
 	"strings"
 	"testing"
 	"time"
+
+	"golang.org/x/sync/errgroup"
 )
 
 func testFilterFunc(_ Level, keyValues ...interface{}) bool {
