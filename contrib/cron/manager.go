@@ -2,11 +2,7 @@ package cron
 
 import (
 	"context"
-	"fmt"
-	"os"
-	"os/signal"
 	"sync"
-	"syscall"
 
 	"github.com/bpcoder16/Chestnut/v2/appconfig/env"
 	"github.com/bpcoder16/Chestnut/v2/logit"
@@ -67,15 +63,9 @@ func Run(ctx context.Context) {
 	scheduler.Start()
 	logit.Context(ctx).InfoW("cron.Manager.Run", "CronScheduler started")
 
-	// 捕获系统信号以优雅地关闭调度器
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM, syscall.SIGKILL)
-
 	select {
 	case <-ctx.Done():
 		logit.Context(ctx).InfoW("cron.Manager.Run", "Context cancelled, CronScheduler preparing to shutdown")
-	case sig := <-sigChan:
-		logit.Context(ctx).InfoW("cron.Manager.Run", fmt.Sprintf("Received signal: %v, CronScheduler preparing to shutdown", sig))
 	}
 
 	logit.Context(ctx).InfoW("cron.Manager.Run", "CronScheduler shutdown...")

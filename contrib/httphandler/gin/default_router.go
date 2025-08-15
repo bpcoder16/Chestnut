@@ -81,20 +81,12 @@ func NewDefaultRouter(path string) *DefaultRouter {
 		registries: make([]registry, 0, 20),
 	}
 	r.RouterGroup.router = r
-	r.Use(defaultLogger())
 	return r
 }
 
-func NewRouterNoLogger(path string) *DefaultRouter {
-	r := &DefaultRouter{
-		RouterGroup: RouterGroup{
-			handlers: nil,
-			basePath: path,
-			router:   nil,
-		},
-		registries: make([]registry, 0, 20),
-	}
-	r.RouterGroup.router = r
+func NewApiRouter(path string) *DefaultRouter {
+	r := NewDefaultRouter(path)
+	r.Use(DefaultLogger())
 	return r
 }
 

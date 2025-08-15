@@ -3,15 +3,16 @@ package websocket
 import (
 	"context"
 	"errors"
+	"net/http"
+	"reflect"
+	"sync"
+	"time"
+
 	"github.com/bpcoder16/Chestnut/v2/core/gtask"
 	"github.com/bpcoder16/Chestnut/v2/core/log"
 	"github.com/bpcoder16/Chestnut/v2/core/utils"
 	"github.com/bpcoder16/Chestnut/v2/logit"
 	"github.com/gorilla/websocket"
-	"net/http"
-	"reflect"
-	"sync"
-	"time"
 )
 
 const (
@@ -53,22 +54,11 @@ func getUpgrader(config *Config) *websocket.Upgrader {
 	}
 }
 
-// TODO 临时解决方案，由于 gorilla/websocket 不支持 Sec-WebSocket-Extensions Header
-func (ws *WebSocket) filterHeader(h http.Header) http.Header {
-	h.Del("Sec-WebSocket-Extensions")
-	return h
-}
-
-type WebSocket struct {
-	config   *Config
-	upgrader *websocket.Upgrader
-
-	textMessageControllers map[string]TextMessageController
-	authorizationFunc      func(ctx context.Context, r *http.Request, w http.ResponseWriter) (returnCtx context.Context, isAuthorized bool, userId int64)
-	beforeFunc             func(ctx context.Context, r *http.Request, w http.ResponseWriter) (returnCtx context.Context, isAuthorized bool, userId int64)
-	clientCloseFunc        func(ctx context.Context, uuidStr string)
-	clientManager          *ClientManager
-}
+//// TODO 临时解决方案，由于 gorilla/websocket 不支持 Sec-WebSocket-Extensions Header
+//func (ws *WebSocket) filterHeader(h http.Header) http.Header {
+//	h.Del("Sec-WebSocket-Extensions")
+//	return h
+//}
 
 func New(configPath string) *WebSocket {
 	config := loadConfig(configPath)
@@ -76,36 +66,55 @@ func New(configPath string) *WebSocket {
 		config:   config,
 		upgrader: getUpgrader(config),
 
+		clientManager: NewClientManager(),
+
 		textMessageControllers: make(map[string]TextMessageController),
 		authorizationFunc:      nil,
-		clientCloseFunc:        nil,
 		beforeFunc:             nil,
-		clientManager:          NewClientManager(),
+		clientCloseFunc:        nil,
 	}
 	return ws
+}
+
+type WebSocket struct {
+	mu sync.RWMutex
+
+	config   *Config
+	upgrader *websocket.Upgrader
+
+	clientManager *ClientManager
+
+	textMessageControllers map[string]TextMessageController
+	authorizationFunc      func(ctx context.Context, r *http.Request, w http.ResponseWriter) (returnCtx context.Context, isAuthorized bool, userId int64)
+	beforeFunc             func(ctx context.Context, r *http.Request, w http.ResponseWriter) (returnCtx context.Context, isAuthorized bool, userId int64)
+	clientCloseFunc        func(ctx context.Context, uuidStr string)
 }
 
 func (ws *WebSocket) GetClientManager() *ClientManager {
 	return ws.clientManager
 }
 
-func (ws *WebSocket) SetBeforeFunc(f func(ctx context.Context, r *http.Request, w http.ResponseWriter) (returnCtx context.Context, isAuthorized bool, userId int64)) {
-	ws.beforeFunc = f
+func (ws *WebSocket) OnTextMessageController(scene string, controller TextMessageController) {
+	ws.mu.Lock()
+	defer ws.mu.Unlock()
+	ws.textMessageControllers[scene] = controller
 }
 
 func (ws *WebSocket) SetAuthorizationFunc(f func(ctx context.Context, r *http.Request, w http.ResponseWriter) (returnCtx context.Context, isAuthorized bool, userId int64)) {
 	ws.authorizationFunc = f
 }
 
+func (ws *WebSocket) SetBeforeFunc(f func(ctx context.Context, r *http.Request, w http.ResponseWriter) (returnCtx context.Context, isAuthorized bool, userId int64)) {
+	ws.beforeFunc = f
+}
+
 func (ws *WebSocket) SetClientCloseFunc(f func(context.Context, string)) {
 	ws.clientCloseFunc = f
 }
 
-func (ws *WebSocket) OnTextMessageController(scene string, controller TextMessageController) {
-	ws.textMessageControllers[scene] = controller
-}
-
 func (ws *WebSocket) getTextMessageController(scene string) (controller TextMessageController, err error) {
+	ws.mu.RLock()
+	defer ws.mu.RUnlock()
 	var exist bool
 	var controllerTemplate TextMessageController
 	controllerTemplate, exist = ws.textMessageControllers[scene]
@@ -148,11 +157,6 @@ func (ws *WebSocket) Handle(ctx context.Context, path string, r *http.Request, w
 	conn, err := ws.upgrader.Upgrade(w, r, w.Header())
 	elapsed := time.Since(begin)
 	if err != nil {
-		logit.Context(ctx).InfoW(
-			"Connection.Status", "Failed",
-			"Connection.CostTime", utils.ShowDurationString(elapsed),
-			"Websocket.Upgrade.Err", err,
-		)
 		logit.Context(ctx).WarnW(
 			"Connection.Status", "Failed",
 			"Connection.CostTime", utils.ShowDurationString(elapsed),
@@ -202,12 +206,10 @@ func (ws *WebSocket) Handle(ctx context.Context, path string, r *http.Request, w
 	g, gCtx := gtask.WithContext(ctx)
 
 	g.Go(func() error {
-		client.readPump(gCtx, r, w)
-		return nil
+		return client.readPump(gCtx, r, w)
 	})
 	g.Go(func() error {
-		client.writePump(gCtx, r, w)
-		return nil
+		return client.writePump(gCtx, r, w)
 	})
 
 	_ = g.Wait()

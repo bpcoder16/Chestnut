@@ -1,7 +1,6 @@
 package gin
 
 import (
-	"net/http"
 	"os"
 	"sync"
 
@@ -15,7 +14,7 @@ var (
 	once sync.Once
 )
 
-func initGinConfig() {
+func lazyInit() {
 	once.Do(func() {
 		switch env.RunMode() {
 		case env.RunModeRelease:
@@ -37,13 +36,10 @@ type Router interface {
 	RegisterHandler(engine *gin.Engine)
 }
 
-func HTTPHandler(routers ...Router) http.Handler {
-	initGinConfig()
+func HTTPHandler(routers ...Router) *gin.Engine {
+	lazyInit()
 	h := gin.New()
-	h.Use(
-		corsPreCheckRequest(),
-		recoveryWithWriter(os.Stderr),
-	)
+	h.Use(RecoveryWithWriter(os.Stderr))
 	for _, router := range routers {
 		router.RegisterHandler(h)
 	}

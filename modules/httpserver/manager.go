@@ -2,12 +2,8 @@ package httpserver
 
 import (
 	"context"
-	"fmt"
 	"net"
 	"net/http"
-	"os"
-	"os/signal"
-	"syscall"
 	"time"
 
 	"github.com/bpcoder16/Chestnut/v2/logit"
@@ -55,15 +51,9 @@ func NewManager(configPath string, handler http.Handler) *Manager {
 
 func (m *Manager) Run(ctx context.Context) error {
 	go func() {
-		// 捕获系统信号以优雅地关闭调度器
-		sigChan := make(chan os.Signal, 1)
-		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM, syscall.SIGKILL)
-
 		select {
 		case <-ctx.Done():
 			logit.Context(ctx).InfoW("httpServer.Manager.Run", "Context cancelled, HttpServer preparing to shutdown")
-		case sig := <-sigChan:
-			logit.Context(ctx).InfoW("httpServer.Manager.Run", fmt.Sprintf("Received signal: %v, HttpServer preparing to shutdown", sig))
 		}
 
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

@@ -21,7 +21,13 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func defaultLogger() gin.HandlerFunc {
+func generateRequestBody(ctx *gin.Context) []byte {
+	body, _ := ctx.GetRawData()                            // 读取 request body 的内容
+	ctx.Request.Body = io.NopCloser(bytes.NewBuffer(body)) // 创建 io.ReadCloser 对象传给 request body
+	return body                                            // 返回 request body 的值
+}
+
+func DefaultLogger() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		begin := time.Now()
 
@@ -41,7 +47,7 @@ func defaultLogger() gin.HandlerFunc {
 		elapsed := time.Since(begin)
 
 		logit.Context(ctx).InfoW(
-			"userId", ctx.GetUint64(log.DefaultUserIdKey),
+			"userId", ctx.GetInt64(log.DefaultUserIdKey),
 			"costTime", utils.ShowDurationString(elapsed),
 			"clientIP", ctx.ClientIP(),
 			"method", ctx.Request.Method,
@@ -55,12 +61,6 @@ func defaultLogger() gin.HandlerFunc {
 	}
 }
 
-func generateRequestBody(ctx *gin.Context) []byte {
-	body, _ := ctx.GetRawData()                            // 读取 request body 的内容
-	ctx.Request.Body = io.NopCloser(bytes.NewBuffer(body)) // 创建 io.ReadCloser 对象传给 request body
-	return body                                            // 返回 request body 的值
-}
-
 // 自定义一个结构体，实现 gin.ResponseWriter interface
 type responseWriter struct {
 	gin.ResponseWriter
@@ -72,7 +72,7 @@ func (w responseWriter) Write(b []byte) (int, error) {
 	return w.ResponseWriter.Write(b)
 }
 
-func recoveryWithWriter(out io.Writer) gin.HandlerFunc {
+func RecoveryWithWriter(out io.Writer) gin.HandlerFunc {
 	var logger *gLog.Logger
 	if out != nil {
 		logger = gLog.New(out, "\n\n\x1b[31m", gLog.LstdFlags)
@@ -115,7 +115,7 @@ func recoveryWithWriter(out io.Writer) gin.HandlerFunc {
 	}
 }
 
-func corsPreCheckRequest() gin.HandlerFunc {
+func CORSPreCheckRequest() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		if ctx.Request.Method == http.MethodOptions {
 			ctx.Header("Access-Control-Allow-Origin", "*")
