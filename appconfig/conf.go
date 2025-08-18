@@ -25,13 +25,14 @@ type Log struct {
 }
 
 type Default struct {
-	MySQLSupport      bool
-	SQLiteSupport     bool
-	ClickhouseSupport bool
-	RedisSupport      bool
-	MongoDBSupport    bool
-	LRUCacheSupport   bool
-	AliyunOSSSupport  bool
+	MySQLSupport         bool
+	SQLiteSupport        bool
+	ClickhouseSupport    bool
+	RedisSupport         bool
+	MongoDBSupport       bool
+	LRUCacheSupport      bool
+	AliyunOSSSupport     bool
+	LocalLockPoolSupport bool
 }
 
 type AsyncService struct {

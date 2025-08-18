@@ -17,16 +17,12 @@ import (
 	"github.com/bpcoder16/Chestnut/v2/default/redis"
 	"github.com/bpcoder16/Chestnut/v2/default/resty"
 	"github.com/bpcoder16/Chestnut/v2/default/sqlite"
-	"github.com/bpcoder16/Chestnut/v2/lock"
 	"github.com/bpcoder16/Chestnut/v2/logit"
 	"github.com/bpcoder16/Chestnut/v2/modules/zaplogger"
 )
 
 func MustInit(ctx context.Context, config *appconfig.AppConfig, funcList ...func(ctx context.Context, debugWriter, infoWriter, warnErrorFatalWriter io.Writer)) {
 	time.Local = env.TimeLocation()
-
-	// TODO 后续修改
-	lock.InitLocalManager(10000)
 
 	if config.Log.StdRedirectFileSupport {
 		zaplogger.StdRedirectFile(config.Log.LogDir)

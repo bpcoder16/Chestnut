@@ -21,6 +21,7 @@ default:
   MongoDBSupport: false
   LRUCacheSupport: false
   AliyunOSSSupport: false
+  LocalLockPoolSupport: false
 
 asyncService:
   Support: false

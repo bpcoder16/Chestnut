@@ -6,10 +6,13 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"path"
 	"syscall"
 
 	"github.com/bpcoder16/Chestnut/v2/appconfig"
+	"github.com/bpcoder16/Chestnut/v2/appconfig/env"
 	"github.com/bpcoder16/Chestnut/v2/core/asynctask"
+	"github.com/bpcoder16/Chestnut/v2/default/locallock"
 	"github.com/bpcoder16/Chestnut/v2/logit"
 )
 
@@ -38,5 +41,14 @@ func Start(ctx context.Context, config *appconfig.AppConfig, goFunc func(f func(
 			config.AsyncService.TaskMaxRetryCnt,
 			goFunc,
 		)
+	}
+	if config.Default.LocalLockPoolSupport {
+		goFunc(func() error {
+			locallock.Run(
+				ctx,
+				path.Join(env.ConfigDirPath(), "local_lock_pool.yaml"),
+			)
+			return nil
+		})
 	}
 }
