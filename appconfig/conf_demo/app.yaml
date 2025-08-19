@@ -28,3 +28,9 @@ asyncService:
   QueueSize: 10000
   ConsumerSize: 1000
   TaskMaxRetryCnt: 3
+
+migrateService:
+  Support: false
+  DefaultVersion: 10000
+  FileVersionSaveDir: "./data"
+  MigrateSQLFileDir: "./migrate/sqlite"
