@@ -2,6 +2,8 @@ package concurrency
 
 import (
 	"context"
+	"fmt"
+	"runtime"
 
 	"github.com/bpcoder16/Chestnut/v2/core/gtask"
 	"github.com/bpcoder16/Chestnut/v2/core/log"
@@ -17,6 +19,18 @@ type ChanResult struct {
 	Result any
 
 	uniqueName string // 不需要程序自行设置
+}
+
+func init() {
+	panicFunc = func(p any) {
+		// 输出 panic 信息
+		fmt.Printf("\n\033[31m[PANIC] %v\033[0m\n", p)
+
+		// 输出堆栈信息
+		var buf [4096]byte
+		n := runtime.Stack(buf[:], false)
+		fmt.Printf("[STACK]\n%s\n", string(buf[:n]))
+	}
 }
 
 func Init(panicHandler func(any)) {
