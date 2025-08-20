@@ -53,17 +53,16 @@ func (m *Manager) Run(ctx context.Context) error {
 	go func() {
 		select {
 		case <-ctx.Done():
-			logit.Context(ctx).InfoW("httpServer.Manager.Run", "Context cancelled, HttpServer preparing to shutdown")
+			logit.Context(ctx).InfoW("httpServer.Manager.Run", "Context cancelled, preparing to shutdown")
 		}
 
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 
-		logit.Context(ctx).InfoW("httpServer.Manager.Run", "HttpServer shutdown...")
 		if err := m.server.Shutdown(shutdownCtx); err != nil {
-			logit.Context(ctx).ErrorW("httpServer.Manager.Run", "HttpServer shutdown failed: "+err.Error())
+			logit.Context(ctx).ErrorW("httpServer.Manager.Run", "shutdown failed: "+err.Error())
 		}
-		logit.Context(ctx).InfoW("httpServer.Manager.Run", "HttpServer shutdown completed, exited")
+		logit.Context(ctx).InfoW("httpServer.Manager.Run", "shutdown completed, exited")
 	}()
 
 	logit.Context(ctx).InfoW("httpServer.Manager.Run", "HttpServer started")

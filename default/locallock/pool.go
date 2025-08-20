@@ -26,10 +26,9 @@ func Run(ctx context.Context, configPath string) {
 
 	select {
 	case <-ctx.Done():
-		logit.Context(ctx).InfoW("localPool.Manager.Run", "Context cancelled, localPool preparing to shutdown")
+		logit.Context(ctx).InfoW("localPool.Manager.Run", "Context cancelled, preparing to shutdown")
 	}
 
-	logit.Context(ctx).InfoW("localPool.Manager.Run", "localPool shutdown...")
 	pool.Close()
-	logit.Context(ctx).InfoW("localPool.Manager.Run", "localPool shutdown completed, exited")
+	logit.Context(ctx).InfoW("localPool.Manager.Run", "shutdown completed, exited")
 }

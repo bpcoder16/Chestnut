@@ -24,11 +24,11 @@ func Start(ctx context.Context, config *appconfig.AppConfig, goFunc func(f func(
 
 		select {
 		case <-ctx.Done():
-			logit.Context(ctx).InfoW("goFunc.Run", "Context cancelled, goFunc preparing to shutdown")
+			logit.Context(ctx).InfoW("goFunc.Run", "Context cancelled, shutdown completed, exited")
 			return errors.New("ctx.Done")
 		case sig := <-sigChan:
-			logit.Context(ctx).InfoW("goFunc.Run", fmt.Sprintf("Received signal: %v, goFunc preparing to shutdown", sig))
-			return fmt.Errorf("received signal: %v, goFunc preparing to shutdown", sig)
+			logit.Context(ctx).InfoW("goFunc.Run", fmt.Sprintf("Received signal: %v, shutdown completed, exited", sig))
+			return fmt.Errorf("received signal: %v, shutdown completed, exited", sig)
 		}
 	})
 	if config.AsyncService.Support &&

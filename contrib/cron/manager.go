@@ -65,12 +65,11 @@ func Run(ctx context.Context) {
 
 	select {
 	case <-ctx.Done():
-		logit.Context(ctx).InfoW("cron.Manager.Run", "Context cancelled, CronScheduler preparing to shutdown")
+		logit.Context(ctx).InfoW("cron.Manager.Run", "Context cancelled, preparing to shutdown")
 	}
 
-	logit.Context(ctx).InfoW("cron.Manager.Run", "CronScheduler shutdown...")
 	if err := scheduler.Shutdown(); err != nil {
-		logit.Context(ctx).ErrorW("cron.Manager.Run", "CronScheduler shutdown failed:"+err.Error())
+		logit.Context(ctx).ErrorW("cron.Manager.Run", "shutdown failed:"+err.Error())
 	}
-	logit.Context(ctx).InfoW("cron.Manager.Run", "CronScheduler shutdown completed, exited")
+	logit.Context(ctx).InfoW("cron.Manager.Run", "shutdown completed, exited")
 }
