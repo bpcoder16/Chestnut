@@ -49,27 +49,27 @@ func (l *Logger) LogMode(level logger.LogLevel) logger.Interface {
 
 func (l *Logger) Info(ctx context.Context, msg string, data ...interface{}) {
 	if l.LogLevel >= logger.Info {
-		ctx = context.WithValue(ctx, log.DefaultDownstreamKey, "MySQL")
+		ctx = context.WithValue(ctx, log.DefaultDownstreamKey, "SQLite")
 		l.Helper.WithContext(ctx).InfoF(l.infoStr+msg, append([]interface{}{utils.FileWithLineNum()}, data...)...)
 	}
 }
 
 func (l *Logger) Warn(ctx context.Context, msg string, data ...interface{}) {
 	if l.LogLevel >= logger.Warn {
-		ctx = context.WithValue(ctx, log.DefaultDownstreamKey, "MySQL")
+		ctx = context.WithValue(ctx, log.DefaultDownstreamKey, "SQLite")
 		l.Helper.WithContext(ctx).WarnF(l.warnStr+msg, append([]interface{}{utils.FileWithLineNum()}, data...)...)
 	}
 }
 
 func (l *Logger) Error(ctx context.Context, msg string, data ...interface{}) {
 	if l.LogLevel >= logger.Error {
-		ctx = context.WithValue(ctx, log.DefaultDownstreamKey, "MySQL")
+		ctx = context.WithValue(ctx, log.DefaultDownstreamKey, "SQLite")
 		l.Helper.WithContext(ctx).ErrorF(l.errStr+msg, append([]interface{}{utils.FileWithLineNum()}, data...)...)
 	}
 }
 
 func (l *Logger) Trace(ctx context.Context, begin time.Time, fc func() (sql string, rowsAffected int64), err error) {
-	ctx = context.WithValue(ctx, log.DefaultDownstreamKey, "MySQL")
+	ctx = context.WithValue(ctx, log.DefaultDownstreamKey, "SQLite")
 	if l.LogLevel <= logger.Silent {
 		return
 	}
