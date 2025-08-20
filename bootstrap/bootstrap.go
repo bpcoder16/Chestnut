@@ -36,6 +36,28 @@ func MustInit(ctx context.Context, config *appconfig.AppConfig, funcList ...func
 
 	initHTTPClient(debugWriter, infoWriter, warnErrorFatalWriter)
 
+	if config.MigrateService.Support &&
+		config.MigrateService.DefaultVersion > 0 &&
+		len(config.MigrateService.FileVersionSaveDir) > 0 &&
+		len(config.MigrateService.MigrateSQLFileDir) > 0 {
+		switch {
+		case config.Default.MySQLSupport:
+			initdb.Init(
+				config.MigrateService.DefaultVersion,
+				mysql.MasterDB(),
+				config.MigrateService.FileVersionSaveDir,
+				config.MigrateService.MigrateSQLFileDir,
+			)
+		case config.Default.SQLiteSupport:
+			initdb.Init(
+				config.MigrateService.DefaultVersion,
+				sqlite.DefaultClient(),
+				config.MigrateService.FileVersionSaveDir,
+				config.MigrateService.MigrateSQLFileDir,
+			)
+		}
+	}
+
 	for _, fn := range funcList {
 		fn(ctx, debugWriter, infoWriter, warnErrorFatalWriter)
 	}
@@ -89,27 +111,7 @@ func initDefault(ctx context.Context, config *appconfig.AppConfig, debugWriter, 
 	if config.Default.AliyunOSSSupport {
 		initAliyunOSS()
 	}
-	if config.MigrateService.Support &&
-		config.MigrateService.DefaultVersion > 0 &&
-		len(config.MigrateService.FileVersionSaveDir) > 0 &&
-		len(config.MigrateService.MigrateSQLFileDir) > 0 {
-		switch {
-		case config.Default.MySQLSupport:
-			initdb.Init(
-				config.MigrateService.DefaultVersion,
-				mysql.MasterDB(),
-				config.MigrateService.FileVersionSaveDir,
-				config.MigrateService.MigrateSQLFileDir,
-			)
-		case config.Default.SQLiteSupport:
-			initdb.Init(
-				config.MigrateService.DefaultVersion,
-				sqlite.DefaultClient(),
-				config.MigrateService.FileVersionSaveDir,
-				config.MigrateService.MigrateSQLFileDir,
-			)
-		}
-	}
+
 }
 
 func DefaultHelper(debugWriter, infoWriter, warnErrorFatalWriter io.Writer, caller log.Valuer) *log.Helper {
