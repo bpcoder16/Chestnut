@@ -1,6 +1,7 @@
 package initdb
 
 import (
+	"context"
 	"path"
 	"strconv"
 	"strings"
@@ -10,7 +11,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func Init(defaultVersion int, gormDB *gorm.DB, fileVersionSaveDir, migrateSQLFileDir string) {
+func Init(ctx context.Context, defaultVersion int, gormDB *gorm.DB, fileVersionSaveDir, migrateSQLFileDir string) {
 	versionFilePath := path.Join(env.RootPath(), fileVersionSaveDir, "version")
 
 	fileVersionValue, err := operations.ReadOrCreate[int](versionFilePath, defaultVersion)
@@ -51,7 +52,7 @@ func Init(defaultVersion int, gormDB *gorm.DB, fileVersionSaveDir, migrateSQLFil
 				sqlValue += insertOrUpdateValue
 			}
 			sqlValueList := strings.Split(sqlValue, ";")
-			errDB := gormDB.Transaction(func(tx *gorm.DB) error {
+			errDB := gormDB.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 				for _, sql := range sqlValueList {
 					if errE := tx.Exec(sql).Error; errE != nil {
 						return errE

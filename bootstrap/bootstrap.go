@@ -43,6 +43,7 @@ func MustInit(ctx context.Context, config *appconfig.AppConfig, funcList ...func
 		switch {
 		case config.Default.MySQLSupport:
 			initdb.Init(
+				ctx,
 				config.MigrateService.DefaultVersion,
 				mysql.MasterDB(),
 				config.MigrateService.FileVersionSaveDir,
@@ -50,6 +51,7 @@ func MustInit(ctx context.Context, config *appconfig.AppConfig, funcList ...func
 			)
 		case config.Default.SQLiteSupport:
 			initdb.Init(
+				ctx,
 				config.MigrateService.DefaultVersion,
 				sqlite.DefaultClient(),
 				config.MigrateService.FileVersionSaveDir,
