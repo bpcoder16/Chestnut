@@ -51,7 +51,7 @@ func Init(ctx context.Context, defaultVersion int, gormDB *gorm.DB, fileVersionS
 				}
 				sqlValue += insertOrUpdateValue
 			}
-			sqlValueList := strings.Split(sqlValue, ";")
+			sqlValueList := strings.Split(strings.Trim(sqlValue, " \n\t\r"), ";")
 			errDB := gormDB.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 				for _, sql := range sqlValueList {
 					if errE := tx.Exec(sql).Error; errE != nil {
