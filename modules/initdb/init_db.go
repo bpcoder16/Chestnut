@@ -2,6 +2,7 @@ package initdb
 
 import (
 	"context"
+	"errors"
 	"path"
 	"strconv"
 	"strings"
@@ -54,8 +55,10 @@ func Init(ctx context.Context, defaultVersion int, gormDB *gorm.DB, fileVersionS
 			sqlValueList := strings.Split(strings.Trim(sqlValue, " \n\t\r"), ";")
 			errDB := gormDB.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 				for _, sql := range sqlValueList {
-					if errE := tx.Exec(sql).Error; errE != nil {
-						return errE
+					if len(sql) > 0 {
+						if errE := tx.Exec(sql).Error; errE != nil {
+							return errors.New("SQL:" + sql + ", ERR:" + errE.Error())
+						}
 					}
 				}
 				return nil
