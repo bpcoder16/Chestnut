@@ -1,6 +1,6 @@
 module github.com/bpcoder16/Chestnut/v2
 
-go 1.23.7
+go 1.24.6
 
 require (
 	github.com/aliyun/aliyun-oss-go-sdk v3.0.2+incompatible
