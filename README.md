@@ -1,4 +1,4 @@
-# 🌰 Chestnut
+# 🌰 Chestnut -- Go 语言业务开发通用功能集合库
 
 <div align="center">
   
