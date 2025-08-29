@@ -36,7 +36,7 @@ func (m *Manager) Run(ctx context.Context) error {
 	}
 
 	// 创建 gRPC 监听器
-	listen, err := net.Listen("tcp", m.config.Port)
+	listen, err := net.Listen("tcp", ":"+m.config.Port)
 	if err != nil {
 		logit.Context(ctx).FatalW("grpcServer failed to listen: ", err)
 		return err
