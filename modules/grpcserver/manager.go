@@ -2,6 +2,7 @@ package grpcserver
 
 import (
 	"context"
+	"errors"
 	"net"
 
 	"github.com/bpcoder16/Chestnut/v2/logit"
@@ -35,6 +36,9 @@ func (m *Manager) Run(ctx context.Context) error {
 		}
 	}
 
+	// 启动优雅关闭监听器
+	go m.gracefulShutdown(ctx)
+
 	// 创建 gRPC 监听器
 	listen, err := net.Listen("tcp", ":"+m.config.Port)
 	if err != nil {
@@ -42,16 +46,21 @@ func (m *Manager) Run(ctx context.Context) error {
 		return err
 	}
 
-	go func() {
-		select {
-		case <-ctx.Done():
-			logit.Context(ctx).InfoW("grpcServer.Manager.Run", "Context cancelled, preparing to shutdown")
-		}
+	logit.Context(ctx).InfoW("grpcServer.Manager.Run", "grpcServer started", "port", m.config.Port)
 
-		m.server.GracefulStop()
-		logit.Context(ctx).InfoW("grpcServer.Manager.Run", "shutdown completed, exited")
-	}()
+	// 区分正常关闭和异常错误
+	if errS := m.server.Serve(listen); errS != nil && !errors.Is(errS, grpc.ErrServerStopped) {
+		return errS
+	}
+	return nil
+}
 
-	logit.Context(ctx).InfoW("grpcServer.Manager.Run", "grpcServer started")
-	return m.server.Serve(listen)
+// gracefulShutdown 处理优雅关闭逻辑
+func (m *Manager) gracefulShutdown(ctx context.Context) {
+	// 等待context取消信号
+	<-ctx.Done()
+	logit.Context(ctx).InfoW("grpcServer.Manager.Run", "Context cancelled, preparing to shutdown")
+
+	m.server.GracefulStop()
+	logit.Context(ctx).InfoW("grpcServer.Manager.Run", "shutdown completed successfully")
 }

@@ -5,3 +5,4 @@ writeTimeoutMillisecond: 10000
 idleTimeoutMillisecond: 15000
 maxHeaderBytes: 1048576
 isOpenConnStateTraceLog: false
+shutdownTimeoutSecond: 120

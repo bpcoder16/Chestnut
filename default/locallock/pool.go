@@ -24,11 +24,9 @@ func Run(ctx context.Context, configPath string) {
 		time.Duration(config.SweepSec)*time.Second,
 	)
 
-	select {
-	case <-ctx.Done():
-		logit.Context(ctx).InfoW("localPool.Manager.Run", "Context cancelled, preparing to shutdown")
-	}
+	<-ctx.Done()
+	logit.Context(ctx).InfoW("localPool.Manager.Run", "Context cancelled, preparing to shutdown")
 
 	pool.Close()
-	logit.Context(ctx).InfoW("localPool.Manager.Run", "shutdown completed, exited")
+	logit.Context(ctx).InfoW("localPool.Manager.Run", "shutdown completed successfully")
 }
