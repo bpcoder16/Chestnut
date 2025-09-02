@@ -27,7 +27,7 @@ func Start(ctx context.Context, config *appconfig.AppConfig, goFunc func(f func(
 			logit.Context(ctx).InfoW("goFunc.Run", "Context cancelled, shutdown completed successfully")
 			return errors.New("ctx.Done")
 		case sig := <-sigChan:
-			logit.Context(ctx).InfoW("goFunc.Run", fmt.Sprintf("Received signal: %v, shutdown completed, exited", sig))
+			logit.Context(ctx).InfoW("goFunc.Run", fmt.Sprintf("Received signal: %v, shutdown completed successfully", sig))
 			return fmt.Errorf("received signal: %v, shutdown completed successfully", sig)
 		}
 	})
