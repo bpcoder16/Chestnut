@@ -4,11 +4,16 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
 
 	"github.com/elastic/go-elasticsearch/v7/esapi"
+)
+
+var (
+	DeleteIndexNotFoundError = errors.New("delete index not found")
 )
 
 type Document struct {
@@ -340,4 +345,59 @@ func (m *Manager) Analyze(ctx context.Context, index, text string, params Analyz
 	}
 
 	return
+}
+
+func (m *Manager) DeleteIndex(ctx context.Context, index string) error {
+	res, err := m.client.Indices.Delete(
+		[]string{index},
+		m.client.Indices.Delete.WithContext(ctx),
+	)
+	if err != nil {
+		return fmt.Errorf("delete index request error: %w", err)
+	}
+	defer func() {
+		_ = res.Body.Close()
+	}()
+
+	if res.IsError() {
+		if res.StatusCode == 404 {
+			return DeleteIndexNotFoundError
+		}
+		body, _ := io.ReadAll(res.Body)
+		return fmt.Errorf("delete index error: %s", string(body))
+	}
+
+	return nil
+}
+
+func (m *Manager) CreateIndex(ctx context.Context, index string, mapping any) error {
+	var options []func(*esapi.IndicesCreateRequest)
+	options = append(options, m.client.Indices.Create.WithContext(ctx))
+
+	if mapping != nil {
+		var buf bytes.Buffer
+		if err := json.NewEncoder(&buf).Encode(mapping); err != nil {
+			return fmt.Errorf("failed to encode mapping: %w", err)
+		}
+		options = append(options, m.client.Indices.Create.WithBody(&buf))
+	}
+
+	res, err := m.client.Indices.Create(index, options...)
+	if err != nil {
+		return fmt.Errorf("create index request error: %w", err)
+	}
+	defer func() {
+		_ = res.Body.Close()
+	}()
+
+	if res.IsError() {
+		if res.StatusCode == 400 {
+			body, _ := io.ReadAll(res.Body)
+			return fmt.Errorf("create index bad request: %s", string(body))
+		}
+		body, _ := io.ReadAll(res.Body)
+		return fmt.Errorf("create index error: %s", string(body))
+	}
+
+	return nil
 }
