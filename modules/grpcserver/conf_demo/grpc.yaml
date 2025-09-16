@@ -1,1 +1,31 @@
 port: "6666"
+
+# 性能配置
+Performance:
+  MaxConcurrentStreams: 1000      # 每个连接的最大并发流数量 (默认: 100)
+  MaxRecvMsgSize: 4194304         # 控制服务端最大能接收的单条消息大小 (默认：4MB)
+  MaxSendMsgSize: 4194304         # 控制 服务端最大能发送的单条消息大小 (默认：2GB)
+  InitialWindowSize: 524288       # 窗口（window）机制 来限制发送方在没有收到 ACK 前，最多能发多少数据。(512K)
+  InitialConnWindowSize: 1048576  # 连接级 (connection-level) HTTP/2 flow control 窗口大小配置 (1M)
+  WriteBufferSize: 32768          # 控制 写缓冲区大小 (32K)
+  ReadBufferSize: 32768           # 控制 从底层连接（TCP socket）读取时的缓冲区大小 (32K)
+#  NumStreamWorkers: 0             # NumStreamWorkers 控制 gRPC 服务端 处理流的并发模型(实验选项)
+
+# 连接保活配置
+Keepalive:
+  MaxConnectionIdleSec: 0         # 连接空闲超时时间 (默认: 无限)
+  MaxConnectionAgeSec: 7200       # 连接最大存活时间 (默认: 无限)
+  MaxConnectionAgeGraceSec: 300   # 连接优雅关闭宽限期 (默认: 无限)
+  TimeSec: 60                     # 发送keepalive ping的间隔 (默认: 2小时)
+  TimeoutSec: 5                   # keepalive ping响应超时 (默认: 20秒)
+
+# 连接策略配置
+KeepAlivePolicy:
+  MinTimeSec: 10                  # 客户端ping的最小间隔 (默认: 5分钟) 客户端 PING 太频繁，就会被判违规。
+  PermitWithoutStream: true       # 是否允许客户端在没有活跃 RPC 的情况下发送 PING（true/false）
+
+## TLS 配置
+#TLS:
+#  Enabled: true
+#  CertFile: "/path/to/server.crt"
+#  KeyFile: "/path/to/server.key"

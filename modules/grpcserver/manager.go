@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"net"
+	"time"
 
 	"github.com/bpcoder16/Chestnut/v2/logit"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/keepalive"
 )
 
 type Service interface {
@@ -21,12 +23,58 @@ type Manager struct {
 
 func NewManager(configPath string, serviceList ...Service) *Manager {
 	config := loadConfig(configPath)
+
+	// 构建服务器选项
+	opts := buildServerOptions(config)
+
 	manager := &Manager{
 		config:     config,
-		server:     grpc.NewServer(),
+		server:     grpc.NewServer(opts...),
 		serverList: serviceList,
 	}
 	return manager
+}
+
+// buildServerOptions 构建 gRPC 服务器选项
+func buildServerOptions(config *Config) []grpc.ServerOption {
+	opts := []grpc.ServerOption{
+		// 性能配置
+		grpc.MaxConcurrentStreams(config.Performance.MaxConcurrentStreams),
+		grpc.MaxRecvMsgSize(config.Performance.MaxRecvMsgSize),
+		grpc.MaxSendMsgSize(config.Performance.MaxSendMsgSize),
+		grpc.InitialWindowSize(config.Performance.InitialWindowSize),
+		grpc.InitialConnWindowSize(config.Performance.InitialConnWindowSize),
+		grpc.WriteBufferSize(config.Performance.WriteBufferSize),
+		grpc.ReadBufferSize(config.Performance.ReadBufferSize),
+		//grpc.NumStreamWorkers(config.Performance.NumStreamWorkers),
+
+		// Keepalive 配置
+		grpc.KeepaliveParams(keepalive.ServerParameters{
+			MaxConnectionIdle:     config.Keepalive.MaxConnectionIdleSec * time.Second,
+			MaxConnectionAge:      config.Keepalive.MaxConnectionAgeSec * time.Second,
+			MaxConnectionAgeGrace: config.Keepalive.MaxConnectionAgeGraceSec * time.Second,
+			Time:                  config.Keepalive.TimeSec * time.Second,
+			Timeout:               config.Keepalive.TimeoutSec * time.Second,
+		}),
+		// 连接策略配置
+		grpc.KeepaliveEnforcementPolicy(keepalive.EnforcementPolicy{
+			MinTime:             config.KeepAlivePolicy.MinTimeSec * time.Second,
+			PermitWithoutStream: config.KeepAlivePolicy.PermitWithoutStream,
+		}),
+	}
+
+	//// 如果启用了 TLS，添加 TLS 凭证
+	//if config.TLS.Enabled {
+	//	if config.TLS.CertFile != "" && config.TLS.KeyFile != "" {
+	//		creds, err := credentials.NewServerTLSFromFile(config.TLS.CertFile, config.TLS.KeyFile)
+	//		if err != nil {
+	//			panic("Failed to load TLS credentials: " + err.Error())
+	//		}
+	//		opts = append(opts, grpc.Creds(creds))
+	//	}
+	//}
+
+	return opts
 }
 
 func (m *Manager) Run(ctx context.Context) error {
