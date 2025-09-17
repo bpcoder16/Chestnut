@@ -16,9 +16,9 @@ type Service interface {
 }
 
 type Manager struct {
-	config     *Config
-	server     *grpc.Server
-	serverList []Service
+	config      *Config
+	server      *grpc.Server
+	serviceList []Service
 }
 
 func NewManager(configPath string, serviceList ...Service) *Manager {
@@ -28,9 +28,9 @@ func NewManager(configPath string, serviceList ...Service) *Manager {
 	opts := buildServerOptions(config)
 
 	manager := &Manager{
-		config:     config,
-		server:     grpc.NewServer(opts...),
-		serverList: serviceList,
+		config:      config,
+		server:      grpc.NewServer(opts...),
+		serviceList: serviceList,
 	}
 	return manager
 }
@@ -78,8 +78,8 @@ func buildServerOptions(config *Config) []grpc.ServerOption {
 }
 
 func (m *Manager) Run(ctx context.Context) error {
-	if len(m.serverList) > 0 {
-		for _, service := range m.serverList {
+	if len(m.serviceList) > 0 {
+		for _, service := range m.serviceList {
 			service.RegisterService(m.server)
 		}
 	}
