@@ -54,6 +54,10 @@ func NewClient(conn *websocket.Conn, uuidStr string, userId int64) *Client {
 	}
 }
 
+func (c *Client) UserID() int64 {
+	return c.userId
+}
+
 func (c *Client) close(ctx context.Context, sourceText string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
