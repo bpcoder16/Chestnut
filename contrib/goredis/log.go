@@ -5,8 +5,8 @@ import (
 	"net"
 	"time"
 
-	"github.com/bpcoder16/Chestnut/v2/core/log"
-	"github.com/bpcoder16/Chestnut/v2/core/utils"
+	"github.com/bpcoder16/Chestnut/v3/core/log"
+	"github.com/bpcoder16/Chestnut/v3/core/utils"
 	"github.com/redis/go-redis/v9"
 )
 

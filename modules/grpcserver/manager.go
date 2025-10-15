@@ -6,7 +6,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/bpcoder16/Chestnut/v2/logit"
+	"github.com/bpcoder16/Chestnut/v3/logit"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
 )

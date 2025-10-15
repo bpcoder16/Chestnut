@@ -1,8 +1,8 @@
 package mysql
 
 import (
-	"github.com/bpcoder16/Chestnut/v2/contrib/orm/mysql"
-	"github.com/bpcoder16/Chestnut/v2/core/log"
+	"github.com/bpcoder16/Chestnut/v3/contrib/orm/mysql"
+	"github.com/bpcoder16/Chestnut/v3/core/log"
 	"gorm.io/gorm"
 )
 

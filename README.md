@@ -60,7 +60,7 @@ Chestnut 是一个功能丰富的 Go 语言业务开发通用功能集合库，�
 ### 安装
 
 ```bash
-go get github.com/bpcoder16/Chestnut/v2
+go get github.com/bpcoder16/Chestnut/v3
 ```
 
 ### 基本使用
@@ -72,11 +72,11 @@ import (
 	"context"
 	"path"
 
-    "github.com/bpcoder16/Chestnut/v2/appconfig"
-    "github.com/bpcoder16/Chestnut/v2/bootstrap"
-    "github.com/bpcoder16/Chestnut/v2/core/cdefer"
-    "github.com/bpcoder16/Chestnut/v2/core/gtask"
-    "github.com/bpcoder16/Chestnut/v2/modules/httpserver"
+    "github.com/bpcoder16/Chestnut/v3/appconfig"
+    "github.com/bpcoder16/Chestnut/v3/bootstrap"
+    "github.com/bpcoder16/Chestnut/v3/core/cdefer"
+    "github.com/bpcoder16/Chestnut/v3/core/gtask"
+    "github.com/bpcoder16/Chestnut/v3/modules/httpserver"
 )
 
 func main() {
@@ -111,7 +111,7 @@ func main() {
 ### 日志系统
 
 ```go
-import "github.com/bpcoder16/Chestnut/v2/logit"
+import "github.com/bpcoder16/Chestnut/v3/logit"
 
 func example() {
     // 记录信息日志
@@ -129,7 +129,7 @@ func example() {
 
 ```go
 import (
-    "github.com/bpcoder16/Chestnut/v2/contrib/orm/mysql"
+    "github.com/bpcoder16/Chestnut/v3/contrib/orm/mysql"
 )
 
 func dbExample() {
@@ -148,7 +148,7 @@ func dbExample() {
 ### Redis 缓存
 
 ```go
-import "github.com/bpcoder16/Chestnut/v2/contrib/goredis"
+import "github.com/bpcoder16/Chestnut/v3/contrib/goredis"
 
 func redisExample() {
     // 获取 Redis 客户端

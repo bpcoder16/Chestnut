@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"runtime"
 
-	"github.com/bpcoder16/Chestnut/v2/core/gtask"
-	"github.com/bpcoder16/Chestnut/v2/core/log"
-	"github.com/bpcoder16/Chestnut/v2/core/utils"
+	"github.com/bpcoder16/Chestnut/v3/core/gtask"
+	"github.com/bpcoder16/Chestnut/v3/core/log"
+	"github.com/bpcoder16/Chestnut/v3/core/utils"
 )
 
 var (

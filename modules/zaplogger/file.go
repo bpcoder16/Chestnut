@@ -5,8 +5,8 @@ import (
 	"path"
 	"time"
 
-	"github.com/bpcoder16/Chestnut/v2/core/file/filerotatelogs"
-	"github.com/bpcoder16/Chestnut/v2/core/file/standard"
+	"github.com/bpcoder16/Chestnut/v3/core/file/filerotatelogs"
+	"github.com/bpcoder16/Chestnut/v3/core/file/standard"
 )
 
 func GetFileRotateLogWriters(logDir, appName, logName string) (debugWriter, infoWriter, warnErrorFatalWriter io.Writer) {

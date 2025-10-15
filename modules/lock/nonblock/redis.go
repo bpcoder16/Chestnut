@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/bpcoder16/Chestnut/v2/logit"
+	"github.com/bpcoder16/Chestnut/v3/logit"
 	"github.com/redis/go-redis/v9"
 )
 

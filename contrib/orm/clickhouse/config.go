@@ -1,6 +1,6 @@
 package clickhouse
 
-import "github.com/bpcoder16/Chestnut/v2/core/utils"
+import "github.com/bpcoder16/Chestnut/v3/core/utils"
 
 type ConfigItem struct {
 	Host         string `json:"host"`

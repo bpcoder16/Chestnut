@@ -4,7 +4,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/bpcoder16/Chestnut/v2/core/log"
+	"github.com/bpcoder16/Chestnut/v3/core/log"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )

@@ -9,11 +9,11 @@ import (
 	"path"
 	"syscall"
 
-	"github.com/bpcoder16/Chestnut/v2/appconfig"
-	"github.com/bpcoder16/Chestnut/v2/appconfig/env"
-	"github.com/bpcoder16/Chestnut/v2/core/asynctask"
-	"github.com/bpcoder16/Chestnut/v2/default/locallock"
-	"github.com/bpcoder16/Chestnut/v2/logit"
+	"github.com/bpcoder16/Chestnut/v3/appconfig"
+	"github.com/bpcoder16/Chestnut/v3/appconfig/env"
+	"github.com/bpcoder16/Chestnut/v3/core/asynctask"
+	"github.com/bpcoder16/Chestnut/v3/default/locallock"
+	"github.com/bpcoder16/Chestnut/v3/logit"
 )
 
 func Start(ctx context.Context, config *appconfig.AppConfig, goFunc func(f func() error)) {

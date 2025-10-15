@@ -4,8 +4,8 @@ import (
 	"context"
 	"net/http"
 
-	ginHandler "github.com/bpcoder16/Chestnut/v2/contrib/httphandler/gin"
-	"github.com/bpcoder16/Chestnut/v2/contrib/websocket"
+	ginHandler "github.com/bpcoder16/Chestnut/v3/contrib/httphandler/gin"
+	"github.com/bpcoder16/Chestnut/v3/contrib/websocket"
 	"github.com/gin-gonic/gin"
 )
 

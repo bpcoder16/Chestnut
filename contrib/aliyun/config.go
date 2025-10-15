@@ -3,7 +3,7 @@ package aliyun
 import (
 	"sync"
 
-	"github.com/bpcoder16/Chestnut/v2/core/utils"
+	"github.com/bpcoder16/Chestnut/v3/core/utils"
 )
 
 var (

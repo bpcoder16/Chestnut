@@ -1,7 +1,7 @@
 package esclientv7
 
 import (
-	"github.com/bpcoder16/Chestnut/v2/core/log"
+	"github.com/bpcoder16/Chestnut/v3/core/log"
 	"github.com/elastic/go-elasticsearch/v7"
 )
 

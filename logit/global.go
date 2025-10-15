@@ -4,7 +4,7 @@ import (
 	"context"
 	"sync"
 
-	"github.com/bpcoder16/Chestnut/v2/core/log"
+	"github.com/bpcoder16/Chestnut/v3/core/log"
 )
 
 var global = &loggerAppliance{}

@@ -6,10 +6,10 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/bpcoder16/Chestnut/v2/contrib/cron"
-	"github.com/bpcoder16/Chestnut/v2/core/log"
-	"github.com/bpcoder16/Chestnut/v2/core/utils"
-	"github.com/bpcoder16/Chestnut/v2/logit"
+	"github.com/bpcoder16/Chestnut/v3/contrib/cron"
+	"github.com/bpcoder16/Chestnut/v3/core/log"
+	"github.com/bpcoder16/Chestnut/v3/core/utils"
+	"github.com/bpcoder16/Chestnut/v3/logit"
 	"github.com/go-co-op/gocron/v2"
 	"github.com/google/uuid"
 )

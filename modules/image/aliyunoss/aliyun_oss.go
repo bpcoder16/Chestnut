@@ -7,10 +7,10 @@ import (
 	"mime/multipart"
 	"path/filepath"
 
-	"github.com/bpcoder16/Chestnut/v2/contrib/aliyun/oss"
-	"github.com/bpcoder16/Chestnut/v2/core/utils"
-	"github.com/bpcoder16/Chestnut/v2/default/resty"
-	"github.com/bpcoder16/Chestnut/v2/logit"
+	"github.com/bpcoder16/Chestnut/v3/contrib/aliyun/oss"
+	"github.com/bpcoder16/Chestnut/v3/core/utils"
+	"github.com/bpcoder16/Chestnut/v3/default/resty"
+	"github.com/bpcoder16/Chestnut/v3/logit"
 	goResty "github.com/go-resty/resty/v2"
 )
 

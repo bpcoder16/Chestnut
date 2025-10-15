@@ -1,4 +1,4 @@
-module github.com/bpcoder16/Chestnut/v2
+module github.com/bpcoder16/Chestnut/v3
 
 go 1.25.2
 

@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/bpcoder16/Chestnut/v2/appconfig/env"
-	"github.com/bpcoder16/Chestnut/v2/core/file/operations"
+	"github.com/bpcoder16/Chestnut/v3/appconfig/env"
+	"github.com/bpcoder16/Chestnut/v3/core/file/operations"
 	"gorm.io/gorm"
 )
 

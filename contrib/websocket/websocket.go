@@ -8,10 +8,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/bpcoder16/Chestnut/v2/core/gtask"
-	"github.com/bpcoder16/Chestnut/v2/core/log"
-	"github.com/bpcoder16/Chestnut/v2/core/utils"
-	"github.com/bpcoder16/Chestnut/v2/logit"
+	"github.com/bpcoder16/Chestnut/v3/core/gtask"
+	"github.com/bpcoder16/Chestnut/v3/core/log"
+	"github.com/bpcoder16/Chestnut/v3/core/utils"
+	"github.com/bpcoder16/Chestnut/v3/logit"
 	"github.com/gorilla/websocket"
 )
 

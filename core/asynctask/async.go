@@ -5,9 +5,9 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/bpcoder16/Chestnut/v2/core/log"
-	"github.com/bpcoder16/Chestnut/v2/core/utils"
-	"github.com/bpcoder16/Chestnut/v2/logit"
+	"github.com/bpcoder16/Chestnut/v3/core/log"
+	"github.com/bpcoder16/Chestnut/v3/core/utils"
+	"github.com/bpcoder16/Chestnut/v3/logit"
 )
 
 type taskData struct {

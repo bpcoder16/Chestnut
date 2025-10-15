@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/bpcoder16/Chestnut/v2/logit"
-	"github.com/bpcoder16/Chestnut/v2/modules/lock/localpool"
+	"github.com/bpcoder16/Chestnut/v3/logit"
+	"github.com/bpcoder16/Chestnut/v3/modules/lock/localpool"
 )
 
 var pool *localpool.RWLockPool[string]

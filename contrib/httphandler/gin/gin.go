@@ -4,8 +4,8 @@ import (
 	"os"
 	"sync"
 
-	"github.com/bpcoder16/Chestnut/v2/appconfig/env"
-	"github.com/bpcoder16/Chestnut/v2/contrib/validator"
+	"github.com/bpcoder16/Chestnut/v3/appconfig/env"
+	"github.com/bpcoder16/Chestnut/v3/contrib/validator"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 )

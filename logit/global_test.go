@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/bpcoder16/Chestnut/v2/core/log"
+	"github.com/bpcoder16/Chestnut/v3/core/log"
 )
 
 func TestGlobalLog(t *testing.T) {

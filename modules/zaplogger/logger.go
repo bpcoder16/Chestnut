@@ -4,8 +4,8 @@ import (
 	"context"
 	"io"
 
-	"github.com/bpcoder16/Chestnut/v2/contrib/log/zap"
-	"github.com/bpcoder16/Chestnut/v2/core/log"
+	"github.com/bpcoder16/Chestnut/v3/contrib/log/zap"
+	"github.com/bpcoder16/Chestnut/v3/core/log"
 )
 
 // 	zaplogger.GetZapLogger(
