@@ -1,0 +1,19 @@
+local:
+  configDirName: "conf"
+  configFile: "app-server.yaml"
+nacos:
+  serverConfigs:
+    - scheme: "grpc"
+      ipAddr: "192.168.50.201"
+      #      port: 18848
+      grpcPort: 19848
+
+  clientConfig:
+    namespaceId: "demo-server"
+    cacheDir: "./conf-cache-server"
+    notLoadCacheAtStart: true
+    logDir: "./log/nacos-server"
+    logLevel: "debug"
+
+  group: "Dev"
+  configFile: "app-server.yaml"

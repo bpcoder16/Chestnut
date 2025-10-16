@@ -31,3 +31,12 @@ func ParseFile(filePath string, resPtr interface{}) (err error) {
 	}
 	return
 }
+
+func ParseContentYaml(content string, resPtr interface{}) (err error) {
+	v := viper.New()
+	v.SetConfigType("yaml")
+	if err = viper.ReadConfig(strings.NewReader(content)); err == nil {
+		err = v.Unmarshal(resPtr)
+	}
+	return
+}

@@ -7,7 +7,18 @@ import (
 
 	"github.com/bpcoder16/Chestnut/v3/appconfig/env"
 	"github.com/bpcoder16/Chestnut/v3/core/utils"
+	"github.com/nacos-group/nacos-sdk-go/v2/common/constant"
 )
+
+type Base struct {
+	Local struct {
+		configPath string
+	}
+	Nacos struct {
+		ServerConfigs []constant.ServerConfig
+		ClientConfig  constant.ClientConfig
+	}
+}
 
 type AppConfig struct {
 	Env env.Option
