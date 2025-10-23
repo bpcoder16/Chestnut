@@ -22,6 +22,9 @@ var (
 	fChan            chan taskData
 	fQueueSize       int
 	qTaskMaxRetryCnt int
+	consumerWg       sync.WaitGroup
+	shutdownCh       chan struct{}
+	shutdownOnce     sync.Once
 )
 
 func SetQueueSize(queueSize int) {
@@ -40,6 +43,7 @@ func lazyInit() {
 		} else {
 			fChan = make(chan taskData, defaultQueueSize)
 		}
+		shutdownCh = make(chan struct{})
 	})
 }
 
@@ -69,25 +73,58 @@ func StartConsumerPool(ctx context.Context, queueSize, consumerSize, taskMaxRetr
 	SetQueueSize(queueSize)
 	lazyInit()
 	for i := 0; i < consumerSize; i++ {
+		consumerWg.Add(1)
 		goFunc(func() error {
+			defer consumerWg.Done()
 			return consumer(ctx)
 		})
 	}
+
+	// 监听 ctx.Done(),触发优雅关闭
+	goFunc(func() error {
+		<-ctx.Done()
+		GracefulShutdown()
+		return ctx.Err()
+	})
 }
 
 func consumer(ctx context.Context) error {
 	ctx = context.WithValue(ctx, log.DefaultMessageKey, "AsyncTask")
 	for {
 		select {
-		case <-ctx.Done():
-			return ctx.Err()
+		case <-shutdownCh:
+			// 优雅关闭:继续处理队列中剩余的任务
+			for {
+				select {
+				case f, ok := <-fChan:
+					if !ok {
+						return errors.New("consumer channel closed")
+					}
+					task(ctx, f)
+				default:
+					// 队列已空,退出
+					return nil
+				}
+			}
 		case f, ok := <-fChan:
 			if !ok {
-				return errors.New("consumer Channel closed")
+				return errors.New("consumer channel closed")
 			}
 			task(ctx, f)
 		}
 	}
+}
+
+// GracefulShutdown 优雅关闭:停止接收新任务,等待所有队列任务消费完成
+func GracefulShutdown() {
+	shutdownOnce.Do(func() {
+		// 关闭 shutdown 通道,通知所有消费者开始清空队列
+		close(shutdownCh)
+		// 等待所有消费者处理完队列中的任务
+		consumerWg.Wait()
+		// 关闭任务队列
+		close(fChan)
+	})
 }
 
 func task(ctx context.Context, t taskData) {
