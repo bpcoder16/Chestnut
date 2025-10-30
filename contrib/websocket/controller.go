@@ -39,10 +39,10 @@ func (b *BaseTextMessageController) Init(_ TextMessageController) {}
 
 func (b *BaseTextMessageController) ParsePayload(_ context.Context, client *Client, message ReceiveMessage) (err error) {
 	b.Client = client
-	if len(message.Scene) > 0 {
+	if message.Scene != b.Client.State.Scene {
 		b.Client.State.Scene = message.Scene
-	}
-	if len(message.SceneParams) > 0 {
+		b.Client.State.SceneParams = message.SceneParams
+	} else if len(message.SceneParams) > 0 {
 		b.Client.State.SceneParams = message.SceneParams
 	}
 	if len(message.SID) > 0 {
