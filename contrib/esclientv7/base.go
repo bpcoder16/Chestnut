@@ -91,10 +91,14 @@ func (m *Manager) GetDefaultDSLParams() DSLParams {
 }
 
 func (m *Manager) DefaultSearch(ctx context.Context, index string, params DSLParams, dest any, o ...func(*esapi.SearchRequest)) (total Total, maxScore float64, err error) {
-	return m.Search(ctx, index, params, dest, o...)
+	return m.search(ctx, index, params, dest, nil, o...)
 }
 
-func (m *Manager) Search(ctx context.Context, index string, dsl any, dest any, o ...func(*esapi.SearchRequest)) (total Total, maxScore float64, err error) {
+func (m *Manager) Search(ctx context.Context, index string, dsl any, hitsHitsDest any, aggregationsDest any, o ...func(*esapi.SearchRequest)) (total Total, maxScore float64, err error) {
+	return m.search(ctx, index, dsl, hitsHitsDest, aggregationsDest, o...)
+}
+
+func (m *Manager) search(ctx context.Context, index string, dsl any, hitsHitsDest any, aggregationsDest any, o ...func(*esapi.SearchRequest)) (total Total, maxScore float64, err error) {
 	var buf bytes.Buffer
 	if err = json.NewEncoder(&buf).Encode(dsl); err != nil {
 		return
@@ -133,6 +137,7 @@ func (m *Manager) Search(ctx context.Context, index string, dsl any, dest any, o
 			MaxScore float64         `json:"max_score"`
 			Hits     json.RawMessage `json:"hits"`
 		} `json:"hits"`
+		Aggregations json.RawMessage `json:"aggregations"`
 	}
 	if err = json.NewDecoder(res.Body).Decode(&result); err != nil {
 		err = fmt.Errorf("decode response failed: %w", err)
@@ -141,8 +146,16 @@ func (m *Manager) Search(ctx context.Context, index string, dsl any, dest any, o
 	total = result.Hits.Total
 	maxScore = result.Hits.MaxScore
 
-	if err = json.Unmarshal(result.Hits.Hits, dest); err != nil {
-		err = fmt.Errorf("unmarshal hits failed: %w", err)
+	if hitsHitsDest != nil {
+		if err = json.Unmarshal(result.Hits.Hits, hitsHitsDest); err != nil {
+			err = fmt.Errorf("unmarshal hits failed: %w", err)
+		}
+	}
+
+	if aggregationsDest != nil {
+		if err = json.Unmarshal(result.Aggregations, aggregationsDest); err != nil {
+			err = fmt.Errorf("unmarshal aggregations failed: %w", err)
+		}
 	}
 
 	return
