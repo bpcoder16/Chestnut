@@ -59,6 +59,7 @@ type DSLParams struct {
 	Size  int                 `json:"size,omitempty"`
 	Query DSLParamsQuery      `json:"query,omitempty"`
 	Sort  []map[string]string `json:"sort,omitempty"`
+	Aggs  map[string]any      `json:"aggs,omitempty"`
 }
 
 type DSLParamsQuery struct {
@@ -85,6 +86,7 @@ func (m *Manager) GetDefaultDSLParams() DSLParams {
 			},
 		},
 		Sort: make([]map[string]string, 0, 2),
+		Aggs: make(map[string]any),
 	}
 }
 
