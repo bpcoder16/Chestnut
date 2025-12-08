@@ -55,11 +55,11 @@ func (m *Manager) GetByID(ctx context.Context, index, id string, dest any) error
 }
 
 type DSLParams struct {
-	From  int                 `json:"from,omitempty"`
-	Size  int                 `json:"size,omitempty"`
-	Query DSLParamsQuery      `json:"query,omitempty"`
-	Sort  []map[string]string `json:"sort,omitempty"`
-	Aggs  map[string]any      `json:"aggs,omitempty"`
+	From  int              `json:"from,omitempty"`
+	Size  int              `json:"size,omitempty"`
+	Query DSLParamsQuery   `json:"query,omitempty"`
+	Sort  []map[string]any `json:"sort,omitempty"`
+	Aggs  map[string]any   `json:"aggs,omitempty"`
 }
 
 type DSLParamsQuery struct {
@@ -85,7 +85,7 @@ func (m *Manager) GetDefaultDSLParams() DSLParams {
 				MinimumShouldMatch: 0,
 			},
 		},
-		Sort: make([]map[string]string, 0, 2),
+		Sort: make([]map[string]any, 0, 2),
 		Aggs: make(map[string]any),
 	}
 }
