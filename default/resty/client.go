@@ -29,6 +29,9 @@ func SetClient(logger *log.Helper) {
 		)
 		return nil
 	})
+
+	// TODO 临时设置全局的超时时间，需要等到后续 resty 升级到 v3 后，支持单个请求的超时设置
+	client.SetTimeout(15 * time.Second)
 }
 
 func Client() *resty.Client {
