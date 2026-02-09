@@ -202,16 +202,27 @@ func SignAuthMiddleware(secretKeyMap map[string]string, timeWindow time.Duration
 
 		// 读取原始 body
 		reqBodyBytes := generateRequestBody(ctx)
+		reqBody := make(map[string]any, 10)
 
-		// 解析 JSON 并排序为字符串
-		var reqBody map[string]any
-		if errJ := json.Unmarshal(reqBodyBytes, &reqBody); errJ != nil {
-			ctx.JSON(http.StatusBadRequest, gin.H{
-				"code":  http.StatusBadRequest,
-				"error": "JSON 解析失败",
-			})
-			ctx.Abort()
-			return
+		if len(reqBodyBytes) > 0 {
+			// 解析 JSON 并排序为字符串
+			if errJ := json.Unmarshal(reqBodyBytes, &reqBody); errJ != nil {
+				ctx.JSON(http.StatusBadRequest, gin.H{
+					"code":  http.StatusBadRequest,
+					"msg":   string(reqBodyBytes),
+					"error": "JSON 解析失败",
+				})
+				ctx.Abort()
+				return
+			}
+		}
+
+		// 获取所有查询参数
+		queryParams := ctx.Request.URL.Query()
+		for key, values := range queryParams {
+			if len(values) > 0 {
+				reqBody[key] = values[0]
+			}
 		}
 
 		if signauth.Signature(secretKey, reqBody, timestamp, toStringFunc) != signature {
