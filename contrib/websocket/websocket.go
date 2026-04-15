@@ -138,6 +138,8 @@ func (ws *WebSocket) before(ctx context.Context, path string, r *http.Request, w
 			http.Error(w, "Forbidden", http.StatusForbidden)
 			return
 		}
+	} else {
+		isAuthorized = true
 	}
 	var isOK bool
 	if uuidStr, isOK = ctxNew.Value(ConnUUIDCTXKey).(string); !isOK {
