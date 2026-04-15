@@ -45,6 +45,9 @@ func (r *RedisPubSub) Subscribe(ctx context.Context, redisClient *redis.Client, 
 }
 
 func (r *RedisPubSub) getRandomChannel() string {
+	if len(r.channels) == 1 {
+		return r.channels[0]
+	}
 	return r.channels[utils.RandIntN(len(r.channels))]
 }
 
