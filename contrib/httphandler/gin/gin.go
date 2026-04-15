@@ -4,8 +4,8 @@ import (
 	"os"
 	"sync"
 
-	"github.com/bpcoder16/Chestnut/v2/appconfig/env"
-	"github.com/bpcoder16/Chestnut/v2/contrib/validator"
+	"github.com/bpcoder16/Chestnut/v4/appconfig/env"
+	"github.com/bpcoder16/Chestnut/v4/contrib/validator"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 )
@@ -32,16 +32,12 @@ func lazyInit() {
 	})
 }
 
-type Router interface {
-	RegisterHandler(engine *gin.Engine)
-}
-
-func HTTPHandler(routers ...Router) *gin.Engine {
+func HTTPHandler(registerFuncs ...func(*gin.RouterGroup)) *gin.Engine {
 	lazyInit()
 	h := gin.New()
 	h.Use(RecoveryWithWriter(os.Stderr))
-	for _, router := range routers {
-		router.RegisterHandler(h)
+	for _, fn := range registerFuncs {
+		fn(&h.RouterGroup)
 	}
 	return h
 }

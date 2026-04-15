@@ -3,7 +3,7 @@ package httpserver
 import (
 	"time"
 
-	"github.com/bpcoder16/Chestnut/v2/core/utils"
+	"github.com/bpcoder16/Chestnut/v4/core/utils"
 )
 
 type Config struct {

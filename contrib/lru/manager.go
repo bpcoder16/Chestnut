@@ -3,7 +3,7 @@ package lru
 import (
 	"time"
 
-	"github.com/bpcoder16/Chestnut/v2/core/log"
+	"github.com/bpcoder16/Chestnut/v4/core/log"
 	"github.com/hashicorp/golang-lru/v2"
 	"github.com/hashicorp/golang-lru/v2/expirable"
 )

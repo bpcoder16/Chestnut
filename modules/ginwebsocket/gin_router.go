@@ -4,8 +4,7 @@ import (
 	"context"
 	"net/http"
 
-	ginHandler "github.com/bpcoder16/Chestnut/v2/contrib/httphandler/gin"
-	"github.com/bpcoder16/Chestnut/v2/contrib/websocket"
+	"github.com/bpcoder16/Chestnut/v4/contrib/websocket"
 	"github.com/gin-gonic/gin"
 )
 
@@ -13,12 +12,9 @@ const (
 	basePath = "/ws"
 )
 
-var _ ginHandler.Router = (*Router)(nil)
-
 type Router struct {
-	wsBaseRouter *ginHandler.DefaultRouter
-	wsManager    *websocket.WebSocket
-	path         string
+	wsManager *websocket.WebSocket
+	path      string
 }
 
 func (r *Router) GetClientManager() *websocket.ClientManager {
@@ -41,18 +37,17 @@ func (r *Router) SetClientCloseFunc(f func(context.Context, string)) {
 	r.wsManager.SetClientCloseFunc(f)
 }
 
-func (r *Router) RegisterHandler(engine *gin.Engine) {
-	r.wsBaseRouter.GET(r.path, func(ctx *gin.Context) {
+// Register 将 WebSocket 路由注册到指定 RouterGroup，供 HTTPHandler 使用。
+func (r *Router) Register(rg *gin.RouterGroup) {
+	ws := rg.Group(basePath)
+	ws.GET(r.path, func(ctx *gin.Context) {
 		r.wsManager.Handle(ctx, r.path, ctx.Request, ctx.Writer)
 	})
-	r.wsBaseRouter.RegisterHandler(engine)
 }
 
 func NewRouter(path, configPath string) *Router {
-	r := &Router{
-		wsBaseRouter: ginHandler.NewDefaultRouter(basePath),
-		wsManager:    websocket.New(configPath),
-		path:         path,
+	return &Router{
+		wsManager: websocket.New(configPath),
+		path:      path,
 	}
-	return r
 }

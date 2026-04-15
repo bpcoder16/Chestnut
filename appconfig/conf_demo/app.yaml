@@ -22,6 +22,8 @@ default:
   LRUCacheSupport: false
   AliyunOSSSupport: false
   LocalLockPoolSupport: false
+  SwaggerSupport: false
+  PProfSupport: false
 
 asyncService:
   Support: false

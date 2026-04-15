@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/bpcoder16/Chestnut/v2/logit"
+	"github.com/bpcoder16/Chestnut/v4/logit"
 )
 
 type Router interface {

@@ -5,8 +5,8 @@ import (
 	"path"
 	"path/filepath"
 
-	"github.com/bpcoder16/Chestnut/v2/appconfig/env"
-	"github.com/bpcoder16/Chestnut/v2/core/utils"
+	"github.com/bpcoder16/Chestnut/v4/appconfig/env"
+	"github.com/bpcoder16/Chestnut/v4/core/utils"
 )
 
 type AppConfig struct {
@@ -34,6 +34,8 @@ type Default struct {
 	LRUCacheSupport      bool
 	AliyunOSSSupport     bool
 	LocalLockPoolSupport bool
+	SwaggerSupport       bool
+	PProfSupport         bool
 }
 
 type AsyncService struct {

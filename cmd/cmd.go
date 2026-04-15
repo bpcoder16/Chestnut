@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/bpcoder16/Chestnut/v2/appconfig/env"
-	"github.com/bpcoder16/Chestnut/v2/core/log"
-	"github.com/bpcoder16/Chestnut/v2/core/utils"
+	"github.com/bpcoder16/Chestnut/v4/appconfig/env"
+	"github.com/bpcoder16/Chestnut/v4/core/log"
+	"github.com/bpcoder16/Chestnut/v4/core/utils"
 	"github.com/spf13/cobra"
 )
 

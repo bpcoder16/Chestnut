@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/bpcoder16/Chestnut/v2/logit"
+	"github.com/bpcoder16/Chestnut/v4/logit"
 )
 
 func TimeCostLog(ctx context.Context, logField string) func() {

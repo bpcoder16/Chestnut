@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/bpcoder16/Chestnut/v2/core/log"
-	cUtils "github.com/bpcoder16/Chestnut/v2/core/utils"
+	"github.com/bpcoder16/Chestnut/v4/core/log"
+	cUtils "github.com/bpcoder16/Chestnut/v4/core/utils"
 	"gorm.io/gorm/logger"
 	"gorm.io/gorm/utils"
 )

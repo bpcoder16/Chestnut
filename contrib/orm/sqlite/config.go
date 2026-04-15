@@ -1,6 +1,6 @@
 package sqlite
 
-import "github.com/bpcoder16/Chestnut/v2/core/utils"
+import "github.com/bpcoder16/Chestnut/v4/core/utils"
 
 type Config struct {
 	DSN          string

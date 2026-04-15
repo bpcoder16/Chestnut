@@ -5,9 +5,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/bpcoder16/Chestnut/v2/appconfig/env"
-	"github.com/bpcoder16/Chestnut/v2/core/log"
-	"github.com/bpcoder16/Chestnut/v2/core/utils"
+	"github.com/bpcoder16/Chestnut/v4/appconfig/env"
+	"github.com/bpcoder16/Chestnut/v4/core/log"
+	"github.com/bpcoder16/Chestnut/v4/core/utils"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"

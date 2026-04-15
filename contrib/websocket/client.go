@@ -10,9 +10,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/bpcoder16/Chestnut/v2/core/log"
-	"github.com/bpcoder16/Chestnut/v2/core/utils"
-	"github.com/bpcoder16/Chestnut/v2/logit"
+	"github.com/bpcoder16/Chestnut/v4/core/log"
+	"github.com/bpcoder16/Chestnut/v4/core/utils"
+	"github.com/bpcoder16/Chestnut/v4/logit"
 	"github.com/gorilla/websocket"
 )
 

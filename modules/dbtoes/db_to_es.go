@@ -5,7 +5,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/bpcoder16/Chestnut/v2/contrib/esclientv7"
+	"github.com/bpcoder16/Chestnut/v4/contrib/esclientv7"
 )
 
 type ESCommonItem interface {
