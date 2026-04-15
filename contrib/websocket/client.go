@@ -31,13 +31,37 @@ type Client struct {
 
 	textMsgCh chan []byte
 	isClosed  bool
-	State     State // 客户端状态信息
+
+	stateMu sync.RWMutex
+	State   State // 客户端状态信息
 }
 
 type State struct {
 	SID         string         `json:"sid,omitempty"`
 	Scene       string         `json:"scene,omitempty"` // 场景信息
 	SceneParams map[string]any `json:"-"`
+}
+
+// GetState 线程安全地返回当前 State 的快照。
+func (c *Client) GetState() State {
+	c.stateMu.RLock()
+	defer c.stateMu.RUnlock()
+	return c.State
+}
+
+// UpdateState 线程安全地更新 State，仅更新非零值字段。
+func (c *Client) UpdateState(scene, sid string, sceneParams map[string]any) {
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
+	if len(scene) > 0 {
+		c.State.Scene = scene
+	}
+	if len(sid) > 0 {
+		c.State.SID = sid
+	}
+	if len(sceneParams) > 0 {
+		c.State.SceneParams = sceneParams
+	}
 }
 
 func NewClient(conn *websocket.Conn, uuidStr string, userId int64) *Client {
@@ -81,13 +105,14 @@ func (c *Client) close(ctx context.Context, sourceText string) {
 }
 
 func (c *Client) log(ctx context.Context, level string, keyValues ...interface{}) {
+	state := c.GetState()
 	newKeyValues := []interface{}{
 		"subProtocol", c.conn.Subprotocol(),
 		"localAddr", c.conn.LocalAddr().String(),
 		"remoteAddr", c.conn.RemoteAddr().String(),
 		"client.ws.clientManager.Len()", c.ws.clientManager.Len(),
-		"client.State", c.State,
-		"client.State.SceneParams", c.State.SceneParams,
+		"client.State", state,
+		"client.State.SceneParams", state.SceneParams,
 	}
 	newKeyValues = append(newKeyValues, keyValues...)
 
@@ -173,14 +198,15 @@ func (c *Client) receiveTextMessage(ctx context.Context, messageBytes []byte) (e
 		return
 	}
 	if len(receiveMessage.Scene) == 0 {
-		if len(c.State.Scene) == 0 {
+		state := c.GetState()
+		if len(state.Scene) == 0 {
 			err = errors.New("receiveMessage.Scene.Empty")
 			return
 		}
 		// 如果没有传递，说明用户停留在当前场景
-		receiveMessage.Scene = c.State.Scene
-		receiveMessage.SceneParams = c.State.SceneParams
-		receiveMessage.SID = c.State.SID
+		receiveMessage.Scene = state.Scene
+		receiveMessage.SceneParams = state.SceneParams
+		receiveMessage.SID = state.SID
 	}
 
 	var controller TextMessageController
