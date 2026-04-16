@@ -1,6 +1,7 @@
 package gin
 
 import (
+	"net/http"
 	"os"
 	"sync"
 
@@ -36,6 +37,9 @@ func HTTPHandler(registerFuncs ...func(*gin.RouterGroup)) *gin.Engine {
 	lazyInit()
 	h := gin.New()
 	h.Use(RecoveryWithWriter(os.Stderr))
+	h.GET("/health", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"status": "ok"})
+	})
 	for _, fn := range registerFuncs {
 		fn(&h.RouterGroup)
 	}
