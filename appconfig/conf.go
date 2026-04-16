@@ -36,6 +36,9 @@ type Default struct {
 	LocalLockPoolSupport bool
 	SwaggerSupport       bool
 	PProfSupport         bool
+	CronSupport                  bool
+	CronDistributedLockSupport   bool
+	WebSocketSupport             bool
 }
 
 type AsyncService struct {
@@ -60,6 +63,15 @@ func (c *AppConfig) Check() (err error) {
 	case env.RunModeDebug, env.RunModeTest, env.RunModeRelease:
 	default:
 		err = errors.New("invalid runMode: " + c.Env.RunMode)
+	}
+	if c.Default.WebSocketSupport && !c.Default.RedisSupport {
+		err = errors.New("WebSocketSupport requires RedisSupport to be enabled")
+	}
+	if c.Default.CronDistributedLockSupport && !c.Default.CronSupport {
+		err = errors.New("CronDistributedLockSupport requires CronSupport to be enabled")
+	}
+	if c.Default.CronDistributedLockSupport && !c.Default.RedisSupport {
+		err = errors.New("CronDistributedLockSupport requires RedisSupport to be enabled")
 	}
 	return err
 }

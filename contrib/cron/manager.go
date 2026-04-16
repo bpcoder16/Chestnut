@@ -11,18 +11,24 @@ import (
 )
 
 var (
-	scheduler gocron.Scheduler
-	once      sync.Once
-	mu        sync.Mutex
+	scheduler        gocron.Scheduler
+	once             sync.Once
+	mu               sync.Mutex
+	schedulerOptions []gocron.SchedulerOption
 )
+
+// SetSchedulerOptions 在第一个 Job 注册前调用，将额外选项注入 scheduler（如分布式锁）。
+func SetSchedulerOptions(options ...gocron.SchedulerOption) {
+	schedulerOptions = append(schedulerOptions, options...)
+}
 
 func lazyInit() {
 	once.Do(func() {
 		var err error
-		// 创建一个新的调度器
-		scheduler, err = gocron.NewScheduler(
-			gocron.WithLocation(env.TimeLocation()),
-		)
+		opts := make([]gocron.SchedulerOption, 0, len(schedulerOptions)+1)
+		opts = append(opts, gocron.WithLocation(env.TimeLocation()))
+		opts = append(opts, schedulerOptions...)
+		scheduler, err = gocron.NewScheduler(opts...)
 		if err != nil {
 			panic("Create CronScheduler:" + err.Error())
 		}

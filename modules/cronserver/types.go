@@ -1,8 +1,7 @@
 package cronserver
 
 type Config struct {
-	IsRunCron bool
-	CronList  []ConfigItem
+	CronList []ConfigItem
 }
 
 type ConfigItem struct {

@@ -37,12 +37,11 @@ func getCron(cronConfig ConfigItem) (cron Interface, err error) {
 	return
 }
 
-func Run(ctx context.Context, configPath string) {
-	config := loadConfig(configPath)
-	if !config.IsRunCron {
-		return
+func Run(ctx context.Context, configPath string, options ...gocron.SchedulerOption) {
+	if len(options) > 0 {
+		cron.SetSchedulerOptions(options...)
 	}
-
+	config := loadConfig(configPath)
 	ctx = context.WithValue(ctx, log.DefaultMessageKey, "Cron")
 	for _, cronConfig := range config.CronList {
 		cronController, cronErr := getCron(cronConfig)
