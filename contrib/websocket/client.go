@@ -17,8 +17,9 @@ import (
 )
 
 var (
-	newline = []byte{'\n'}
-	space   = []byte{' '}
+	newline    = []byte{'\n'}
+	space      = []byte{' '}
+	errCtxDone = errors.New("ctx.Done")
 )
 
 type Client struct {
@@ -82,26 +83,28 @@ func (c *Client) UserID() int64 {
 	return c.userId
 }
 
-func (c *Client) close(ctx context.Context, sourceText string) {
+// close 执行连接清理。若本次调用真正触发了清理返回 true，连接已被其他路径关闭则返回 false。
+func (c *Client) close(ctx context.Context, sourceText string) bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	isClosedForLog := c.isClosed
 	if false == c.isClosed {
 		_ = c.sendCloseMessage(ctx)
 		_ = c.conn.Close()
 		c.isClosed = true
 		close(c.textMsgCh)
+		c.ws.clientManager.Delete(c.uuidStr)
 		if c.ws.clientCloseFunc != nil {
 			c.ws.clientCloseFunc(ctx, c.uuidStr)
 		}
+		c.infoLog(ctx,
+			"sourceText", sourceText,
+			"function", "Client.close",
+			"Disconnection.Status", "Success",
+			"client.ws.clientManager", "Delete("+c.uuidStr+")",
+		)
+		return true
 	}
-	c.ws.clientManager.Delete(c.uuidStr)
-	c.debugLog(ctx,
-		"sourceText", sourceText,
-		"function", "Client.close",
-		"client.isClosed", isClosedForLog,
-		"client.ws.clientManager", "Delete("+c.uuidStr+")",
-	)
+	return false
 }
 
 func (c *Client) log(ctx context.Context, level string, keyValues ...interface{}) {
@@ -247,8 +250,8 @@ func (c *Client) readPump(ctx context.Context, _ *http.Request, _ http.ResponseW
 				"recover", r,
 			)
 		}
-		c.close(ctx, "ReadPump.Defer")
-		if err != nil {
+		actualClose := c.close(ctx, "ReadPump.Defer")
+		if err != nil && actualClose && !errors.Is(err, errCtxDone) {
 			c.warnLog(ctx,
 				"function", "client.readPump",
 				"err", "c.conn.ReadMessage().Err:"+err.Error(),
@@ -263,7 +266,7 @@ func (c *Client) readPump(ctx context.Context, _ *http.Request, _ http.ResponseW
 	for {
 		select {
 		case <-ctx.Done():
-			err = errors.New("ctx.Done")
+			err = errCtxDone
 			return
 		default:
 			mt, message, errR := c.conn.ReadMessage()
@@ -328,8 +331,8 @@ func (c *Client) writePump(ctx context.Context, req *http.Request, resp http.Res
 				"recover", r,
 			)
 		}
-		c.close(ctx, "WritePump.Defer")
-		if err != nil {
+		actualClose := c.close(ctx, "WritePump.Defer")
+		if err != nil && actualClose && !errors.Is(err, errCtxDone) {
 			c.warnLog(ctx,
 				"function", "client.writePump",
 				"err", err,
@@ -342,7 +345,7 @@ func (c *Client) writePump(ctx context.Context, req *http.Request, resp http.Res
 	for {
 		select {
 		case <-ctx.Done():
-			err = errors.New("ctx.Done")
+			err = errCtxDone
 			return
 		case message, ok := <-c.textMsgCh:
 			if !ok {
@@ -359,7 +362,7 @@ func (c *Client) writePump(ctx context.Context, req *http.Request, resp http.Res
 				err = errors.New("c.conn.NextWriter.Err:" + errW.Error())
 				return
 			}
-			if _, errW = writer.Write(message); err != nil {
+			if _, errW = writer.Write(message); errW != nil {
 				err = errors.New("writer.Write().Err:" + errW.Error())
 				c.mu.Unlock()
 				return

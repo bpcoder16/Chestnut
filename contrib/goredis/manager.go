@@ -2,7 +2,6 @@ package goredis
 
 import (
 	"context"
-	"errors"
 	"strconv"
 	"time"
 
@@ -49,8 +48,7 @@ func (m *Manager) connect() {
 		//ConnMaxLifetime: 2 * time.Hour,
 	})
 	m.client.AddHook(NewLoggerHook(m.logger))
-	err := m.client.Get(context.Background(), "testConnect").Err()
-	if err != nil && !errors.Is(err, redis.Nil) {
+	if err := m.client.Ping(context.Background()).Err(); err != nil {
 		panic(m.config.Host + ":" + strconv.Itoa(m.config.Port) + ", failed to connect redis: " + err.Error())
 	}
 }

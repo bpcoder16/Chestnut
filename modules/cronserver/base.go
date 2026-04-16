@@ -22,7 +22,6 @@ func (b *Base) Before(name string, maxConcurrencyCnt int) {
 	b.name = name
 	b.maxConcurrencyCnt = maxConcurrencyCnt
 	b.processAddTaskList = make([]func(context.Context), 0, 100)
-	b.baseTaskList = make([]func(context.Context), 0, 100)
 }
 
 func (b *Base) AddBaseTaskList(task func(context.Context)) {
