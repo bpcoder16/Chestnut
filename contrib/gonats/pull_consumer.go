@@ -42,6 +42,8 @@ func (m *Manager) MustRegisterPullConsumer(ctx context.Context, streamName strin
 		key = cfg.Name
 	}
 	m.pullConsumers.Store(key, pc)
+	m.logger.WithContext(ctx).InfoW("NATS.MustRegisterPullConsumer", "pull consumer registered",
+		"stream", streamName, "consumer", key)
 	return pc
 }
 

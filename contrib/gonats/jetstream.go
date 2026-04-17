@@ -17,6 +17,8 @@ func (m *Manager) MustRegisterStream(ctx context.Context, cfg StreamConfig) jets
 		panic("failed to register NATS stream [" + cfg.Name + "]: " + err.Error())
 	}
 	m.streams.Store(cfg.Name, stream)
+	m.logger.WithContext(ctx).InfoW("NATS.MustRegisterStream", "stream registered",
+		"name", cfg.Name, "subjects", cfg.Subjects)
 	return stream
 }
 
