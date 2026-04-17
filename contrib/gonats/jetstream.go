@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/bpcoder16/Chestnut/v4/core/log"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 	"golang.org/x/sync/errgroup"
@@ -12,6 +13,7 @@ import (
 // MustRegisterStream 创建或更新 Stream 并保存到全局注册表，供后续通过 GetStream 取用。
 // 失败时直接 panic，用于应用启动阶段初始化。
 func (m *Manager) MustRegisterStream(ctx context.Context, cfg StreamConfig) jetstream.Stream {
+	ctx = context.WithValue(ctx, log.DefaultDownstreamKey, "NATS")
 	stream, err := m.js.CreateOrUpdateStream(ctx, buildStreamConfig(cfg))
 	if err != nil {
 		panic("failed to register NATS stream [" + cfg.Name + "]: " + err.Error())
@@ -48,6 +50,7 @@ func (m *Manager) DeleteStream(ctx context.Context, name string) error {
 //
 // header 可选：不传则使用空 Header，传入则在其基础上追加 Nats-Log-Id。
 func (m *Manager) JSPublish(ctx context.Context, subject string, data []byte, headers ...nats.Header) (*jetstream.PubAck, error) {
+	ctx = context.WithValue(ctx, log.DefaultDownstreamKey, "NATS")
 	var header nats.Header
 	if len(headers) > 0 && headers[0] != nil {
 		header = headers[0]
@@ -81,6 +84,7 @@ func (m *Manager) JSPublish(ctx context.Context, subject string, data []byte, he
 //
 // header 可选：不传则使用空 Header，传入则在其基础上追加 Nats-Log-Id。
 func (m *Manager) JSPublishIdempotent(ctx context.Context, subject string, data []byte, msgID string, headers ...nats.Header) (*jetstream.PubAck, error) {
+	ctx = context.WithValue(ctx, log.DefaultDownstreamKey, "NATS")
 	var header nats.Header
 	if len(headers) > 0 && headers[0] != nil {
 		header = headers[0]
@@ -121,6 +125,7 @@ func (m *Manager) JSPublishIdempotent(ctx context.Context, subject string, data 
 //
 // header 可选：不传则使用空 Header，传入则在其基础上追加 Nats-Log-Id。
 func (m *Manager) JSPublishAsync(ctx context.Context, subject string, data []byte, headers ...nats.Header) (jetstream.PubAckFuture, error) {
+	ctx = context.WithValue(ctx, log.DefaultDownstreamKey, "NATS")
 	var header nats.Header
 	if len(headers) > 0 && headers[0] != nil {
 		header = headers[0]
@@ -149,6 +154,7 @@ func (m *Manager) JSPublishAsync(ctx context.Context, subject string, data []byt
 //
 // header 可选：不传则使用空 Header，传入则在其基础上追加 Nats-Log-Id。
 func (m *Manager) JSPublishIdempotentAsync(ctx context.Context, subject string, data []byte, msgID string, headers ...nats.Header) (jetstream.PubAckFuture, error) {
+	ctx = context.WithValue(ctx, log.DefaultDownstreamKey, "NATS")
 	var header nats.Header
 	if len(headers) > 0 && headers[0] != nil {
 		header = headers[0]
@@ -182,6 +188,7 @@ type AsyncBatchMsg struct {
 // 任意一条 ACK 失败则返回第一个错误，其余消息仍继续等待各自的 ACK。
 // 适合需要批量发布且关注整体成功与否的场景。
 func (m *Manager) JSPublishAsyncBatch(ctx context.Context, msgs []AsyncBatchMsg) error {
+	ctx = context.WithValue(ctx, log.DefaultDownstreamKey, "NATS")
 	futures := make([]jetstream.PubAckFuture, 0, len(msgs))
 	for _, msg := range msgs {
 		future, err := m.JSPublishAsync(ctx, msg.Subject, msg.Data, msg.Header)
@@ -218,6 +225,7 @@ type IdempotentBatchMsg struct {
 // 每条消息通过 MsgID 在 Duplicates 窗口内去重，任意一条 ACK 失败则返回第一个错误。
 // 适合高频且需要 exactly-once 语义的批量发布场景。
 func (m *Manager) JSPublishIdempotentAsyncBatch(ctx context.Context, msgs []IdempotentBatchMsg) error {
+	ctx = context.WithValue(ctx, log.DefaultDownstreamKey, "NATS")
 	futures := make([]jetstream.PubAckFuture, 0, len(msgs))
 	for _, msg := range msgs {
 		future, err := m.JSPublishIdempotentAsync(ctx, msg.Subject, msg.Data, msg.MsgID, msg.Header)

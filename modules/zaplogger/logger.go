@@ -26,7 +26,7 @@ func GetZapLogger(debugWriter, infoWriter, warnErrorFatalWriter io.Writer, calle
 			return func(ctx context.Context) interface{} {
 				msg := ctx.Value(log.DefaultMessageKey)
 				if msg == nil {
-					return "None"
+					return "System"
 				}
 				return msg
 			}

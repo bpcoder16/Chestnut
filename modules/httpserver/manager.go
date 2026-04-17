@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/bpcoder16/Chestnut/v4/core/log"
 	"github.com/bpcoder16/Chestnut/v4/logit"
 )
 
@@ -57,6 +58,7 @@ func (m *Manager) Run(ctx context.Context) error {
 	// 启动优雅关闭监听器
 	go m.gracefulShutdown(ctx)
 
+	ctx = context.WithValue(ctx, log.DefaultDownstreamKey, "HttpServer")
 	logit.Context(ctx).InfoW("httpServer.Manager.Run", "HttpServer started", "port", m.config.Port)
 
 	// 区分正常关闭和异常错误

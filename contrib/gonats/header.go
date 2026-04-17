@@ -45,5 +45,6 @@ func extractLogIdFromHeader(ctx context.Context, header nats.Header) context.Con
 		logId = utils.UniqueID()
 	}
 	ctx = context.WithValue(ctx, log.DefaultMessageKey, "NATS")
+	ctx = context.WithValue(ctx, log.DefaultDownstreamKey, "NATS")
 	return context.WithValue(ctx, log.DefaultLogIdKey, logId)
 }

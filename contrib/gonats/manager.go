@@ -1,6 +1,7 @@
 package gonats
 
 import (
+	"context"
 	"crypto/tls"
 	"strings"
 	"sync"
@@ -14,13 +15,13 @@ import (
 // Manager 管理 NATS 连接、JetStream 上下文和 Stream 注册表。
 // 通过 NewManager 创建，生命周期与应用一致。
 type Manager struct {
-	nc          *nats.Conn
-	js          jetstream.JetStream
-	jsBaseOpts  []jetstream.JetStreamOpt // connect() 时确定的默认选项，不可变
-	streams       sync.Map // key: stream name (string), value: jetstream.Stream
-	pullConsumers sync.Map // key: consumer name (string), value: *PullConsumer
-	logger      *log.Helper
-	config      *Config
+	nc            *nats.Conn
+	js            jetstream.JetStream
+	jsBaseOpts    []jetstream.JetStreamOpt // connect() 时确定的默认选项，不可变
+	streams       sync.Map                 // key: stream name (string), value: jetstream.Stream
+	pullConsumers sync.Map                 // key: consumer name (string), value: *PullConsumer
+	logger        *log.Helper
+	config        *Config
 }
 
 // NewManager 根据配置文件路径创建 Manager 并建立连接。
@@ -85,6 +86,7 @@ func (m *Manager) Close() {
 }
 
 func (m *Manager) connect() {
+	ctx := context.WithValue(context.Background(), log.DefaultDownstreamKey, "NATS")
 	opts := []nats.Option{
 		nats.Name(m.config.Name),
 		nats.MaxReconnects(m.config.MaxReconnects),
@@ -98,17 +100,17 @@ func (m *Manager) connect() {
 		nats.DrainTimeout(time.Duration(m.config.DrainTimeoutMillisecond) * time.Millisecond),
 		nats.DisconnectErrHandler(func(nc *nats.Conn, err error) {
 			if err != nil {
-				m.logger.ErrorW("NATS.Disconnect", "connection disconnected", "err", err)
+				m.logger.WithContext(ctx).ErrorW("NATS.Disconnect", "connection disconnected", "err", err)
 			}
 		}),
 		nats.ReconnectHandler(func(nc *nats.Conn) {
-			m.logger.InfoW("NATS.Reconnect", "reconnected successfully", "url", nc.ConnectedUrl())
+			m.logger.WithContext(ctx).InfoW("NATS.Reconnect", "reconnected successfully", "url", nc.ConnectedUrl())
 		}),
 		nats.ClosedHandler(func(nc *nats.Conn) {
-			m.logger.InfoW("NATS.Closed", "connection closed")
+			m.logger.WithContext(ctx).InfoW("NATS.Closed", "connection closed")
 		}),
 		nats.ErrorHandler(func(nc *nats.Conn, sub *nats.Subscription, err error) {
-			m.logger.ErrorW("NATS.AsyncError", "async error", "subject", sub.Subject, "err", err)
+			m.logger.WithContext(ctx).ErrorW("NATS.AsyncError", "async error", "subject", sub.Subject, "err", err)
 		}),
 	}
 
@@ -141,7 +143,7 @@ func (m *Manager) connect() {
 	m.jsBaseOpts = []jetstream.JetStreamOpt{
 		// 异步发布失败时记录错误日志，避免静默丢弃。
 		jetstream.WithPublishAsyncErrHandler(func(_ jetstream.JetStream, msg *nats.Msg, err error) {
-			m.logger.ErrorW("NATS.AsyncPublish", "async publish failed", "subject", msg.Subject, "err", err)
+			m.logger.WithContext(ctx).ErrorW("NATS.AsyncPublish", "async publish failed", "subject", msg.Subject, "err", err)
 		}),
 		// 异步发布等待 ACK 的超时，超时后触发 ErrHandler。
 		// 必须小于 drainTimeoutMillisecond，确保 nc.Drain() 关闭前 pending publish 能触发 ErrHandler。
@@ -157,5 +159,5 @@ func (m *Manager) connect() {
 	}
 	m.js = js
 
-	m.logger.InfoW("NATS.Connected", "connected successfully", "url", nc.ConnectedUrl())
+	m.logger.WithContext(ctx).InfoW("NATS.Connected", "connected successfully", "url", nc.ConnectedUrl())
 }

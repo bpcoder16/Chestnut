@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math"
 	"sync"
 	"time"
 
@@ -28,6 +27,7 @@ func (c *PullConsumer) Consumer() jetstream.Consumer {
 // 失败时直接 panic，用于应用启动阶段初始化。
 // 注册 key 优先使用 cfg.Durable，其次 cfg.Name。
 func (m *Manager) MustRegisterPullConsumer(ctx context.Context, streamName string, cfg PullConsumerConfig) *PullConsumer {
+	ctx = context.WithValue(ctx, log.DefaultDownstreamKey, "NATS")
 	consumer, err := m.js.CreateOrUpdateConsumer(ctx, streamName, buildPullConsumerConfig(cfg))
 	if err != nil {
 		key := cfg.Durable
@@ -59,9 +59,6 @@ func (m *Manager) GetPullConsumer(name string) (*PullConsumer, error) {
 
 // Fetch 一次性拉取最多 batch 条消息，阻塞等待直到凑满或 maxWait 超时。
 //
-// minPending 指定 Stream 中至少有多少条待消费消息时才触发投递，用于攒批减少空拉。
-// 传 0 时自动取 ceil(batch/2)，避免每次只拉到少量消息。
-//
 // 使用示例（定时批处理任务）：
 //
 //	msgs, err := consumer.Fetch(ctx, 100, 10*time.Second, 0)
@@ -71,19 +68,16 @@ func (m *Manager) GetPullConsumer(name string) (*PullConsumer, error) {
 //	    msg.Ack()
 //	}
 //	if msgs.Error() != nil { ... }
-func (c *PullConsumer) Fetch(ctx context.Context, batch int, maxWait time.Duration, minPending int) (jetstream.MessageBatch, error) {
-	if minPending == 0 {
-		minPending = int(math.Ceil(float64(batch) / 2))
-	}
+func (c *PullConsumer) Fetch(ctx context.Context, batch int, maxWait time.Duration) (jetstream.MessageBatch, error) {
+	ctx = context.WithValue(ctx, log.DefaultDownstreamKey, "NATS")
 	c.logger.WithContext(ctx).DebugW("NATS.Fetch", "fetching messages",
-		"batch", batch, "maxWait", maxWait, "minPending", minPending)
+		"batch", batch, "maxWait", maxWait)
 	msgs, err := c.consumer.Fetch(batch,
 		jetstream.FetchMaxWait(maxWait),
-		jetstream.FetchMinPending(int64(minPending)),
 	)
 	if err != nil {
 		c.logger.WithContext(ctx).ErrorW("NATS.Fetch", "fetch failed",
-			"batch", batch, "maxWait", maxWait, "minPending", minPending, "err", err)
+			"batch", batch, "maxWait", maxWait, "err", err)
 		return nil, err
 	}
 	return msgs, nil
@@ -100,6 +94,7 @@ func (c *PullConsumer) Fetch(ctx context.Context, batch int, maxWait time.Durati
 //	    msg.Ack()
 //	}
 func (c *PullConsumer) FetchNoWait(ctx context.Context, batch int) (jetstream.MessageBatch, error) {
+	ctx = context.WithValue(ctx, log.DefaultDownstreamKey, "NATS")
 	c.logger.WithContext(ctx).DebugW("NATS.FetchNoWait", "fetching messages", "batch", batch)
 	msgs, err := c.consumer.FetchNoWait(batch)
 	if err != nil {
@@ -112,9 +107,6 @@ func (c *PullConsumer) FetchNoWait(ctx context.Context, batch int) (jetstream.Me
 // FetchBytes 按字节上限拉取消息，最多拉取 maxBytes 字节，不会截断单条消息。
 // 适合消息体大小不均匀、需要控制单批内存占用的场景。
 //
-// minPending 指定 Stream 中至少有多少条待消费消息时才触发投递。
-// 传 0 时不设限制，服务端有消息即立即投递。
-//
 // 使用示例：
 //
 //	msgs, err := consumer.FetchBytes(ctx, 1*1024*1024, 10*time.Second, 0)
@@ -122,13 +114,12 @@ func (c *PullConsumer) FetchNoWait(ctx context.Context, batch int) (jetstream.Me
 //	    msg.Ack()
 //	}
 func (c *PullConsumer) FetchBytes(ctx context.Context, maxBytes int, maxWait time.Duration, minPending int) (jetstream.MessageBatch, error) {
+	ctx = context.WithValue(ctx, log.DefaultDownstreamKey, "NATS")
 	c.logger.WithContext(ctx).DebugW("NATS.FetchBytes", "fetching messages",
 		"maxBytes", maxBytes, "maxWait", maxWait, "minPending", minPending)
-	opts := []jetstream.FetchOpt{jetstream.FetchMaxWait(maxWait)}
-	if minPending > 0 {
-		opts = append(opts, jetstream.FetchMinPending(int64(minPending)))
-	}
-	msgs, err := c.consumer.FetchBytes(maxBytes, opts...)
+	msgs, err := c.consumer.FetchBytes(maxBytes,
+		jetstream.FetchMaxWait(maxWait),
+	)
 	if err != nil {
 		c.logger.WithContext(ctx).ErrorW("NATS.FetchBytes", "fetch failed",
 			"maxBytes", maxBytes, "maxWait", maxWait, "minPending", minPending, "err", err)
@@ -154,6 +145,7 @@ func (c *PullConsumer) FetchBytes(ctx context.Context, maxBytes int, maxWait tim
 //	if err != nil { return err }
 //	defer consCtx.Stop()
 func (c *PullConsumer) Consume(ctx context.Context, handler func(context.Context, jetstream.Msg), maxMessages int, errHandler jetstream.ConsumeErrHandlerFunc) (jetstream.ConsumeContext, error) {
+	ctx = context.WithValue(ctx, log.DefaultDownstreamKey, "NATS")
 	opts := make([]jetstream.PullConsumeOpt, 0, 2)
 	if maxMessages > 0 {
 		opts = append(opts, jetstream.PullMaxMessages(maxMessages))
@@ -235,6 +227,7 @@ func (c *PullConsumer) Messages(opts ...jetstream.PullMessagesOpt) (jetstream.Me
 //	    })
 //	})
 func (c *PullConsumer) ConsumeWithWorkers(ctx context.Context, numWorkers int, maxMessages int, handler func(msg jetstream.Msg)) error {
+	ctx = context.WithValue(ctx, log.DefaultDownstreamKey, "NATS")
 	if numWorkers <= 0 {
 		numWorkers = 5
 	}
@@ -247,7 +240,7 @@ func (c *PullConsumer) ConsumeWithWorkers(ctx context.Context, numWorkers int, m
 		return err
 	}
 
-	c.logger.WithContext(ctx).DebugW("NATS.ConsumeWithWorkers", "starting workers",
+	c.logger.WithContext(ctx).InfoW("NATS.ConsumeWithWorkers", "subscribed successfully",
 		"numWorkers", numWorkers, "maxMessages", maxMessages)
 
 	// ctx 取消时停止迭代器，令 iter.Next() 返回 ErrMsgIteratorClosed
