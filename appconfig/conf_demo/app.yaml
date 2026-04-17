@@ -24,6 +24,10 @@ default:
   LocalLockPoolSupport: false
   SwaggerSupport: false
   PProfSupport: false
+  CronSupport: false
+  CronDistributedLockSupport: false
+  WebSocketSupport: false
+  NATSSupport: false
 
 asyncService:
   Support: false

@@ -14,6 +14,7 @@ import (
 	"github.com/bpcoder16/Chestnut/v4/default/lru"
 	"github.com/bpcoder16/Chestnut/v4/default/mongodb"
 	"github.com/bpcoder16/Chestnut/v4/default/mysql"
+	defaultNATS "github.com/bpcoder16/Chestnut/v4/default/nats"
 	"github.com/bpcoder16/Chestnut/v4/default/redis"
 	"github.com/bpcoder16/Chestnut/v4/default/resty"
 	"github.com/bpcoder16/Chestnut/v4/default/sqlite"
@@ -113,6 +114,9 @@ func initDefault(ctx context.Context, config *appconfig.AppConfig, debugWriter, 
 	if config.Default.AliyunOSSSupport {
 		initAliyunOSS()
 	}
+	if config.Default.NATSSupport {
+		initNATS(debugWriter, infoWriter, warnErrorFatalWriter)
+	}
 
 }
 
@@ -179,6 +183,13 @@ func initLRUCache(debugWriter, infoWriter, warnErrorFatalWriter io.Writer) {
 
 func initAliyunOSS() {
 	oss.InitAliyunOSS(path.Join(env.ConfigDirPath(), "aliyun.yaml"))
+}
+
+func initNATS(debugWriter, infoWriter, warnErrorFatalWriter io.Writer) {
+	defaultNATS.SetManager(
+		path.Join(env.ConfigDirPath(), "nats.yaml"),
+		DefaultHelper(debugWriter, infoWriter, warnErrorFatalWriter, log.FileWithLineNumCaller()),
+	)
 }
 
 func initHTTPClient(debugWriter, infoWriter, warnErrorFatalWriter io.Writer) {

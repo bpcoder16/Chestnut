@@ -29,6 +29,14 @@ func (m *Manager) Client() *redis.Client {
 	return m.client
 }
 
+// Close 关闭 Redis 连接池，释放所有连接。
+// 应在应用退出时调用（如注册到 cdefer）。
+func (m *Manager) Close() {
+	if err := m.client.Close(); err != nil {
+		m.logger.WarnW("Redis.Close", "failed to close connection pool", "err", err)
+	}
+}
+
 func (m *Manager) connect() {
 	m.client = redis.NewClient(&redis.Options{
 		Addr:         m.config.Host + ":" + strconv.Itoa(m.config.Port),

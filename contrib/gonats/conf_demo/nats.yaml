@@ -1,0 +1,43 @@
+# NATS Server 地址列表，集群模式填多个地址。
+# TLS 安全连接使用 tls:// 前缀，如 tls://127.0.0.1:4222。
+urls:
+  - "nats://127.0.0.1:4222"
+
+# 客户端名称，显示在 NATS 监控面板中，便于识别连接来源。
+name: "chestnut-app"
+
+# 认证配置（三选一，均为空则不认证）
+username: ""
+password: ""
+token: ""
+
+# 最大重连次数，-1 表示无限重连
+maxReconnects: 10
+
+# 每次重连基础等待时间（毫秒）
+reconnectWaitMillisecond: 2000
+
+# 重连等待的随机抖动上限（毫秒）。
+# 实际等待时间 = reconnectWait + rand(0, jitter)。
+# 多实例同时断线时，抖动可避免所有实例同时涌入重连请求（惊群效应）。
+reconnectJitterMillisecond: 500
+
+# 初次连接超时时间（毫秒）
+connectTimeoutMillisecond: 5000
+
+# 优雅关闭超时时间（毫秒）。
+# 应用退出时等待 in-flight 消息处理完成，超时后强制关闭。
+# 未 ACK 的消息由 NATS server 负责重投递，不会丢失。
+drainTimeoutMillisecond: 5000
+
+# 重连期间缓冲出站消息的内存上限（MB）。
+# 超出后 Publish/JSPublish/PublishAsync 立即返回错误，消息丢弃。
+# 建议值 = 单次重连最长时间（秒）× 业务发布吞吐（MB/s）。
+reconnectBufSizeMegabyte: 32
+
+# TLS 安全连接配置（不使用 TLS 时整块留空即可）
+tls:
+  certFile: ""              # 客户端证书路径（双向 TLS）
+  keyFile: ""               # 客户端私钥路径
+  caFile: ""                # CA 根证书路径（校验服务端证书）
+  insecureSkipVerify: false # 跳过服务端证书校验，仅开发调试使用。必须同时设置 caFile 或 certFile 才会生效

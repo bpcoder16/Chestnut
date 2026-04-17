@@ -39,6 +39,7 @@ type Default struct {
 	CronSupport                  bool
 	CronDistributedLockSupport   bool
 	WebSocketSupport             bool
+	NATSSupport                  bool
 }
 
 type AsyncService struct {
