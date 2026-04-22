@@ -19,7 +19,6 @@ import (
 	"github.com/bpcoder16/Chestnut/v4/default/resty"
 	"github.com/bpcoder16/Chestnut/v4/default/sqlite"
 	"github.com/bpcoder16/Chestnut/v4/logit"
-	"github.com/bpcoder16/Chestnut/v4/modules/initdb"
 	"github.com/bpcoder16/Chestnut/v4/modules/zaplogger"
 )
 
@@ -36,30 +35,6 @@ func MustInit(ctx context.Context, config *appconfig.AppConfig, funcList ...func
 	initDefault(ctx, config, debugWriter, infoWriter, warnErrorFatalWriter)
 
 	initHTTPClient(debugWriter, infoWriter, warnErrorFatalWriter)
-
-	if config.MigrateService.Support &&
-		config.MigrateService.DefaultVersion > 0 &&
-		len(config.MigrateService.FileVersionSaveDir) > 0 &&
-		len(config.MigrateService.MigrateSQLFileDir) > 0 {
-		switch {
-		case config.Default.MySQLSupport:
-			initdb.Init(
-				ctx,
-				config.MigrateService.DefaultVersion,
-				mysql.MasterDB(),
-				config.MigrateService.FileVersionSaveDir,
-				config.MigrateService.MigrateSQLFileDir,
-			)
-		case config.Default.SQLiteSupport:
-			initdb.Init(
-				ctx,
-				config.MigrateService.DefaultVersion,
-				sqlite.DefaultClient(),
-				config.MigrateService.FileVersionSaveDir,
-				config.MigrateService.MigrateSQLFileDir,
-			)
-		}
-	}
 
 	for _, fn := range funcList {
 		fn(ctx, debugWriter, infoWriter, warnErrorFatalWriter)

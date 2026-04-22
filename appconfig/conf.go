@@ -16,7 +16,6 @@ type AppConfig struct {
 	Log            Log
 	Default        Default
 	AsyncService   AsyncService
-	MigrateService MigrateService
 }
 
 type Log struct {
@@ -47,13 +46,6 @@ type AsyncService struct {
 	QueueSize       int
 	ConsumerSize    int
 	TaskMaxRetryCnt int
-}
-
-type MigrateService struct {
-	Support            bool
-	DefaultVersion     int
-	FileVersionSaveDir string
-	MigrateSQLFileDir  string
 }
 
 func (c *AppConfig) Check() (err error) {

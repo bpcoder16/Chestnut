@@ -71,7 +71,6 @@ Chestnut 是一个功能丰富的 Go 语言业务开发通用功能集合库，�
 - **配置管理**：灵活的配置加载和环境变量支持（appconfig）
 - **加密工具**：AES-GCM 加密（modules/crypto）
 - **验证器**：数据验证和多语言支持（contrib/validator）
-- **数据库初始化**：数据库自动迁移工具（modules/initdb）
 - **数据同步**：DB 到 ES 数据同步（modules/dbtoes）
 - **图片存储**：阿里云 OSS 图片上传（modules/image/aliyunoss）
 - **HTTP 客户端**：基于 Resty 的 HTTP 客户端封装（default/resty）
@@ -315,7 +314,6 @@ func redisExample() {
     ├── grpcserver/   # gRPC 服务器
     ├── httpserver/   # HTTP 服务器
     ├── image/        # 图片处理（阿里云 OSS）
-    ├── initdb/       # 数据库初始化
     ├── lock/         # 锁机制（本地锁池、Redis 分布式锁）
     └── zaplogger/    # Zap 日志初始化
 ```
