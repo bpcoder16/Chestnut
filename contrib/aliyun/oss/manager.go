@@ -5,8 +5,11 @@ import (
 	"context"
 	"errors"
 	"io"
+	"mime"
 	"net/http"
+	"net/url"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/bpcoder16/Chestnut/v4/contrib/aliyun"
@@ -92,8 +95,40 @@ func (m *Manager) GetSceneConfig(scene string) (*aliyun.SceneConfig, error) {
 
 const transferRetryCnt = 3
 
-func buildTargetOSSPath(targetDir, originURL string) string {
-	ext := filepath.Ext(originURL)
+func extFromURL(rawURL string) string {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return ""
+	}
+	return filepath.Ext(u.Path)
+}
+
+func extFromContentType(contentType string) string {
+	mediaType, _, err := mime.ParseMediaType(contentType)
+	if err != nil {
+		return ""
+	}
+	switch mediaType {
+	case "image/jpeg":
+		return ".jpg"
+	case "image/png":
+		return ".png"
+	case "image/gif":
+		return ".gif"
+	case "image/webp":
+		return ".webp"
+	case "image/bmp":
+		return ".bmp"
+	default:
+		return ""
+	}
+}
+
+func buildTargetOSSPath(targetDir string, originURL string, contentType string) string {
+	ext := extFromURL(originURL)
+	if ext == "" {
+		ext = extFromContentType(strings.ToLower(contentType))
+	}
 	return filepath.Join(targetDir, utils.UniqueID()+ext)
 }
 
@@ -118,7 +153,7 @@ func (m *Manager) TransferImage(ctx context.Context, originURL, scene string) (o
 		logit.Context(ctx).WarnW("oss.Manager.TransferImage", "read body failed", "err", err, "url", originURL)
 		return "", err
 	}
-	ossPath = buildTargetOSSPath(entry.config.TargetDir, originURL)
+	ossPath = buildTargetOSSPath(entry.config.TargetDir, originURL, httpResp.Header.Get("Content-Type"))
 	for i := 0; i < transferRetryCnt; i++ {
 		err = entry.bucket.PutObject(ossPath, bytes.NewReader(body))
 		if err == nil {
