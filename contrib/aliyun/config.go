@@ -9,6 +9,7 @@ type SceneConfig struct {
 	AccessKeySecret string `yaml:"accessKeySecret"`
 	Endpoint        string `yaml:"endpoint"`
 	BucketName      string `yaml:"bucketName"`
+	TargetDir       string `yaml:"targetDir"`
 	StsRoleArn      string `yaml:"stsRoleArn"`
 	StsSessionName  string `yaml:"stsSessionName"`
 	Region          string `yaml:"region"`

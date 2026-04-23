@@ -1,9 +1,15 @@
 package oss
 
 import (
+	"bytes"
+	"context"
 	"errors"
+	"path/filepath"
 
 	"github.com/bpcoder16/Chestnut/v4/contrib/aliyun"
+	"github.com/bpcoder16/Chestnut/v4/core/utils"
+	"github.com/bpcoder16/Chestnut/v4/default/resty"
+	"github.com/bpcoder16/Chestnut/v4/logit"
 
 	openapi "github.com/alibabacloud-go/darabonba-openapi/v2/client"
 	sts "github.com/alibabacloud-go/sts-20150401/v2/client"
@@ -30,6 +36,7 @@ type StsCredentials struct {
 	Expiration      string
 	Endpoint        string
 	BucketName      string
+	TargetDir       string
 }
 
 func InitAliyunOSSManager(configPath string) {
@@ -79,6 +86,44 @@ func (m *Manager) GetSceneConfig(scene string) (*aliyun.SceneConfig, error) {
 	return entry.config, nil
 }
 
+const transferRetryCnt = 3
+
+func buildTargetOSSPath(targetDir, originURL string) string {
+	ext := filepath.Ext(originURL)
+	return filepath.Join(targetDir, utils.UniqueID()+ext)
+}
+
+func (m *Manager) TransferImage(ctx context.Context, originURL, scene string) (ossPath string, err error) {
+	entry, ok := m.scenes[scene]
+	if !ok {
+		return "", errors.New("oss: scene not found: " + scene)
+	}
+	resp, err := resty.Client().R().Get(originURL)
+	if err != nil {
+		logit.Context(ctx).WarnW("oss.Manager.TransferImage", "http get failed", "err", err, "url", originURL)
+		return "", err
+	}
+	if resp.IsError() {
+		err = errors.New("HTTPStatus:" + resp.Status())
+		logit.Context(ctx).WarnW("oss.Manager.TransferImage", "http error", "err", err, "url", originURL)
+		return "", err
+	}
+	ossPath = buildTargetOSSPath(entry.config.TargetDir, originURL)
+	imageData := bytes.NewReader(resp.Body())
+	for i := 0; i < transferRetryCnt; i++ {
+		_, _ = imageData.Seek(0, 0)
+		err = entry.bucket.PutObject(ossPath, imageData)
+		if err == nil {
+			break
+		}
+	}
+	if err != nil {
+		logit.Context(ctx).WarnW("oss.Manager.TransferImage", "upload failed", "err", err, "ossPath", ossPath)
+		ossPath = ""
+	}
+	return
+}
+
 func (m *Manager) GenStsToken(scene string, durationSeconds int64) (*StsCredentials, error) {
 	entry, ok := m.scenes[scene]
 	if !ok {
@@ -101,5 +146,6 @@ func (m *Manager) GenStsToken(scene string, durationSeconds int64) (*StsCredenti
 		Expiration:      dara.StringValue(cred.Expiration),
 		Endpoint:        entry.config.Endpoint,
 		BucketName:      entry.config.BucketName,
+		TargetDir:       entry.config.TargetDir,
 	}, nil
 }

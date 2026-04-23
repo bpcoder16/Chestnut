@@ -4,6 +4,7 @@ scenes:
     accessKeySecret: ""
     endpoint: "https://oss-cn-shanghai.aliyuncs.com"
     bucketName: ""
+    targetDir: "scene_name"
     stsRoleArn: "acs:ram::uid:role/role-name"
     stsSessionName: "app-name"
     region: "cn-shanghai"
