@@ -1,0 +1,9 @@
+scenes:
+  scene_name:
+    accessKeyId: ""
+    accessKeySecret: ""
+    endpoint: "https://oss-cn-shanghai.aliyuncs.com"
+    bucketName: ""
+    stsRoleArn: "acs:ram::uid:role/role-name"
+    stsSessionName: "app-name"
+    region: "cn-shanghai"

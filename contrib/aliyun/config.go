@@ -1,35 +1,27 @@
 package aliyun
 
 import (
-	"sync"
-
 	"github.com/bpcoder16/Chestnut/v4/core/utils"
 )
 
-var (
-	once    sync.Once
-	_config *Config
-)
-
-type Config struct {
-	AccessKeyId     string `json:"accessKeyId"`
-	AccessKeySecret string `json:"accessKeySecret"`
-	Endpoint        string `json:"endpoint"`
-	BucketName      string `json:"bucketName"`
+type SceneConfig struct {
+	AccessKeyId     string `yaml:"accessKeyId"`
+	AccessKeySecret string `yaml:"accessKeySecret"`
+	Endpoint        string `yaml:"endpoint"`
+	BucketName      string `yaml:"bucketName"`
+	StsRoleArn      string `yaml:"stsRoleArn"`
+	StsSessionName  string `yaml:"stsSessionName"`
+	Region          string `yaml:"region"`
 }
 
-func InitAliyunConfig(configPath string) *Config {
-	once.Do(func() {
-		_config = loadConfig(configPath)
-	})
-	return _config
+type OSSConfig struct {
+	Scenes map[string]*SceneConfig `yaml:"scenes"`
 }
 
-func loadConfig(configPath string) *Config {
-	var config Config
-	err := utils.ParseFile(configPath, &config)
-	if err != nil {
-		panic("load Aliyun conf err:" + err.Error())
+func LoadOSSConfig(configPath string) *OSSConfig {
+	var config OSSConfig
+	if err := utils.ParseFile(configPath, &config); err != nil {
+		panic("load OSS conf err: " + err.Error())
 	}
 	return &config
 }

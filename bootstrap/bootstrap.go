@@ -157,7 +157,7 @@ func initLRUCache(debugWriter, infoWriter, warnErrorFatalWriter io.Writer) {
 }
 
 func initAliyunOSS() {
-	oss.InitAliyunOSS(path.Join(env.ConfigDirPath(), "aliyun.yaml"))
+	oss.InitAliyunOSSManager(path.Join(env.ConfigDirPath(), "oss.yaml"))
 }
 
 func initNATS(debugWriter, infoWriter, warnErrorFatalWriter io.Writer) {
