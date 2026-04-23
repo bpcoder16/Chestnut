@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io"
+	"net/http"
 	"path/filepath"
+	"time"
 
 	"github.com/bpcoder16/Chestnut/v4/contrib/aliyun"
 	"github.com/bpcoder16/Chestnut/v4/core/utils"
-	"github.com/bpcoder16/Chestnut/v4/default/resty"
 	"github.com/bpcoder16/Chestnut/v4/logit"
 
 	openapi "github.com/alibabacloud-go/darabonba-openapi/v2/client"
@@ -16,6 +18,8 @@ import (
 	"github.com/alibabacloud-go/tea/dara"
 	gosdk "github.com/aliyun/aliyun-oss-go-sdk/oss"
 )
+
+var imageHTTPClient = &http.Client{Timeout: 15 * time.Second}
 
 var DefaultManager *Manager
 
@@ -98,21 +102,25 @@ func (m *Manager) TransferImage(ctx context.Context, originURL, scene string) (o
 	if !ok {
 		return "", errors.New("oss: scene not found: " + scene)
 	}
-	resp, err := resty.Client().R().Get(originURL)
+	httpResp, err := imageHTTPClient.Get(originURL)
 	if err != nil {
 		logit.Context(ctx).WarnW("oss.Manager.TransferImage", "http get failed", "err", err, "url", originURL)
 		return "", err
 	}
-	if resp.IsError() {
-		err = errors.New("HTTPStatus:" + resp.Status())
+	defer httpResp.Body.Close()
+	if httpResp.StatusCode >= 400 {
+		err = errors.New("HTTPStatus:" + httpResp.Status)
 		logit.Context(ctx).WarnW("oss.Manager.TransferImage", "http error", "err", err, "url", originURL)
 		return "", err
 	}
+	body, err := io.ReadAll(httpResp.Body)
+	if err != nil {
+		logit.Context(ctx).WarnW("oss.Manager.TransferImage", "read body failed", "err", err, "url", originURL)
+		return "", err
+	}
 	ossPath = buildTargetOSSPath(entry.config.TargetDir, originURL)
-	imageData := bytes.NewReader(resp.Body())
 	for i := 0; i < transferRetryCnt; i++ {
-		_, _ = imageData.Seek(0, 0)
-		err = entry.bucket.PutObject(ossPath, imageData)
+		err = entry.bucket.PutObject(ossPath, bytes.NewReader(body))
 		if err == nil {
 			break
 		}
