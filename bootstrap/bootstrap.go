@@ -9,6 +9,7 @@ import (
 	"github.com/bpcoder16/Chestnut/v4/appconfig"
 	"github.com/bpcoder16/Chestnut/v4/appconfig/env"
 	"github.com/bpcoder16/Chestnut/v4/contrib/aliyun/oss"
+	"github.com/bpcoder16/Chestnut/v4/contrib/geetest"
 	"github.com/bpcoder16/Chestnut/v4/core/log"
 	"github.com/bpcoder16/Chestnut/v4/default/clickhouse"
 	"github.com/bpcoder16/Chestnut/v4/default/lru"
@@ -89,6 +90,9 @@ func initDefault(ctx context.Context, config *appconfig.AppConfig, debugWriter, 
 	if config.Default.AliyunOSSSupport {
 		initAliyunOSS()
 	}
+	if config.Default.GeeTestSupport {
+		initGeeTest()
+	}
 	if config.Default.NATSSupport {
 		initNATS(debugWriter, infoWriter, warnErrorFatalWriter)
 	}
@@ -158,6 +162,10 @@ func initLRUCache(debugWriter, infoWriter, warnErrorFatalWriter io.Writer) {
 
 func initAliyunOSS() {
 	oss.InitAliyunOSSManager(path.Join(env.ConfigDirPath(), "oss.yaml"))
+}
+
+func initGeeTest() {
+	geetest.InitVerifier(geetest.LoadConfig(path.Join(env.ConfigDirPath(), "geetest.yaml")))
 }
 
 func initNATS(debugWriter, infoWriter, warnErrorFatalWriter io.Writer) {

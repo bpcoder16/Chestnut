@@ -32,6 +32,7 @@ type Default struct {
 	MongoDBSupport       bool
 	LRUCacheSupport      bool
 	AliyunOSSSupport     bool
+	GeeTestSupport       bool
 	LocalLockPoolSupport bool
 	SwaggerSupport       bool
 	PProfSupport         bool
