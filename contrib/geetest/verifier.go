@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	validateURL = "https://gcaptcha4.geetest.com/validate"
+	validateURL = "http://gcaptcha4.geetest.com/validate"
 	httpTimeout = 10 * time.Second
 )
 
