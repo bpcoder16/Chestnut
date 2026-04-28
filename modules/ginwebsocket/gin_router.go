@@ -1,9 +1,6 @@
 package ginwebsocket
 
 import (
-	"context"
-	"net/http"
-
 	"github.com/bpcoder16/Chestnut/v4/contrib/websocket"
 	"github.com/gin-gonic/gin"
 )
@@ -21,19 +18,19 @@ func (r *Router) GetClientManager() *websocket.ClientManager {
 	return r.wsManager.GetClientManager()
 }
 
-func (r *Router) OnTextMessageController(scene string, controller websocket.TextMessageController) {
-	r.wsManager.OnTextMessageController(scene, controller)
+func (r *Router) OnTextMessageController(scene string, controller websocket.TextMessageController) error {
+	return r.wsManager.OnTextMessageController(scene, controller)
 }
 
-func (r *Router) SetAuthorizationFunc(f func(ctx context.Context, r *http.Request, w http.ResponseWriter) (returnCtx context.Context, isAuthorized bool, userId int64)) {
+func (r *Router) SetAuthorizationFunc(f websocket.AuthorizationFunc) {
 	r.wsManager.SetAuthorizationFunc(f)
 }
 
-func (r *Router) SetBeforeFunc(f func(ctx context.Context, r *http.Request, w http.ResponseWriter) (returnCtx context.Context, isAuthorized bool, userId int64)) {
+func (r *Router) SetBeforeFunc(f websocket.AuthorizationFunc) {
 	r.wsManager.SetBeforeFunc(f)
 }
 
-func (r *Router) SetClientCloseFunc(f func(context.Context, string)) {
+func (r *Router) SetClientCloseFunc(f websocket.ClientCloseFunc) {
 	r.wsManager.SetClientCloseFunc(f)
 }
 
