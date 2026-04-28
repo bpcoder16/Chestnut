@@ -83,6 +83,11 @@ func (c *Client) UserID() int64 {
 	return c.userId
 }
 
+// Close 公开关闭方法，供外部（如踢出逻辑）主动关闭连接。
+func (c *Client) Close(ctx context.Context) {
+	c.close(ctx, "ExternalForceClose")
+}
+
 // close 执行连接清理。若本次调用真正触发了清理返回 true，连接已被其他路径关闭则返回 false。
 func (c *Client) close(ctx context.Context, sourceText string) bool {
 	c.mu.Lock()
