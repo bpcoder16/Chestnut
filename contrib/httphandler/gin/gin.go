@@ -36,6 +36,7 @@ func lazyInit() {
 func HTTPHandler(registerFuncs ...func(*gin.RouterGroup)) *gin.Engine {
 	lazyInit()
 	h := gin.New()
+	h.ContextWithFallback = true
 	h.Use(RecoveryWithWriter(os.Stderr))
 	h.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
