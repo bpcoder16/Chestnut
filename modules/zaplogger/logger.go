@@ -19,6 +19,25 @@ import (
 //	)
 
 func GetZapLogger(debugWriter, infoWriter, warnErrorFatalWriter io.Writer, caller log.Valuer, opts ...log.FilterOption) log.Logger {
+	return getZapLogger(zap.NewLogger(debugWriter, infoWriter, warnErrorFatalWriter), caller, opts...)
+}
+
+func GetRequestZapLogger(requestWriter io.Writer, caller log.Valuer, opts ...log.FilterOption) log.Logger {
+	return getZapLogger(zap.NewLogger(io.Discard, requestWriter, io.Discard), caller, opts...)
+}
+
+func GetCronRoutingZapLogger(debugWriter, infoWriter, warnErrorFatalWriter, cronDebugWriter, cronInfoWriter, cronWarnErrorFatalWriter io.Writer, caller log.Valuer, opts ...log.FilterOption) log.Logger {
+	return getZapLogger(
+		log.NewContextRoutingLogger(
+			zap.NewLogger(debugWriter, infoWriter, warnErrorFatalWriter),
+			zap.NewLogger(cronDebugWriter, cronInfoWriter, cronWarnErrorFatalWriter),
+		),
+		caller,
+		opts...,
+	)
+}
+
+func getZapLogger(logger log.Logger, caller log.Valuer, opts ...log.FilterOption) log.Logger {
 	kv := make([]interface{}, 0, 8)
 	kv = append(kv,
 		log.DefaultMessageKey,
@@ -108,7 +127,7 @@ func GetZapLogger(debugWriter, infoWriter, warnErrorFatalWriter io.Writer, calle
 
 	return log.NewFilter(
 		log.With(
-			zap.NewLogger(debugWriter, infoWriter, warnErrorFatalWriter),
+			logger,
 			kv...,
 		),
 		opts...,

@@ -8,6 +8,8 @@ import (
 )
 
 var global = &loggerAppliance{}
+var requestGlobal = &loggerAppliance{}
+var cronGlobal = &loggerAppliance{}
 
 type loggerAppliance struct {
 	lock   sync.Mutex
@@ -16,6 +18,8 @@ type loggerAppliance struct {
 
 func init() {
 	global.SetLogger(log.DefaultLogger)
+	requestGlobal.SetLogger(log.DefaultLogger)
+	cronGlobal.SetLogger(log.DefaultLogger)
 }
 
 func GetGlobalHelper() *log.Helper {
@@ -37,12 +41,35 @@ func SetLogger(logger log.Logger) {
 	global.SetLogger(logger)
 }
 
+func SetRequestLogger(logger log.Logger) {
+	requestGlobal.SetLogger(logger)
+}
+
+func SetCronLogger(logger log.Logger) {
+	cronGlobal.SetLogger(logger)
+}
+
 func Log(level log.Level, keyValues ...interface{}) error {
 	return global.helper.Log(level, keyValues...)
 }
 
 func Context(ctx context.Context) *log.Helper {
+	if IsCronContext(ctx) {
+		return cronGlobal.helper.WithContext(ctx)
+	}
 	return global.helper.WithContext(ctx)
+}
+
+func RequestContext(ctx context.Context) *log.Helper {
+	return requestGlobal.helper.WithContext(ctx)
+}
+
+func CronContext(ctx context.Context) *log.Helper {
+	return cronGlobal.helper.WithContext(ctx)
+}
+
+func IsCronContext(ctx context.Context) bool {
+	return log.IsCronContext(ctx)
 }
 
 func Debug(a ...interface{}) {

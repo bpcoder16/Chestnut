@@ -30,12 +30,14 @@ func MustInit(ctx context.Context, config *appconfig.AppConfig, funcList ...func
 		zaplogger.StdRedirectFile(config.Log.LogDir)
 	}
 	debugWriter, infoWriter, warnErrorFatalWriter := getWriters(config)
+	requestWriter := getRequestWriter(config)
+	cronDebugWriter, cronInfoWriter, cronWarnErrorFatalWriter := getCronWriters(config)
 
-	initLoggers(ctx, config, debugWriter, infoWriter, warnErrorFatalWriter)
+	initLoggers(ctx, config, debugWriter, infoWriter, warnErrorFatalWriter, requestWriter, cronDebugWriter, cronInfoWriter, cronWarnErrorFatalWriter)
 
-	initDefault(ctx, config, debugWriter, infoWriter, warnErrorFatalWriter)
+	initDefault(ctx, config, debugWriter, infoWriter, warnErrorFatalWriter, cronDebugWriter, cronInfoWriter, cronWarnErrorFatalWriter)
 
-	initHTTPClient(debugWriter, infoWriter, warnErrorFatalWriter)
+	initHTTPClient(debugWriter, infoWriter, warnErrorFatalWriter, cronDebugWriter, cronInfoWriter, cronWarnErrorFatalWriter)
 
 	for _, fn := range funcList {
 		fn(ctx, debugWriter, infoWriter, warnErrorFatalWriter)
@@ -51,7 +53,28 @@ func getWriters(config *appconfig.AppConfig) (debugWriter, infoWriter, warnError
 	return
 }
 
-func initLoggers(_ context.Context, config *appconfig.AppConfig, debugWriter, infoWriter, warnErrorFatalWriter io.Writer) {
+func getRequestWriter(config *appconfig.AppConfig) io.Writer {
+	if config.Log.UseRotateLog {
+		return zaplogger.GetFileRotateRequestLogWriter(config.Log.LogDir, env.AppName(), env.AppName())
+	}
+	return zaplogger.GetStandardRequestWriter(config.Log.LogDir, env.AppName(), env.AppName())
+}
+
+func getCronWriters(config *appconfig.AppConfig) (debugWriter, infoWriter, warnErrorFatalWriter io.Writer) {
+	if config.Log.UseRotateLog {
+		debugWriter, infoWriter, warnErrorFatalWriter = zaplogger.GetFileRotateCronLogWriters(config.Log.LogDir, env.AppName(), env.AppName())
+	} else {
+		debugWriter, infoWriter, warnErrorFatalWriter = zaplogger.GetStandardCronWriters(config.Log.LogDir, env.AppName(), env.AppName())
+	}
+	return
+}
+
+func initLoggers(
+	_ context.Context,
+	config *appconfig.AppConfig,
+	debugWriter, infoWriter, warnErrorFatalWriter, requestWriter io.Writer,
+	cronDebugWriter, cronInfoWriter, cronWarnErrorFatalWriter io.Writer,
+) {
 	logit.SetLogger(zaplogger.GetZapLogger(
 		debugWriter, infoWriter, warnErrorFatalWriter,
 		log.FileWithLineNumCaller(),
@@ -66,26 +89,48 @@ func initLoggers(_ context.Context, config *appconfig.AppConfig, debugWriter, in
 		//	return false
 		//}),
 	))
+	logit.SetRequestLogger(zaplogger.GetRequestZapLogger(
+		requestWriter,
+		log.FileWithLineNumCaller(),
+		log.FilterKey(config.FilterKeys...),
+		log.FilterLevel(func() log.Level {
+			if env.RunMode() == env.RunModeRelease {
+				return log.LevelInfo
+			}
+			return log.LevelDebug
+		}()),
+	))
+	logit.SetCronLogger(zaplogger.GetZapLogger(
+		cronDebugWriter, cronInfoWriter, cronWarnErrorFatalWriter,
+		log.FileWithLineNumCaller(),
+		log.FilterKey(config.FilterKeys...),
+		log.FilterLevel(func() log.Level {
+			if env.RunMode() == env.RunModeRelease {
+				return log.LevelInfo
+			}
+			return log.LevelDebug
+		}()),
+	))
 }
 
-func initDefault(ctx context.Context, config *appconfig.AppConfig, debugWriter, infoWriter, warnErrorFatalWriter io.Writer) {
+func initDefault(ctx context.Context, config *appconfig.AppConfig, debugWriter, infoWriter, warnErrorFatalWriter, cronDebugWriter, cronInfoWriter, cronWarnErrorFatalWriter io.Writer) {
 	if config.Default.MySQLSupport {
-		initMySQL(debugWriter, infoWriter, warnErrorFatalWriter)
+		initMySQL(debugWriter, infoWriter, warnErrorFatalWriter, cronDebugWriter, cronInfoWriter, cronWarnErrorFatalWriter)
 	}
 	if config.Default.SQLiteSupport {
-		initSQLite(debugWriter, infoWriter, warnErrorFatalWriter)
+		initSQLite(debugWriter, infoWriter, warnErrorFatalWriter, cronDebugWriter, cronInfoWriter, cronWarnErrorFatalWriter)
 	}
 	if config.Default.ClickhouseSupport {
-		initClickhouse(debugWriter, infoWriter, warnErrorFatalWriter)
+		initClickhouse(debugWriter, infoWriter, warnErrorFatalWriter, cronDebugWriter, cronInfoWriter, cronWarnErrorFatalWriter)
 	}
 	if config.Default.RedisSupport {
-		initRedis(debugWriter, infoWriter, warnErrorFatalWriter)
+		initRedis(debugWriter, infoWriter, warnErrorFatalWriter, cronDebugWriter, cronInfoWriter, cronWarnErrorFatalWriter)
 	}
 	if config.Default.MongoDBSupport {
-		initMongoDB(ctx, debugWriter, infoWriter, warnErrorFatalWriter)
+		initMongoDB(ctx, debugWriter, infoWriter, warnErrorFatalWriter, cronDebugWriter, cronInfoWriter, cronWarnErrorFatalWriter)
 	}
 	if config.Default.LRUCacheSupport {
-		initLRUCache(debugWriter, infoWriter, warnErrorFatalWriter)
+		initLRUCache(debugWriter, infoWriter, warnErrorFatalWriter, cronDebugWriter, cronInfoWriter, cronWarnErrorFatalWriter)
 	}
 	if config.Default.AliyunOSSSupport {
 		initAliyunOSS()
@@ -94,7 +139,7 @@ func initDefault(ctx context.Context, config *appconfig.AppConfig, debugWriter, 
 		initGeeTest()
 	}
 	if config.Default.NATSSupport {
-		initNATS(debugWriter, infoWriter, warnErrorFatalWriter)
+		initNATS(debugWriter, infoWriter, warnErrorFatalWriter, cronDebugWriter, cronInfoWriter, cronWarnErrorFatalWriter)
 	}
 
 }
@@ -117,46 +162,65 @@ func DefaultHelper(debugWriter, infoWriter, warnErrorFatalWriter io.Writer, call
 	)
 }
 
-func initMySQL(debugWriter, infoWriter, warnErrorFatalWriter io.Writer) {
+func DefaultCronRoutingHelper(debugWriter, infoWriter, warnErrorFatalWriter, cronDebugWriter, cronInfoWriter, cronWarnErrorFatalWriter io.Writer, caller log.Valuer) *log.Helper {
+	return log.NewHelper(
+		zaplogger.GetCronRoutingZapLogger(
+			debugWriter, infoWriter, warnErrorFatalWriter,
+			cronDebugWriter, cronInfoWriter, cronWarnErrorFatalWriter,
+			caller,
+			log.FilterLevel(func() log.Level {
+				if env.RunMode() == env.RunModeRelease {
+					return log.LevelInfo
+				}
+				return log.LevelDebug
+			}()),
+			//log.FilterFunc(func(level log.Level, keyValues ...interface{}) bool {
+			//	return false
+			//}),
+		),
+	)
+}
+
+func initMySQL(debugWriter, infoWriter, warnErrorFatalWriter, cronDebugWriter, cronInfoWriter, cronWarnErrorFatalWriter io.Writer) {
 	mysql.SetManager(
 		path.Join(env.ConfigDirPath(), "mysql.yaml"),
-		DefaultHelper(debugWriter, infoWriter, warnErrorFatalWriter, nil),
+		DefaultCronRoutingHelper(debugWriter, infoWriter, warnErrorFatalWriter, cronDebugWriter, cronInfoWriter, cronWarnErrorFatalWriter, nil),
 	)
 }
 
-func initSQLite(debugWriter, infoWriter, warnErrorFatalWriter io.Writer) {
+func initSQLite(debugWriter, infoWriter, warnErrorFatalWriter, cronDebugWriter, cronInfoWriter, cronWarnErrorFatalWriter io.Writer) {
 	sqlite.SetManager(
 		path.Join(env.ConfigDirPath(), "sqlite.yaml"),
-		DefaultHelper(debugWriter, infoWriter, warnErrorFatalWriter, nil),
+		DefaultCronRoutingHelper(debugWriter, infoWriter, warnErrorFatalWriter, cronDebugWriter, cronInfoWriter, cronWarnErrorFatalWriter, nil),
 	)
 }
 
-func initClickhouse(debugWriter, infoWriter, warnErrorFatalWriter io.Writer) {
+func initClickhouse(debugWriter, infoWriter, warnErrorFatalWriter, cronDebugWriter, cronInfoWriter, cronWarnErrorFatalWriter io.Writer) {
 	clickhouse.SetManager(
 		path.Join(env.ConfigDirPath(), "clickhouse.yaml"),
-		DefaultHelper(debugWriter, infoWriter, warnErrorFatalWriter, nil),
+		DefaultCronRoutingHelper(debugWriter, infoWriter, warnErrorFatalWriter, cronDebugWriter, cronInfoWriter, cronWarnErrorFatalWriter, nil),
 	)
 }
 
-func initRedis(debugWriter, infoWriter, warnErrorFatalWriter io.Writer) {
+func initRedis(debugWriter, infoWriter, warnErrorFatalWriter, cronDebugWriter, cronInfoWriter, cronWarnErrorFatalWriter io.Writer) {
 	redis.SetManager(
 		path.Join(env.ConfigDirPath(), "redis.yaml"),
-		DefaultHelper(debugWriter, infoWriter, warnErrorFatalWriter, log.FileWithLineNumCallerRedis()),
+		DefaultCronRoutingHelper(debugWriter, infoWriter, warnErrorFatalWriter, cronDebugWriter, cronInfoWriter, cronWarnErrorFatalWriter, log.FileWithLineNumCallerRedis()),
 	)
 }
 
-func initMongoDB(ctx context.Context, debugWriter, infoWriter, warnErrorFatalWriter io.Writer) {
+func initMongoDB(ctx context.Context, debugWriter, infoWriter, warnErrorFatalWriter, cronDebugWriter, cronInfoWriter, cronWarnErrorFatalWriter io.Writer) {
 	mongodb.SetManager(
 		ctx,
 		path.Join(env.ConfigDirPath(), "mongodb.yaml"),
-		DefaultHelper(debugWriter, infoWriter, warnErrorFatalWriter, log.FileWithLineNumCaller()),
+		DefaultCronRoutingHelper(debugWriter, infoWriter, warnErrorFatalWriter, cronDebugWriter, cronInfoWriter, cronWarnErrorFatalWriter, log.FileWithLineNumCaller()),
 	)
 }
 
-func initLRUCache(debugWriter, infoWriter, warnErrorFatalWriter io.Writer) {
+func initLRUCache(debugWriter, infoWriter, warnErrorFatalWriter, cronDebugWriter, cronInfoWriter, cronWarnErrorFatalWriter io.Writer) {
 	lru.SetManager(
 		path.Join(env.ConfigDirPath(), "lru.yaml"),
-		DefaultHelper(debugWriter, infoWriter, warnErrorFatalWriter, log.FileWithLineNumCaller()),
+		DefaultCronRoutingHelper(debugWriter, infoWriter, warnErrorFatalWriter, cronDebugWriter, cronInfoWriter, cronWarnErrorFatalWriter, log.FileWithLineNumCaller()),
 	)
 }
 
@@ -168,13 +232,13 @@ func initGeeTest() {
 	geetest.InitVerifier(geetest.LoadConfig(path.Join(env.ConfigDirPath(), "geetest.yaml")))
 }
 
-func initNATS(debugWriter, infoWriter, warnErrorFatalWriter io.Writer) {
+func initNATS(debugWriter, infoWriter, warnErrorFatalWriter, cronDebugWriter, cronInfoWriter, cronWarnErrorFatalWriter io.Writer) {
 	defaultNATS.SetManager(
 		path.Join(env.ConfigDirPath(), "nats.yaml"),
-		DefaultHelper(debugWriter, infoWriter, warnErrorFatalWriter, log.FileWithLineNumCaller()),
+		DefaultCronRoutingHelper(debugWriter, infoWriter, warnErrorFatalWriter, cronDebugWriter, cronInfoWriter, cronWarnErrorFatalWriter, log.FileWithLineNumCaller()),
 	)
 }
 
-func initHTTPClient(debugWriter, infoWriter, warnErrorFatalWriter io.Writer) {
-	resty.SetClient(DefaultHelper(debugWriter, infoWriter, warnErrorFatalWriter, nil))
+func initHTTPClient(debugWriter, infoWriter, warnErrorFatalWriter, cronDebugWriter, cronInfoWriter, cronWarnErrorFatalWriter io.Writer) {
+	resty.SetClient(DefaultCronRoutingHelper(debugWriter, infoWriter, warnErrorFatalWriter, cronDebugWriter, cronInfoWriter, cronWarnErrorFatalWriter, nil))
 }

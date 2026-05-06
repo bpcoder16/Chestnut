@@ -16,6 +16,7 @@ const (
 	DefaultWebSocketUUIDKey    = "websocketUUID"
 	DefaultWebSocketLogIdKey   = "websocketLogId"
 	DefaultCronActionKey       = "cronAction"
+	DefaultCronMessageValue    = "Cron"
 	DefaultWebSocketPathKey    = "websocketPath"
 )
 

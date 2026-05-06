@@ -42,7 +42,7 @@ func Run(ctx context.Context, configPath string, options ...gocron.SchedulerOpti
 		cron.SetSchedulerOptions(options...)
 	}
 	config := loadConfig(configPath)
-	ctx = context.WithValue(ctx, log.DefaultMessageKey, "Cron")
+	ctx = context.WithValue(ctx, log.DefaultMessageKey, log.DefaultCronMessageValue)
 	for _, cronConfig := range config.CronList {
 		cronController, cronErr := getCron(cronConfig)
 		if cronErr == nil {
