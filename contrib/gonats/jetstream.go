@@ -99,15 +99,14 @@ func (m *Manager) JSPublishIdempotent(ctx context.Context, subject string, data 
 	injectLogId(ctx, msg)
 	ack, err := m.js.PublishMsg(ctx, msg, jetstream.WithMsgID(msgID))
 	if err != nil {
-		m.logger.WithContext(ctx).ErrorW("NATS.JSPublish", "idempotent publish failed", "subject", subject, "msgId", msgID, "err", err)
+		m.logger.WithContext(ctx).ErrorW("NATS.JSPublishIdempotent", "idempotent publish failed", "subject", subject, "msgId", msgID, "err", err)
 		return nil, err
 	}
 
 	m.logger.WithContext(ctx).DebugW(
-		"NATS.JSPublish", "message published",
+		"NATS.JSPublishIdempotent", "message published",
 		"subject", subject,
 		"data", string(data),
-		"msgId", msgID,
 		"headers", msg.Header,
 		"pubAck", ack,
 	)
