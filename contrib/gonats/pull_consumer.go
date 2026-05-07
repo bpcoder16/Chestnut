@@ -278,8 +278,12 @@ func (c *PullConsumer) ConsumeWithWorkers(ctx context.Context, numWorkers int, m
 				<-sem
 			}()
 			msgCtx := extractLogIdFromJSMsg(context.Background(), m)
-			c.logger.WithContext(msgCtx).DebugW("NATS.ConsumeWithWorkers", "received message",
-				"subject", m.Subject(), "data", string(m.Data()), "headers", m.Headers())
+			c.logger.WithContext(msgCtx).InfoW(
+				"NATS.Action", "ConsumeWithWorkers.ReceivedMessage",
+				"subject", m.Subject(),
+				"data", string(m.Data()),
+				"headers", m.Headers(),
+			)
 			handler(m)
 		}(msg)
 	}

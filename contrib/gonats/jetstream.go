@@ -68,8 +68,8 @@ func (m *Manager) JSPublish(ctx context.Context, subject string, data []byte, he
 		m.logger.WithContext(ctx).ErrorW("NATS.JSPublish", "publish failed", "subject", subject, "err", err)
 		return nil, err
 	}
-	m.logger.WithContext(ctx).DebugW(
-		"NATS.JSPublish", "message published",
+	m.logger.WithContext(ctx).InfoW(
+		"NATS.Action", "JSPublish",
 		"subject", subject,
 		"data", string(data),
 		"headers", msg.Header,
@@ -103,8 +103,8 @@ func (m *Manager) JSPublishIdempotent(ctx context.Context, subject string, data 
 		return nil, err
 	}
 
-	m.logger.WithContext(ctx).DebugW(
-		"NATS.JSPublishIdempotent", "message published",
+	m.logger.WithContext(ctx).InfoW(
+		"NATS.Action", "JSPublishIdempotent",
 		"subject", subject,
 		"data", string(data),
 		"headers", msg.Header,
