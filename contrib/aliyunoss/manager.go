@@ -1,4 +1,4 @@
-package oss
+package aliyunoss
 
 import (
 	"bytes"
@@ -9,13 +9,11 @@ import (
 	"io"
 	"mime"
 	"net/http"
-	"net/url"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/bpcoder16/Chestnut/v4/contrib/aliyun"
 	"github.com/bpcoder16/Chestnut/v4/core/utils"
 	"github.com/bpcoder16/Chestnut/v4/logit"
 
@@ -36,7 +34,7 @@ var imageHTTPClient = &http.Client{Timeout: 15 * time.Second}
 var DefaultManager *Manager
 
 type sceneEntry struct {
-	sceneConfig *aliyun.SceneConfig
+	sceneConfig *SceneConfig
 	client      *v2oss.Client
 	stsClient   *sts.Client
 }
@@ -90,7 +88,7 @@ type TextWatermarkOptions struct {
 }
 
 func InitAliyunOSSManager(configPath string) {
-	cfg := aliyun.LoadOSSConfig(configPath)
+	cfg := LoadOSSConfig(configPath)
 	m := &Manager{
 		scenes: make(map[string]*sceneEntry, len(cfg.Scenes)),
 	}
@@ -123,7 +121,7 @@ func InitAliyunOSSManager(configPath string) {
 	DefaultManager = m
 }
 
-func (m *Manager) GetSceneConfig(scene string) (*aliyun.SceneConfig, error) {
+func (m *Manager) GetSceneConfig(scene string) (*SceneConfig, error) {
 	entry, ok := m.scenes[scene]
 	if !ok {
 		return nil, errors.New("oss: scene not found: " + scene)
@@ -132,14 +130,6 @@ func (m *Manager) GetSceneConfig(scene string) (*aliyun.SceneConfig, error) {
 }
 
 const transferRetryCnt = 3
-
-func extFromURL(rawURL string) string {
-	u, err := url.Parse(rawURL)
-	if err != nil {
-		return ""
-	}
-	return filepath.Ext(u.Path)
-}
 
 func extFromContentType(contentType string) string {
 	mediaType, _, err := mime.ParseMediaType(contentType)
@@ -193,50 +183,40 @@ func buildTargetOSSPathWithExt(targetDir string, ext string) string {
 	return filepath.Join(targetDir, time.Now().Format("2006/01/02"), utils.UniqueID()+ext)
 }
 
-func buildTransferImageTargetOSSPath(targetDir string, originURL string, contentType string) string {
-	ext := extFromContentType(strings.ToLower(contentType))
-	if ext == "" {
-		ext = extFromURL(originURL)
-	}
-	return buildTargetOSSPathWithExt(targetDir, ext)
-}
-
-func (m *Manager) TransferImage(ctx context.Context, originURL, scene string) (ossPath string, err error) {
+func (m *Manager) TransferImage(ctx context.Context, originURL, scene string, targetObjectKey string) (err error) {
 	entry, ok := m.scenes[scene]
 	if !ok {
-		return "", errors.New("oss: scene not found: " + scene)
+		return errors.New("oss: scene not found: " + scene)
 	}
 	httpResp, err := imageHTTPClient.Get(originURL)
 	if err != nil {
 		logit.Context(ctx).WarnW("oss.Manager.TransferImage", "http get failed", "err", err, "url", originURL)
-		return "", err
+		return err
 	}
 	defer httpResp.Body.Close()
 	if httpResp.StatusCode >= 400 {
 		err = errors.New("HTTPStatus:" + httpResp.Status)
 		logit.Context(ctx).WarnW("oss.Manager.TransferImage", "http error", "err", err, "url", originURL)
-		return "", err
+		return err
 	}
 	body, err := io.ReadAll(httpResp.Body)
 	if err != nil {
 		logit.Context(ctx).WarnW("oss.Manager.TransferImage", "read body failed", "err", err, "url", originURL)
-		return "", err
+		return err
 	}
-	ossPath = buildTransferImageTargetOSSPath(entry.sceneConfig.TargetDir, originURL, httpResp.Header.Get("Content-Type"))
+
 	for i := 0; i < transferRetryCnt; i++ {
 		_, err = entry.client.PutObject(ctx, &v2oss.PutObjectRequest{
 			Bucket: v2oss.Ptr(entry.sceneConfig.BucketName),
-			Key:    v2oss.Ptr(ossPath),
+			Key:    v2oss.Ptr(targetObjectKey),
 			Body:   bytes.NewReader(body),
-			//ContentType: v2oss.Ptr(httpResp.Header.Get("Content-Type")),
 		})
 		if err == nil {
 			break
 		}
 	}
 	if err != nil {
-		logit.Context(ctx).WarnW("oss.Manager.TransferImage", "upload failed", "err", err, "ossPath", ossPath)
-		ossPath = ""
+		logit.Context(ctx).WarnW("oss.Manager.TransferImage", "upload failed", "err", err)
 	}
 	return
 }

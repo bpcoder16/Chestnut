@@ -1,10 +1,11 @@
-package aliyun
+package aliyunoss
 
 import (
 	"github.com/bpcoder16/Chestnut/v4/core/utils"
 )
 
-const DefaultOSSBucketType = "public"
+const OSSBucketTypePublic = "public"
+const OSSBucketTypePrivate = "private"
 
 type SceneConfig struct {
 	BucketType      string   `yaml:"bucketType"`
@@ -52,7 +53,7 @@ func LoadOSSConfig(configPath string) *OSSConfig {
 func (c *OSSConfig) resolveSceneConfig() {
 	for _, scene := range c.Scenes {
 		if scene.BucketType == "" {
-			scene.BucketType = DefaultOSSBucketType
+			scene.BucketType = OSSBucketTypePublic
 		}
 		if c.Buckets == nil {
 			continue

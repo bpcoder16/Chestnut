@@ -20,7 +20,7 @@ default:
   RedisSupport: false
   MongoDBSupport: false
   LRUCacheSupport: false
-  AliyunOSSSupport: false  # 启用后需配置 conf/oss.yaml（参考 contrib/aliyun/conf.example/oss.yaml）
+  AliyunOSSSupport: false  # 启用后需配置 conf/oss.yaml（参考 contrib/aliyunoss/conf.example/oss.yaml）
   GeeTestSupport: false    # 启用后需配置 conf/geetest.yaml（参考 contrib/geetest/conf.example/geetest.yaml）
   LocalLockPoolSupport: false
   SwaggerSupport: false

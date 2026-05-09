@@ -8,7 +8,7 @@ import (
 
 	"github.com/bpcoder16/Chestnut/v4/appconfig"
 	"github.com/bpcoder16/Chestnut/v4/appconfig/env"
-	"github.com/bpcoder16/Chestnut/v4/contrib/aliyun/oss"
+	"github.com/bpcoder16/Chestnut/v4/contrib/aliyunoss"
 	"github.com/bpcoder16/Chestnut/v4/contrib/geetest"
 	"github.com/bpcoder16/Chestnut/v4/core/log"
 	"github.com/bpcoder16/Chestnut/v4/default/clickhouse"
@@ -225,7 +225,7 @@ func initLRUCache(debugWriter, infoWriter, warnErrorFatalWriter, cronDebugWriter
 }
 
 func initAliyunOSS() {
-	oss.InitAliyunOSSManager(path.Join(env.ConfigDirPath(), "oss.yaml"))
+	aliyunoss.InitAliyunOSSManager(path.Join(env.ConfigDirPath(), "oss.yaml"))
 }
 
 func initGeeTest() {

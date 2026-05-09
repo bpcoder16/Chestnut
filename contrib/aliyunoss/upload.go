@@ -1,4 +1,4 @@
-package oss
+package aliyunoss
 
 import (
 	"context"
