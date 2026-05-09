@@ -131,7 +131,7 @@ func (m *Manager) GetSceneConfig(scene string) (*SceneConfig, error) {
 
 const transferRetryCnt = 3
 
-func extFromContentType(contentType string) string {
+func ExtFromContentType(contentType string) string {
 	mediaType, _, err := mime.ParseMediaType(contentType)
 	if err != nil {
 		return ""
@@ -176,7 +176,7 @@ func (m *Manager) BuildTargetOSSPath(scene string, contentType string, extraDirs
 			targetDir = filepath.Join(targetDir, extraDir)
 		}
 	}
-	return buildTargetOSSPathWithExt(targetDir, extFromContentType(strings.ToLower(contentType))), nil
+	return buildTargetOSSPathWithExt(targetDir, ExtFromContentType(strings.ToLower(contentType))), nil
 }
 
 func buildTargetOSSPathWithExt(targetDir string, ext string) string {
@@ -305,7 +305,7 @@ func (m *Manager) GetObjectFormat(ctx context.Context, scene, objectKey string) 
 	if result.ContentType != nil {
 		contentType = *result.ContentType
 	}
-	if ext := extFromContentType(contentType); ext != "" {
+	if ext := ExtFromContentType(strings.ToLower(contentType)); ext != "" {
 		return &ObjectFormat{
 			Format:      strings.TrimPrefix(ext, "."),
 			ContentType: contentType,
