@@ -27,9 +27,6 @@ import (
 )
 
 const (
-	BucketTypePublic  = "public"
-	BucketTypePrivate = "private"
-
 	ObjectFormatSourceContentType = "content_type"
 	ObjectFormatSourceObjectKey   = "object_key"
 )
@@ -39,10 +36,9 @@ var imageHTTPClient = &http.Client{Timeout: 15 * time.Second}
 var DefaultManager *Manager
 
 type sceneEntry struct {
-	sceneConfig  *aliyun.SceneConfig
-	bucketConfig *aliyun.OSSBucketConfig
-	client       *v2oss.Client
-	stsClient    *sts.Client
+	sceneConfig *aliyun.SceneConfig
+	client      *v2oss.Client
+	stsClient   *sts.Client
 }
 
 type Manager struct {
@@ -99,58 +95,32 @@ func InitAliyunOSSManager(configPath string) {
 		scenes: make(map[string]*sceneEntry, len(cfg.Scenes)),
 	}
 	for scene, sc := range cfg.Scenes {
-		bucketType := sc.BucketType
-		if bucketType == "" {
-			bucketType = BucketTypePublic
-		}
-		sc.BucketType = bucketType
-		bucketConfig := mergeBucketConfig(bucketType, sc, cfg.Buckets)
 		ossCfg := v2oss.LoadDefaultConfig().
-			WithCredentialsProvider(credentials.NewStaticCredentialsProvider(bucketConfig.AccessKeyId, bucketConfig.AccessKeySecret)).
-			WithRegion(bucketConfig.Region)
-		if bucketConfig.Endpoint != "" {
-			ossCfg = ossCfg.WithEndpoint(strings.TrimPrefix(strings.TrimPrefix(bucketConfig.Endpoint, "https://"), "http://"))
+			WithCredentialsProvider(credentials.NewStaticCredentialsProvider(sc.AccessKeyId, sc.AccessKeySecret)).
+			WithRegion(sc.Region)
+		if sc.Endpoint != "" {
+			ossCfg = ossCfg.WithEndpoint(strings.TrimPrefix(strings.TrimPrefix(sc.Endpoint, "https://"), "http://"))
 		}
 		ossClient := v2oss.NewClient(ossCfg)
 		stsCfg := &openapi.Config{
-			AccessKeyId:     tea.String(bucketConfig.AccessKeyId),
-			AccessKeySecret: tea.String(bucketConfig.AccessKeySecret),
-			RegionId:        tea.String(bucketConfig.Region),
+			AccessKeyId:     tea.String(sc.AccessKeyId),
+			AccessKeySecret: tea.String(sc.AccessKeySecret),
+			RegionId:        tea.String(sc.Region),
 		}
-		if bucketConfig.StsEndpoint != "" {
-			stsCfg.Endpoint = tea.String(strings.TrimPrefix(strings.TrimPrefix(bucketConfig.StsEndpoint, "https://"), "http://"))
+		if sc.StsEndpoint != "" {
+			stsCfg.Endpoint = tea.String(strings.TrimPrefix(strings.TrimPrefix(sc.StsEndpoint, "https://"), "http://"))
 		}
 		stsClient, err := sts.NewClient(stsCfg)
 		if err != nil {
 			panic("oss: failed to create STS client for scene " + scene + ": " + err.Error())
 		}
 		m.scenes[scene] = &sceneEntry{
-			sceneConfig:  sc,
-			bucketConfig: bucketConfig,
-			client:       ossClient,
-			stsClient:    stsClient,
+			sceneConfig: sc,
+			client:      ossClient,
+			stsClient:   stsClient,
 		}
 	}
 	DefaultManager = m
-}
-
-func mergeBucketConfig(bucketType string, sc *aliyun.SceneConfig, buckets map[string]*aliyun.OSSBucketConfig) *aliyun.OSSBucketConfig {
-	if buckets != nil {
-		if bc, ok := buckets[bucketType]; ok {
-			return bc
-		}
-	}
-	return &aliyun.OSSBucketConfig{
-		AccessKeyId:     sc.AccessKeyId,
-		AccessKeySecret: sc.AccessKeySecret,
-		Endpoint:        sc.Endpoint,
-		StsEndpoint:     sc.StsEndpoint,
-		BucketName:      sc.BucketName,
-		CdnBaseURL:      sc.CdnBaseURL,
-		StsRoleArn:      sc.StsRoleArn,
-		StsSessionName:  sc.StsSessionName,
-		Region:          sc.Region,
-	}
 }
 
 func (m *Manager) GetSceneConfig(scene string) (*aliyun.SceneConfig, error) {
@@ -159,14 +129,6 @@ func (m *Manager) GetSceneConfig(scene string) (*aliyun.SceneConfig, error) {
 		return nil, errors.New("oss: scene not found: " + scene)
 	}
 	return entry.sceneConfig, nil
-}
-
-func (m *Manager) GetSceneResolvedConfig(scene string) (*aliyun.SceneConfig, *aliyun.OSSBucketConfig, error) {
-	entry, ok := m.scenes[scene]
-	if !ok {
-		return nil, nil, errors.New("oss: scene not found: " + scene)
-	}
-	return entry.sceneConfig, entry.bucketConfig, nil
 }
 
 const transferRetryCnt = 3
@@ -263,7 +225,7 @@ func (m *Manager) TransferImage(ctx context.Context, originURL, scene string) (o
 	ossPath = buildTransferImageTargetOSSPath(entry.sceneConfig.TargetDir, originURL, httpResp.Header.Get("Content-Type"))
 	for i := 0; i < transferRetryCnt; i++ {
 		_, err = entry.client.PutObject(ctx, &v2oss.PutObjectRequest{
-			Bucket: v2oss.Ptr(entry.bucketConfig.BucketName),
+			Bucket: v2oss.Ptr(entry.sceneConfig.BucketName),
 			Key:    v2oss.Ptr(ossPath),
 			Body:   bytes.NewReader(body),
 			//ContentType: v2oss.Ptr(httpResp.Header.Get("Content-Type")),
@@ -296,7 +258,7 @@ func (m *Manager) ProcessObjectSaveAs(ctx context.Context, scene, sourceObjectKe
 	process = strings.TrimSuffix(process, "|")
 	process = process + "|sys/saveas,o_" + base64.URLEncoding.EncodeToString([]byte(targetObjectKey))
 	return entry.client.ProcessObject(ctx, &v2oss.ProcessObjectRequest{
-		Bucket:  v2oss.Ptr(entry.bucketConfig.BucketName),
+		Bucket:  v2oss.Ptr(entry.sceneConfig.BucketName),
 		Key:     v2oss.Ptr(sourceObjectKey),
 		Process: v2oss.Ptr(process),
 	})
@@ -343,7 +305,7 @@ func (m *Manager) GetObjectFormat(ctx context.Context, scene, objectKey string) 
 		return nil, errors.New("oss: empty object key")
 	}
 	result, err := entry.client.HeadObject(ctx, &v2oss.HeadObjectRequest{
-		Bucket: v2oss.Ptr(entry.bucketConfig.BucketName),
+		Bucket: v2oss.Ptr(entry.sceneConfig.BucketName),
 		Key:    v2oss.Ptr(objectKey),
 	})
 	if err != nil {
@@ -376,7 +338,7 @@ func (m *Manager) GenStsTokenForObjects(scene string, objectKeys []string, durat
 	if !ok {
 		return nil, errors.New("oss: scene not found: " + scene)
 	}
-	policy, err := buildPutObjectPolicy(entry.bucketConfig.BucketName, objectKeys)
+	policy, err := buildPutObjectPolicy(entry.sceneConfig.BucketName, objectKeys)
 	if err != nil {
 		return nil, err
 	}
@@ -390,9 +352,9 @@ func (m *Manager) genStsToken(scene string, durationSeconds int64, policy string
 	}
 	req := &sts.AssumeRoleRequest{
 		// RAM角色的RamRoleArn。
-		RoleArn: tea.String(entry.bucketConfig.StsRoleArn),
+		RoleArn: tea.String(entry.sceneConfig.StsRoleArn),
 		// 指定自定义角色会话名称
-		RoleSessionName: tea.String(entry.bucketConfig.StsSessionName),
+		RoleSessionName: tea.String(entry.sceneConfig.StsSessionName),
 		// 指定STS临时访问凭证过期时间
 		DurationSeconds: tea.Int64(durationSeconds),
 	}
@@ -409,9 +371,9 @@ func (m *Manager) genStsToken(scene string, durationSeconds int64, policy string
 		AccessKeySecret: tea.StringValue(cred.AccessKeySecret),
 		SecurityToken:   tea.StringValue(cred.SecurityToken),
 		Expiration:      tea.StringValue(cred.Expiration),
-		Endpoint:        entry.bucketConfig.Endpoint,
-		Region:          entry.bucketConfig.Region,
-		BucketName:      entry.bucketConfig.BucketName,
+		Endpoint:        entry.sceneConfig.Endpoint,
+		Region:          entry.sceneConfig.Region,
+		BucketName:      entry.sceneConfig.BucketName,
 	}, nil
 }
 
@@ -455,7 +417,7 @@ func (m *Manager) IsObjectExist(ctx context.Context, scene, objectKey string) (b
 	if !ok {
 		return false, errors.New("oss: scene not found: " + scene)
 	}
-	return entry.client.IsObjectExist(ctx, entry.bucketConfig.BucketName, objectKey)
+	return entry.client.IsObjectExist(ctx, entry.sceneConfig.BucketName, objectKey)
 }
 
 func (m *Manager) SignGetObjectURL(ctx context.Context, scene, objectKey string, expiredInSec int64) (*v2oss.PresignResult, error) {
@@ -464,7 +426,7 @@ func (m *Manager) SignGetObjectURL(ctx context.Context, scene, objectKey string,
 		return nil, errors.New("oss: scene not found: " + scene)
 	}
 	return entry.client.Presign(ctx, &v2oss.GetObjectRequest{
-		Bucket: v2oss.Ptr(entry.bucketConfig.BucketName),
+		Bucket: v2oss.Ptr(entry.sceneConfig.BucketName),
 		Key:    v2oss.Ptr(objectKey),
 	}, v2oss.PresignExpires(time.Duration(expiredInSec)*time.Second))
 }

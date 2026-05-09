@@ -4,6 +4,8 @@ import (
 	"github.com/bpcoder16/Chestnut/v4/core/utils"
 )
 
+const DefaultOSSBucketType = "public"
+
 type SceneConfig struct {
 	BucketType      string   `yaml:"bucketType"`
 	AccessKeyId     string   `yaml:"accessKeyId"`
@@ -43,5 +45,52 @@ func LoadOSSConfig(configPath string) *OSSConfig {
 	if err := utils.ParseFile(configPath, &config); err != nil {
 		panic("load OSS conf err: " + err.Error())
 	}
+	config.resolveSceneConfig()
 	return &config
+}
+
+func (c *OSSConfig) resolveSceneConfig() {
+	for _, scene := range c.Scenes {
+		if scene.BucketType == "" {
+			scene.BucketType = DefaultOSSBucketType
+		}
+		if c.Buckets == nil {
+			continue
+		}
+		bucket, ok := c.Buckets[scene.BucketType]
+		if !ok || bucket == nil {
+			continue
+		}
+		scene.fillEmptyBucketConfig(bucket)
+	}
+}
+
+func (c *SceneConfig) fillEmptyBucketConfig(bucket *OSSBucketConfig) {
+	if c.AccessKeyId == "" {
+		c.AccessKeyId = bucket.AccessKeyId
+	}
+	if c.AccessKeySecret == "" {
+		c.AccessKeySecret = bucket.AccessKeySecret
+	}
+	if c.Endpoint == "" {
+		c.Endpoint = bucket.Endpoint
+	}
+	if c.StsEndpoint == "" {
+		c.StsEndpoint = bucket.StsEndpoint
+	}
+	if c.BucketName == "" {
+		c.BucketName = bucket.BucketName
+	}
+	if c.CdnBaseURL == "" {
+		c.CdnBaseURL = bucket.CdnBaseURL
+	}
+	if c.StsRoleArn == "" {
+		c.StsRoleArn = bucket.StsRoleArn
+	}
+	if c.StsSessionName == "" {
+		c.StsSessionName = bucket.StsSessionName
+	}
+	if c.Region == "" {
+		c.Region = bucket.Region
+	}
 }
