@@ -1,10 +1,45 @@
-scenes:
-  scene_name:
+buckets:
+  public:
     accessKeyId: ""
     accessKeySecret: ""
-    endpoint: "https://oss-cn-shanghai.aliyuncs.com"
-    bucketName: ""
-    targetDir: "scene_name"
-    stsRoleArn: "acs:ram::uid:role/role-name"
-    stsSessionName: "app-name"
+    endpoint: ""
+    stsEndpoint: ""
+    bucketName: "app-public"
+    cdnBaseURL: "https://static.example.com"
+    stsRoleArn: "acs:ram::uid:role/oss-upload-role"
+    stsSessionName: "app-public"
     region: "cn-shanghai"
+  private:
+    accessKeyId: ""
+    accessKeySecret: ""
+    endpoint: ""
+    stsEndpoint: ""
+    bucketName: "app-private"
+    cdnBaseURL: ""
+    stsRoleArn: "acs:ram::uid:role/oss-upload-role"
+    stsSessionName: "app-private"
+    region: "cn-shanghai"
+
+scenes:
+  upload:
+    bucketType: "public"
+    targetDir: "uploads"
+    maxBatchCount: 9
+    maxSize: 10485760
+    allowedExts:
+      - ".jpg"
+      - ".jpeg"
+      - ".png"
+      - ".webp"
+      - ".pdf"
+  private_image:
+    bucketType: "private"
+    targetDir: "private/images"
+    maxBatchCount: 9
+    maxSize: 10485760
+    allowedExts:
+      - ".jpg"
+      - ".jpeg"
+      - ".png"
+      - ".webp"
+      - ".pdf"

@@ -1,23 +1,29 @@
 package oss
 
 import (
+	"context"
+	"errors"
 	"io"
 
-	gosdk "github.com/aliyun/aliyun-oss-go-sdk/oss"
+	v2oss "github.com/aliyun/alibabacloud-oss-go-sdk-v2/oss"
 )
 
 func PutObjectByScene(scene, objectKey string, reader io.Reader) error {
-	bucket, err := DefaultManager.GetBucket(scene)
+	entry, ok := DefaultManager.scenes[scene]
+	if !ok {
+		return errors.New("oss: scene not found: " + scene)
+	}
+	_, err := entry.client.PutObject(context.Background(), &v2oss.PutObjectRequest{
+		Bucket: v2oss.Ptr(entry.bucketConfig.BucketName),
+		Key:    v2oss.Ptr(objectKey),
+		Body:   reader,
+	})
 	if err != nil {
 		return err
 	}
-	return bucket.PutObject(objectKey, reader)
+	return nil
 }
 
-func SignURLByScene(scene, ossPath string, expiredInSec int64) (string, error) {
-	bucket, err := DefaultManager.GetBucket(scene)
-	if err != nil {
-		return "", err
-	}
-	return bucket.SignURL(ossPath, gosdk.HTTPGet, expiredInSec)
+func SignURLByScene(scene, ossPath string, expiredInSec int64) (*v2oss.PresignResult, error) {
+	return DefaultManager.SignGetObjectURL(context.Background(), scene, ossPath, expiredInSec)
 }
