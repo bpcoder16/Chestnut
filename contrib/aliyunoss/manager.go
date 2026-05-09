@@ -183,26 +183,36 @@ func buildTargetOSSPathWithExt(targetDir string, ext string) string {
 	return filepath.Join(targetDir, time.Now().Format("2006/01/02"), utils.UniqueID()+ext)
 }
 
-func (m *Manager) TransferImage(ctx context.Context, originURL, scene string, targetObjectKey string) (err error) {
+func (m *Manager) TransferImage(ctx context.Context, originURL, scene string, extraDirs ...string) (targetObjectKey string, contentType string, fileSize int64, err error) {
 	entry, ok := m.scenes[scene]
 	if !ok {
-		return errors.New("oss: scene not found: " + scene)
+		err = errors.New("oss: scene not found: " + scene)
+		return
 	}
 	httpResp, err := imageHTTPClient.Get(originURL)
 	if err != nil {
 		logit.Context(ctx).WarnW("oss.Manager.TransferImage", "http get failed", "err", err, "url", originURL)
-		return err
+		return
 	}
 	defer httpResp.Body.Close()
 	if httpResp.StatusCode >= 400 {
 		err = errors.New("HTTPStatus:" + httpResp.Status)
 		logit.Context(ctx).WarnW("oss.Manager.TransferImage", "http error", "err", err, "url", originURL)
-		return err
+		return
 	}
 	body, err := io.ReadAll(httpResp.Body)
 	if err != nil {
 		logit.Context(ctx).WarnW("oss.Manager.TransferImage", "read body failed", "err", err, "url", originURL)
-		return err
+		return
+	}
+
+	contentType = httpResp.Header.Get("Content-Type")
+	fileSize = int64(len(body))
+
+	targetObjectKey, err = m.BuildTargetOSSPath(scene, contentType, extraDirs...)
+	if err != nil {
+		logit.Context(ctx).WarnW("oss.Manager.TransferImage", "BuildTargetOSSPath failed", "err", err)
+		return
 	}
 
 	for i := 0; i < transferRetryCnt; i++ {
