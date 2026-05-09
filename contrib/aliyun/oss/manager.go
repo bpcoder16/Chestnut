@@ -3,6 +3,7 @@ package oss
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"io"
@@ -10,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -27,6 +29,9 @@ import (
 const (
 	BucketTypePublic  = "public"
 	BucketTypePrivate = "private"
+
+	ObjectFormatSourceContentType = "content_type"
+	ObjectFormatSourceObjectKey   = "object_key"
 )
 
 var imageHTTPClient = &http.Client{Timeout: 15 * time.Second}
@@ -52,6 +57,40 @@ type StsCredentials struct {
 	Endpoint        string
 	Region          string
 	BucketName      string
+}
+
+// ObjectFormat OSS 文件格式信息。
+type ObjectFormat struct {
+	// Format 文件格式，不带点，例如 jpg、jpeg、png、pdf；优先根据 OSS Content-Type 判断，无法判断时使用 object key 后缀。
+	Format string
+	// ContentType OSS 对象的 Content-Type，例如 image/jpeg、application/pdf。
+	ContentType string
+	// Source 格式识别来源：content_type 表示来自 Content-Type，object_key 表示来自 object key 后缀。
+	Source string
+}
+
+// TextWatermarkOptions 文字水印处理配置。
+type TextWatermarkOptions struct {
+	// TargetObjectKey 处理后图片保存到 OSS 的 object key，例如 processed/2026/05/09/demo.jpg。
+	TargetObjectKey string
+	// Text 水印文字内容，方法内部会做 URL-safe Base64 编码；OSS 限制最大 64 个字符，中文约 20 个字。
+	Text string
+	// Font 字体名称，方法内部会做 URL-safe Base64 编码；空值使用 OSS 默认字体 wqy-zenhei，示例：wqy-zenhei。
+	Font string
+	// Size 字体大小，单位 px；空值使用 OSS 默认值，示例：40。
+	Size int
+	// Color 文字颜色，方法内部会做 URL-safe Base64 编码；格式为 #RRGGBB，示例：#FFFFFF。
+	Color string
+	// Transparency 文字水印透明度，对应 OSS 参数 t，取值范围遵循 OSS 图片处理规则，示例：90。
+	Transparency int
+	// Shadow 文字阴影透明度，对应 OSS 参数 shadow，取值范围 0-100，示例：50。
+	Shadow int
+	// Position 水印位置，对应 OSS 参数 g，示例：se 表示右下。
+	Position string
+	// X 水平边距，对应 OSS 参数 x，单位 px，示例：10。
+	X int
+	// Y 垂直边距，对应 OSS 参数 y，单位 px，示例：10。
+	Y int
 }
 
 func InitAliyunOSSManager(configPath string) {
@@ -163,12 +202,41 @@ func extFromContentType(contentType string) string {
 	}
 }
 
-func buildTargetOSSPath(targetDir string, originURL string, contentType string) string {
+func formatFromExt(ext string) string {
+	return strings.ToLower(strings.TrimPrefix(ext, "."))
+}
+
+// BuildTargetOSSPath 根据场景配置和 Content-Type 生成 OSS object key。
+func BuildTargetOSSPath(scene string, contentType string, extraDirs ...string) (string, error) {
+	return DefaultManager.BuildTargetOSSPath(scene, contentType, extraDirs...)
+}
+
+// BuildTargetOSSPath 根据场景配置和 Content-Type 生成 OSS object key。
+func (m *Manager) BuildTargetOSSPath(scene string, contentType string, extraDirs ...string) (string, error) {
+	entry, ok := m.scenes[scene]
+	if !ok {
+		return "", errors.New("oss: scene not found: " + scene)
+	}
+	targetDir := entry.sceneConfig.TargetDir
+	for _, extraDir := range extraDirs {
+		extraDir = strings.Trim(extraDir, "/")
+		if extraDir != "" && extraDir != "." {
+			targetDir = filepath.Join(targetDir, extraDir)
+		}
+	}
+	return buildTargetOSSPathWithExt(targetDir, extFromContentType(strings.ToLower(contentType))), nil
+}
+
+func buildTargetOSSPathWithExt(targetDir string, ext string) string {
+	return filepath.Join(targetDir, time.Now().Format("2006/01/02"), utils.UniqueID()+ext)
+}
+
+func buildTransferImageTargetOSSPath(targetDir string, originURL string, contentType string) string {
 	ext := extFromContentType(strings.ToLower(contentType))
 	if ext == "" {
 		ext = extFromURL(originURL)
 	}
-	return filepath.Join(targetDir, time.Now().Format("2006/01/02"), utils.UniqueID()+ext)
+	return buildTargetOSSPathWithExt(targetDir, ext)
 }
 
 func (m *Manager) TransferImage(ctx context.Context, originURL, scene string) (ossPath string, err error) {
@@ -192,7 +260,7 @@ func (m *Manager) TransferImage(ctx context.Context, originURL, scene string) (o
 		logit.Context(ctx).WarnW("oss.Manager.TransferImage", "read body failed", "err", err, "url", originURL)
 		return "", err
 	}
-	ossPath = buildTargetOSSPath(entry.sceneConfig.TargetDir, originURL, httpResp.Header.Get("Content-Type"))
+	ossPath = buildTransferImageTargetOSSPath(entry.sceneConfig.TargetDir, originURL, httpResp.Header.Get("Content-Type"))
 	for i := 0; i < transferRetryCnt; i++ {
 		_, err = entry.client.PutObject(ctx, &v2oss.PutObjectRequest{
 			Bucket: v2oss.Ptr(entry.bucketConfig.BucketName),
@@ -209,6 +277,94 @@ func (m *Manager) TransferImage(ctx context.Context, originURL, scene string) (o
 		ossPath = ""
 	}
 	return
+}
+
+func (m *Manager) ProcessObjectSaveAs(ctx context.Context, scene, sourceObjectKey, targetObjectKey, process string) (*v2oss.ProcessObjectResult, error) {
+	entry, ok := m.scenes[scene]
+	if !ok {
+		return nil, errors.New("oss: scene not found: " + scene)
+	}
+	if sourceObjectKey == "" {
+		return nil, errors.New("oss: empty source object key")
+	}
+	if targetObjectKey == "" {
+		return nil, errors.New("oss: empty target object key")
+	}
+	if process == "" {
+		return nil, errors.New("oss: empty process")
+	}
+	process = strings.TrimSuffix(process, "|")
+	process = process + "|sys/saveas,o_" + base64.URLEncoding.EncodeToString([]byte(targetObjectKey))
+	return entry.client.ProcessObject(ctx, &v2oss.ProcessObjectRequest{
+		Bucket:  v2oss.Ptr(entry.bucketConfig.BucketName),
+		Key:     v2oss.Ptr(sourceObjectKey),
+		Process: v2oss.Ptr(process),
+	})
+}
+
+func (m *Manager) ProcessTextWatermarkSaveAs(ctx context.Context, scene, sourceObjectKey string, opts TextWatermarkOptions) (*v2oss.ProcessObjectResult, error) {
+	if opts.Text == "" {
+		return nil, errors.New("oss: empty watermark text")
+	}
+	process := "image/watermark,text_" + base64.RawURLEncoding.EncodeToString([]byte(opts.Text))
+	if opts.Font != "" {
+		process += ",type_" + base64.RawURLEncoding.EncodeToString([]byte(opts.Font))
+	}
+	if opts.Size > 0 {
+		process += ",size_" + strconv.Itoa(opts.Size)
+	}
+	if opts.Color != "" {
+		process += ",color_" + base64.RawURLEncoding.EncodeToString([]byte(opts.Color))
+	}
+	if opts.Transparency > 0 {
+		process += ",t_" + strconv.Itoa(opts.Transparency)
+	}
+	if opts.Shadow > 0 {
+		process += ",shadow_" + strconv.Itoa(opts.Shadow)
+	}
+	if opts.Position != "" {
+		process += ",g_" + opts.Position
+	}
+	if opts.X > 0 {
+		process += ",x_" + strconv.Itoa(opts.X)
+	}
+	if opts.Y > 0 {
+		process += ",y_" + strconv.Itoa(opts.Y)
+	}
+	return m.ProcessObjectSaveAs(ctx, scene, sourceObjectKey, opts.TargetObjectKey, process)
+}
+
+func (m *Manager) GetObjectFormat(ctx context.Context, scene, objectKey string) (*ObjectFormat, error) {
+	entry, ok := m.scenes[scene]
+	if !ok {
+		return nil, errors.New("oss: scene not found: " + scene)
+	}
+	if objectKey == "" {
+		return nil, errors.New("oss: empty object key")
+	}
+	result, err := entry.client.HeadObject(ctx, &v2oss.HeadObjectRequest{
+		Bucket: v2oss.Ptr(entry.bucketConfig.BucketName),
+		Key:    v2oss.Ptr(objectKey),
+	})
+	if err != nil {
+		return nil, err
+	}
+	contentType := ""
+	if result.ContentType != nil {
+		contentType = *result.ContentType
+	}
+	if ext := extFromContentType(contentType); ext != "" {
+		return &ObjectFormat{
+			Format:      strings.TrimPrefix(ext, "."),
+			ContentType: contentType,
+			Source:      ObjectFormatSourceContentType,
+		}, nil
+	}
+	return &ObjectFormat{
+		Format:      formatFromExt(filepath.Ext(objectKey)),
+		ContentType: contentType,
+		Source:      ObjectFormatSourceObjectKey,
+	}, nil
 }
 
 func (m *Manager) GenStsToken(scene string, durationSeconds int64) (*StsCredentials, error) {

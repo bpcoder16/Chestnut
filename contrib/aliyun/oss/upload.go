@@ -27,3 +27,15 @@ func PutObjectByScene(scene, objectKey string, reader io.Reader) error {
 func SignURLByScene(scene, ossPath string, expiredInSec int64) (*v2oss.PresignResult, error) {
 	return DefaultManager.SignGetObjectURL(context.Background(), scene, ossPath, expiredInSec)
 }
+
+func ProcessObjectSaveAsByScene(scene, sourceObjectKey, targetObjectKey, process string) (*v2oss.ProcessObjectResult, error) {
+	return DefaultManager.ProcessObjectSaveAs(context.Background(), scene, sourceObjectKey, targetObjectKey, process)
+}
+
+func ProcessTextWatermarkSaveAsByScene(scene, sourceObjectKey string, opts TextWatermarkOptions) (*v2oss.ProcessObjectResult, error) {
+	return DefaultManager.ProcessTextWatermarkSaveAs(context.Background(), scene, sourceObjectKey, opts)
+}
+
+func GetObjectFormatByScene(scene, objectKey string) (*ObjectFormat, error) {
+	return DefaultManager.GetObjectFormat(context.Background(), scene, objectKey)
+}
