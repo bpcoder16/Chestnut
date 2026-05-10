@@ -20,6 +20,10 @@ func (g *Group) Go(f func() error) {
 	g.Group.Go(f)
 }
 
+func (g *Group) SetLimit(n int) {
+	g.Group.SetLimit(n)
+}
+
 func (g *Group) Wait() error {
 	return g.Group.Wait()
 }

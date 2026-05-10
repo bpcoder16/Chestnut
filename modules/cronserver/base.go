@@ -56,33 +56,13 @@ func (b *Base) taskPoolRun(ctx context.Context, taskList []func(context.Context)
 	if len(taskList) == 0 {
 		return
 	}
-	taskMap := make(map[string]func(ctx context.Context) concurrency.ChanResult)
-	if len(taskList) > b.maxConcurrencyCnt {
-		cnt := 0
-		for index, item := range taskList {
-			if cnt >= b.maxConcurrencyCnt {
-				_, _ = concurrency.Manager(ctx, taskMap, b.name)
-				cnt = 0
-				taskMap = make(map[string]func(ctx context.Context) concurrency.ChanResult)
-			}
-			f := item
-			taskMap[strconv.Itoa(index)] = func(ctx context.Context) concurrency.ChanResult {
-				f(ctx)
-				return concurrency.ChanResult{}
-			}
-			cnt++
+	taskMap := make(map[string]concurrency.Task, len(taskList))
+	for index, item := range taskList {
+		f := item
+		taskMap[strconv.Itoa(index)] = func(ctx context.Context) (any, error) {
+			f(ctx)
+			return nil, nil
 		}
-		if len(taskMap) > 0 {
-			_, _ = concurrency.Manager(ctx, taskMap, b.name)
-		}
-	} else {
-		for index, item := range taskList {
-			f := item
-			taskMap[strconv.Itoa(index)] = func(ctx context.Context) concurrency.ChanResult {
-				f(ctx)
-				return concurrency.ChanResult{}
-			}
-		}
-		_, _ = concurrency.Manager(ctx, taskMap, b.name)
 	}
+	_, _ = concurrency.RunNamed(ctx, taskMap, concurrency.WithLogField(b.name), concurrency.WithLimit(b.maxConcurrencyCnt))
 }
