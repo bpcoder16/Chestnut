@@ -67,24 +67,30 @@ type ObjectFormat struct {
 type TextWatermarkOptions struct {
 	// TargetObjectKey 处理后图片保存到 OSS 的 object key，例如 processed/2026/05/09/demo.jpg。
 	TargetObjectKey string
-	// Text 水印文字内容，方法内部会做 URL-safe Base64 编码；OSS 限制最大 64 个字符，中文约 20 个字。
-	Text string
-	// Font 字体名称，方法内部会做 URL-safe Base64 编码；空值使用 OSS 默认字体 wqy-zenhei，示例：wqy-zenhei。
-	Font string
-	// Size 字体大小，单位 px；空值使用 OSS 默认值，示例：40。
-	Size int
-	// Color 文字颜色，方法内部会做 URL-safe Base64 编码；格式为 #RRGGBB，示例：#FFFFFF。
-	Color string
+
 	// Transparency 文字水印透明度，对应 OSS 参数 t，取值范围遵循 OSS 图片处理规则，示例：90。
 	Transparency int
-	// Shadow 文字阴影透明度，对应 OSS 参数 shadow，取值范围 0-100，示例：50。
-	Shadow int
 	// Position 水印位置，对应 OSS 参数 g，示例：se 表示右下。
 	Position string
 	// X 水平边距，对应 OSS 参数 x，单位 px，示例：10。
 	X int
 	// Y 垂直边距，对应 OSS 参数 y，单位 px，示例：10。
 	Y int
+	// 指定是否将图片水印或文字水印铺满原图 1：将图片水印或文字水印铺满原图 0（默认值）：不将图片水印或文字水印铺满全图
+	Fill int
+
+	// Text 水印文字内容，方法内部会做 URL-safe Base64 编码；OSS 限制最大 64 个字符，中文约 20 个字。
+	Text string
+	// Font 字体名称，方法内部会做 URL-safe Base64 编码；空值使用 OSS 默认字体 wqy-zenhei，示例：wqy-zenhei。
+	Font string
+	// Color 文字颜色，格式为 RRGGBB 或 #RRGGBB，方法内部会移除 # 后传给 OSS，示例：FFFFFF。
+	Color string
+	// Size 字体大小，单位 px；空值使用 OSS 默认值，示例：40。
+	Size int
+	// Shadow 文字阴影透明度，对应 OSS 参数 shadow，取值范围 0-100，示例：50。
+	Shadow int
+	// Rotate 指定文字顺时针旋转角度 取值范围 0-360，示例：50
+	Rotate int
 }
 
 func InitAliyunOSSManager(configPath string) {
@@ -259,20 +265,8 @@ func (m *Manager) ProcessTextWatermarkSaveAs(ctx context.Context, scene, sourceO
 		return nil, errors.New("oss: empty watermark text")
 	}
 	process := "image/watermark,text_" + base64.RawURLEncoding.EncodeToString([]byte(opts.Text))
-	if opts.Font != "" {
-		process += ",type_" + base64.RawURLEncoding.EncodeToString([]byte(opts.Font))
-	}
-	if opts.Size > 0 {
-		process += ",size_" + strconv.Itoa(opts.Size)
-	}
-	if opts.Color != "" {
-		process += ",color_" + base64.RawURLEncoding.EncodeToString([]byte(opts.Color))
-	}
 	if opts.Transparency > 0 {
 		process += ",t_" + strconv.Itoa(opts.Transparency)
-	}
-	if opts.Shadow > 0 {
-		process += ",shadow_" + strconv.Itoa(opts.Shadow)
 	}
 	if opts.Position != "" {
 		process += ",g_" + opts.Position
@@ -283,6 +277,26 @@ func (m *Manager) ProcessTextWatermarkSaveAs(ctx context.Context, scene, sourceO
 	if opts.Y > 0 {
 		process += ",y_" + strconv.Itoa(opts.Y)
 	}
+	if opts.Fill == 1 {
+		process += ",fill_" + strconv.Itoa(opts.Fill)
+	}
+
+	if opts.Font != "" {
+		process += ",type_" + base64.RawURLEncoding.EncodeToString([]byte(opts.Font))
+	}
+	if opts.Color != "" {
+		process += ",color_" + strings.TrimPrefix(opts.Color, "#")
+	}
+	if opts.Size > 0 {
+		process += ",size_" + strconv.Itoa(opts.Size)
+	}
+	if opts.Shadow > 0 {
+		process += ",shadow_" + strconv.Itoa(opts.Shadow)
+	}
+	if opts.Rotate > 0 {
+		process += ",rotate_" + strconv.Itoa(opts.Rotate)
+	}
+
 	return m.ProcessObjectSaveAs(ctx, scene, sourceObjectKey, opts.TargetObjectKey, process)
 }
 
