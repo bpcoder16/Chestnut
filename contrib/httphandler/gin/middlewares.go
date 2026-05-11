@@ -47,7 +47,7 @@ func DefaultLogger() gin.HandlerFunc {
 		elapsed := time.Since(begin)
 
 		logit.RequestContext(ctx).InfoW(
-			"userId", ctx.GetInt64(log.DefaultUserIdKey),
+			"userId", ctx.GetString(log.DefaultUserIdKey),
 			"costTime", utils.ShowDurationString(elapsed),
 			"clientIP", ctx.ClientIP(),
 			"method", ctx.Request.Method,
