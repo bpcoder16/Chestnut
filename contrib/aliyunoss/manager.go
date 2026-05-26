@@ -155,6 +155,12 @@ func ExtFromContentType(contentType string) string {
 		return ".bmp"
 	case "application/pdf":
 		return ".pdf"
+	case "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
+		return ".xlsx"
+	case "application/vnd.ms-excel":
+		return ".xls"
+	case "text/csv", "application/csv":
+		return ".csv"
 	default:
 		return ""
 	}
