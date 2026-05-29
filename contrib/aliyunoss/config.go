@@ -6,6 +6,7 @@ import (
 
 const OSSBucketTypePublic = "public"
 const OSSBucketTypePrivate = "private"
+const DefaultOSSBucketType = OSSBucketTypePublic
 
 type SceneConfig struct {
 	BucketType      string   `yaml:"bucketType"`

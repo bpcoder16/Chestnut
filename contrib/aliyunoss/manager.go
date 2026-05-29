@@ -430,6 +430,18 @@ func (m *Manager) IsObjectExist(ctx context.Context, scene, objectKey string) (b
 	return entry.client.IsObjectExist(ctx, entry.sceneConfig.BucketName, objectKey)
 }
 
+func (m *Manager) DeleteObject(ctx context.Context, scene, objectKey string) error {
+	entry, ok := m.scenes[scene]
+	if !ok {
+		return errors.New("oss: scene not found: " + scene)
+	}
+	_, err := entry.client.DeleteObject(ctx, &v2oss.DeleteObjectRequest{
+		Bucket: v2oss.Ptr(entry.sceneConfig.BucketName),
+		Key:    v2oss.Ptr(objectKey),
+	})
+	return err
+}
+
 func (m *Manager) SignGetObjectURL(ctx context.Context, scene, objectKey string, expiredInSec int64) (*v2oss.PresignResult, error) {
 	entry, ok := m.scenes[scene]
 	if !ok {

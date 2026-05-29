@@ -24,6 +24,10 @@ func PutObjectByScene(ctx context.Context, scene, objectKey string, reader io.Re
 	return nil
 }
 
+func DeleteObjectByScene(ctx context.Context, scene, objectKey string) error {
+	return DefaultManager.DeleteObject(ctx, scene, objectKey)
+}
+
 func SignURLByScene(ctx context.Context, scene, ossPath string, expiredInSec int64) (*v2oss.PresignResult, error) {
 	return DefaultManager.SignGetObjectURL(ctx, scene, ossPath, expiredInSec)
 }
