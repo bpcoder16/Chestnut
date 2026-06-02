@@ -176,6 +176,14 @@ func formatFromExt(ext string) string {
 	return strings.ToLower(strings.TrimPrefix(ext, "."))
 }
 
+func transferObjectExt(contentType, fileExt string) string {
+	fileExt = strings.TrimSpace(fileExt)
+	if fileExt != "" {
+		return "." + strings.TrimPrefix(strings.ToLower(fileExt), ".")
+	}
+	return ExtFromContentType(strings.ToLower(contentType))
+}
+
 // BuildTargetOSSPath 根据场景配置和 Content-Type 生成 OSS object key。
 func BuildTargetOSSPath(scene string, contentType string, extraDirs ...string) (string, error) {
 	return DefaultManager.BuildTargetOSSPath(scene, contentType, extraDirs...)
@@ -183,6 +191,10 @@ func BuildTargetOSSPath(scene string, contentType string, extraDirs ...string) (
 
 // BuildTargetOSSPath 根据场景配置和 Content-Type 生成 OSS object key。
 func (m *Manager) BuildTargetOSSPath(scene string, contentType string, extraDirs ...string) (string, error) {
+	return m.buildTargetOSSPathWithObjectExt(scene, ExtFromContentType(strings.ToLower(contentType)), extraDirs...)
+}
+
+func (m *Manager) buildTargetOSSPathWithObjectExt(scene string, ext string, extraDirs ...string) (string, error) {
 	entry, ok := m.scenes[scene]
 	if !ok {
 		return "", errors.New("oss: scene not found: " + scene)
@@ -194,7 +206,7 @@ func (m *Manager) BuildTargetOSSPath(scene string, contentType string, extraDirs
 			targetDir = filepath.Join(targetDir, extraDir)
 		}
 	}
-	return buildTargetOSSPathWithExt(targetDir, ExtFromContentType(strings.ToLower(contentType))), nil
+	return buildTargetOSSPathWithExt(targetDir, ext), nil
 }
 
 func buildTargetOSSPathWithExt(targetDir string, ext string) string {
@@ -202,6 +214,15 @@ func buildTargetOSSPathWithExt(targetDir string, ext string) string {
 }
 
 func (m *Manager) TransferImage(ctx context.Context, originURL, scene string, extraDirs ...string) (targetObjectKey string, contentType string, fileSize int64, err error) {
+	return m.transferOSSObject(ctx, originURL, scene, "", "oss.Manager.TransferImage", extraDirs...)
+}
+
+// TransferOSSObject 下载远端文件并上传到 OSS，fileExt 非空时优先作为目标 object key 后缀。
+func (m *Manager) TransferOSSObject(ctx context.Context, originURL, scene, fileExt string, extraDirs ...string) (targetObjectKey string, contentType string, fileSize int64, err error) {
+	return m.transferOSSObject(ctx, originURL, scene, fileExt, "oss.Manager.TransferOSSObject", extraDirs...)
+}
+
+func (m *Manager) transferOSSObject(ctx context.Context, originURL, scene, fileExt, logField string, extraDirs ...string) (targetObjectKey string, contentType string, fileSize int64, err error) {
 	entry, ok := m.scenes[scene]
 	if !ok {
 		err = errors.New("oss: scene not found: " + scene)
@@ -209,27 +230,27 @@ func (m *Manager) TransferImage(ctx context.Context, originURL, scene string, ex
 	}
 	httpResp, err := imageHTTPClient.Get(originURL)
 	if err != nil {
-		logit.Context(ctx).WarnW("oss.Manager.TransferImage", "http get failed", "err", err, "url", originURL)
+		logit.Context(ctx).WarnW(logField, "http get failed", "err", err, "url", originURL)
 		return
 	}
 	defer httpResp.Body.Close()
 	if httpResp.StatusCode >= 400 {
 		err = errors.New("HTTPStatus:" + httpResp.Status)
-		logit.Context(ctx).WarnW("oss.Manager.TransferImage", "http error", "err", err, "url", originURL)
+		logit.Context(ctx).WarnW(logField, "http error", "err", err, "url", originURL)
 		return
 	}
 	body, err := io.ReadAll(httpResp.Body)
 	if err != nil {
-		logit.Context(ctx).WarnW("oss.Manager.TransferImage", "read body failed", "err", err, "url", originURL)
+		logit.Context(ctx).WarnW(logField, "read body failed", "err", err, "url", originURL)
 		return
 	}
 
 	contentType = httpResp.Header.Get("Content-Type")
 	fileSize = int64(len(body))
 
-	targetObjectKey, err = m.BuildTargetOSSPath(scene, contentType, extraDirs...)
+	targetObjectKey, err = m.buildTargetOSSPathWithObjectExt(scene, transferObjectExt(contentType, fileExt), extraDirs...)
 	if err != nil {
-		logit.Context(ctx).WarnW("oss.Manager.TransferImage", "BuildTargetOSSPath failed", "err", err)
+		logit.Context(ctx).WarnW(logField, "BuildTargetOSSPath failed", "err", err)
 		return
 	}
 
@@ -244,7 +265,7 @@ func (m *Manager) TransferImage(ctx context.Context, originURL, scene string, ex
 		}
 	}
 	if err != nil {
-		logit.Context(ctx).WarnW("oss.Manager.TransferImage", "upload failed", "err", err)
+		logit.Context(ctx).WarnW(logField, "upload failed", "err", err)
 	}
 	return
 }

@@ -43,3 +43,15 @@ func TestExtFromContentTypeSupportsDocumentsAndVideo(t *testing.T) {
 		})
 	}
 }
+
+func TestTransferObjectExtPrefersManualExt(t *testing.T) {
+	if got := transferObjectExt("image/png", "jpg"); got != ".jpg" {
+		t.Fatalf("transferObjectExt() = %q, want %q", got, ".jpg")
+	}
+}
+
+func TestTransferObjectExtFallsBackToContentType(t *testing.T) {
+	if got := transferObjectExt("image/png", ""); got != ".png" {
+		t.Fatalf("transferObjectExt() = %q, want %q", got, ".png")
+	}
+}
