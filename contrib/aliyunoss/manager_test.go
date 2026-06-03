@@ -33,6 +33,16 @@ func TestExtFromContentTypeSupportsDocumentsAndVideo(t *testing.T) {
 			contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 			want:        ".docx",
 		},
+		{
+			name:        "json",
+			contentType: "application/json",
+			want:        ".json",
+		},
+		{
+			name:        "text json with parameters",
+			contentType: "text/json; charset=utf-8",
+			want:        ".json",
+		},
 	}
 
 	for _, tt := range tests {

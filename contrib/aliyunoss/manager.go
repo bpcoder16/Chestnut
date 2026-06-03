@@ -167,6 +167,8 @@ func ExtFromContentType(contentType string) string {
 		return ".xls"
 	case "text/csv", "application/csv":
 		return ".csv"
+	case "application/json", "text/json":
+		return ".json"
 	default:
 		return ""
 	}
