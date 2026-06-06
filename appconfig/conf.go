@@ -12,10 +12,11 @@ import (
 type AppConfig struct {
 	Env env.Option
 
-	FilterKeys     []string
-	Log            Log
-	Default        Default
-	AsyncService   AsyncService
+	FilterKeys   []string
+	Log          Log
+	Default      Default
+	Bootstrap    Bootstrap
+	AsyncService AsyncService
 }
 
 type Log struct {
@@ -25,21 +26,25 @@ type Log struct {
 }
 
 type Default struct {
-	MySQLSupport         bool
-	SQLiteSupport        bool
-	ClickhouseSupport    bool
-	RedisSupport         bool
-	MongoDBSupport       bool
-	LRUCacheSupport      bool
-	AliyunOSSSupport     bool
-	GeeTestSupport       bool
-	LocalLockPoolSupport bool
-	SwaggerSupport       bool
-	PProfSupport         bool
-	CronSupport                  bool
-	CronDistributedLockSupport   bool
-	WebSocketSupport             bool
-	NATSSupport                  bool
+	MySQLSupport               bool
+	SQLiteSupport              bool
+	ClickhouseSupport          bool
+	RedisSupport               bool
+	MongoDBSupport             bool
+	LRUCacheSupport            bool
+	AliyunOSSSupport           bool
+	GeeTestSupport             bool
+	LocalLockPoolSupport       bool
+	SwaggerSupport             bool
+	PProfSupport               bool
+	CronSupport                bool
+	CronDistributedLockSupport bool
+	WebSocketSupport           bool
+	NATSSupport                bool
+}
+
+type Bootstrap struct {
+	AutoMigrate bool
 }
 
 type AsyncService struct {
