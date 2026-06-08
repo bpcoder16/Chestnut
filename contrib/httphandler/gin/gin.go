@@ -34,10 +34,18 @@ func lazyInit() {
 }
 
 func HTTPHandler(registerFuncs ...func(*gin.RouterGroup)) *gin.Engine {
+	return HTTPHandlerWithMiddlewares(nil, registerFuncs...)
+}
+
+// HTTPHandlerWithMiddlewares 创建 Gin Engine，并在内置路由注册前挂载全局中间件。
+func HTTPHandlerWithMiddlewares(middlewares []gin.HandlerFunc, registerFuncs ...func(*gin.RouterGroup)) *gin.Engine {
 	lazyInit()
 	h := gin.New()
 	h.ContextWithFallback = true
 	h.Use(RecoveryWithWriter(os.Stderr))
+	for _, middleware := range middlewares {
+		h.Use(middleware)
+	}
 	h.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})

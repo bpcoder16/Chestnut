@@ -13,6 +13,12 @@ log:
   useRotateLog: false
   stdRedirectFileSupport: false
 
+ipWhitelist:
+  enabled: false
+  allowIPs:
+    - "127.0.0.1"
+    - "::1"
+
 default:
   MySQLSupport: false
   SQLiteSupport: false

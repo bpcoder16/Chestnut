@@ -17,6 +17,7 @@ type AppConfig struct {
 	Default      Default
 	Bootstrap    Bootstrap
 	AsyncService AsyncService
+	IPWhitelist  IPWhitelist
 }
 
 type Log struct {
@@ -52,6 +53,12 @@ type AsyncService struct {
 	QueueSize       int
 	ConsumerSize    int
 	TaskMaxRetryCnt int
+}
+
+// IPWhitelist 定义 HTTP 入口的远端 IP 白名单配置。
+type IPWhitelist struct {
+	Enabled  bool
+	AllowIPs []string
 }
 
 func (c *AppConfig) Check() (err error) {
