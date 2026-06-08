@@ -2,6 +2,7 @@ package resty
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/bpcoder16/Chestnut/v4/core/log"
@@ -10,6 +11,11 @@ import (
 )
 
 var client *resty.Client
+
+var (
+	ErrClientNotInitialized     = errors.New("resty client is not initialized")
+	ErrMissingMicroServiceLogID = errors.New("missing " + log.MicroServiceLogIdHeader)
+)
 
 func SetClient(logger *log.Helper) {
 	client = resty.New()
@@ -36,4 +42,18 @@ func SetClient(logger *log.Helper) {
 
 func Client() *resty.Client {
 	return client
+}
+
+// MicroServiceRequest 创建微服务间 HTTP 请求，并自动透传当前请求的 logId。
+func MicroServiceRequest(ctx context.Context) (*resty.Request, error) {
+	if client == nil {
+		return nil, ErrClientNotInitialized
+	}
+	logId := log.LogIdFromContext(ctx)
+	if logId == "" {
+		return nil, ErrMissingMicroServiceLogID
+	}
+	return client.R().
+		SetContext(ctx).
+		SetHeader(log.MicroServiceLogIdHeader, logId), nil
 }

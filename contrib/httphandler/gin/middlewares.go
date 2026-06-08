@@ -2,6 +2,7 @@ package gin
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	gLog "log"
@@ -32,7 +33,7 @@ func DefaultLogger() gin.HandlerFunc {
 		begin := time.Now()
 
 		ctx.Set(log.DefaultMessageKey, "HTTP")
-		ctx.Set(log.DefaultLogIdKey, utils.UniqueID())
+		ensureLogId(ctx)
 
 		reqBody := generateRequestBody(ctx)
 
@@ -59,6 +60,49 @@ func DefaultLogger() gin.HandlerFunc {
 			"response", filterBody(writer.body.Bytes()),
 		)
 	}
+}
+
+// RequireMicroServiceLogID 要求业务请求携带 MicroService-Log-Id，并注入请求上下文。
+func RequireMicroServiceLogID() gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		logId := strings.TrimSpace(ctx.GetHeader(log.MicroServiceLogIdHeader))
+		if logId == "" {
+			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{
+				"code": http.StatusBadRequest,
+				"msg":  "missing " + log.MicroServiceLogIdHeader,
+			})
+			return
+		}
+
+		setLogId(ctx, logId)
+		ctx.Next()
+	}
+}
+
+func ensureLogId(ctx *gin.Context) string {
+	logId := ctx.GetString(log.DefaultLogIdKey)
+	if logId != "" {
+		return logId
+	}
+
+	logId = log.LogIdFromContext(ctx.Request.Context())
+	if logId == "" {
+		logId = utils.UniqueID()
+	}
+	setLogId(ctx, logId)
+	return logId
+}
+
+func setLogId(ctx *gin.Context, logId string) {
+	ctx.Set(log.DefaultLogIdKey, logId)
+	if ctx.Request == nil {
+		return
+	}
+	reqCtx := ctx.Request.Context()
+	if reqCtx == nil {
+		reqCtx = context.Background()
+	}
+	ctx.Request = ctx.Request.WithContext(log.WithLogId(reqCtx, logId))
 }
 
 // 自定义一个结构体，实现 gin.ResponseWriter interface
