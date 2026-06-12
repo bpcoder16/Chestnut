@@ -1,6 +1,10 @@
 package aliyunoss
 
 import (
+	"path"
+	"strings"
+
+	"github.com/bpcoder16/Chestnut/v4/appconfig/env"
 	"github.com/bpcoder16/Chestnut/v4/core/utils"
 )
 
@@ -56,6 +60,7 @@ func (c *OSSConfig) resolveSceneConfig() {
 		if scene.BucketType == "" {
 			scene.BucketType = OSSBucketTypePublic
 		}
+		scene.TargetDir = prefixTargetDirWithRunMode(scene.TargetDir)
 		if c.Buckets == nil {
 			continue
 		}
@@ -64,6 +69,31 @@ func (c *OSSConfig) resolveSceneConfig() {
 			continue
 		}
 		scene.fillEmptyBucketConfig(bucket)
+	}
+}
+
+func prefixTargetDirWithRunMode(targetDir string) string {
+	runMode := env.RunMode()
+	targetDir = strings.Trim(targetDir, "/")
+	if targetDir == "" {
+		return runMode
+	}
+	// targetDir 的首段由 runMode 接管，避免环境配置遗漏导致不同环境写入同一 OSS 目录。
+	dir := targetDir
+	if first, rest, ok := strings.Cut(targetDir, "/"); ok && isRunModePrefix(first) {
+		dir = rest
+	} else if isRunModePrefix(targetDir) {
+		dir = ""
+	}
+	return path.Join(runMode, dir)
+}
+
+func isRunModePrefix(prefix string) bool {
+	switch prefix {
+	case env.RunModeDebug, env.RunModeTest, env.RunModeRelease:
+		return true
+	default:
+		return false
 	}
 }
 

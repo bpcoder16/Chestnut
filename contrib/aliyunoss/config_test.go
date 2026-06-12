@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/bpcoder16/Chestnut/v4/appconfig/env"
 )
 
 func TestLoadOSSConfigResolveSceneConfig(t *testing.T) {
@@ -64,5 +66,70 @@ scenes:
 	}
 	if scene.Region != "bucket-region" {
 		t.Fatalf("Region = %q, want bucket-region", scene.Region)
+	}
+}
+
+func TestLoadOSSConfigPrefixesSceneTargetDirWithRunMode(t *testing.T) {
+	oldEnv := env.Default
+	env.Default = env.New(env.Option{RunMode: env.RunModeTest})
+	t.Cleanup(func() {
+		env.Default = oldEnv
+	})
+
+	configPath := filepath.Join(t.TempDir(), "oss.yaml")
+	configBody := []byte(`
+buckets:
+  public:
+    accessKeyId: bucket-ak
+    accessKeySecret: bucket-sk
+    endpoint: bucket-endpoint
+    bucketName: bucket-name
+    region: bucket-region
+scenes:
+  upload:
+    targetDir: uploads
+  nested:
+    targetDir: merchant-join/deposit-payment-voucher
+`)
+	if err := os.WriteFile(configPath, configBody, 0o600); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	cfg := LoadOSSConfig(configPath)
+	if got := cfg.Scenes["upload"].TargetDir; got != "test/uploads" {
+		t.Fatalf("upload TargetDir = %q, want test/uploads", got)
+	}
+	if got := cfg.Scenes["nested"].TargetDir; got != "test/merchant-join/deposit-payment-voucher" {
+		t.Fatalf("nested TargetDir = %q, want test/merchant-join/deposit-payment-voucher", got)
+	}
+}
+
+func TestLoadOSSConfigReplacesExistingRunModeTargetDirPrefix(t *testing.T) {
+	oldEnv := env.Default
+	env.Default = env.New(env.Option{RunMode: env.RunModeRelease})
+	t.Cleanup(func() {
+		env.Default = oldEnv
+	})
+
+	configPath := filepath.Join(t.TempDir(), "oss.yaml")
+	configBody := []byte(`
+buckets:
+  public:
+    accessKeyId: bucket-ak
+    accessKeySecret: bucket-sk
+    endpoint: bucket-endpoint
+    bucketName: bucket-name
+    region: bucket-region
+scenes:
+  upload:
+    targetDir: test/uploads
+`)
+	if err := os.WriteFile(configPath, configBody, 0o600); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	cfg := LoadOSSConfig(configPath)
+	if got := cfg.Scenes["upload"].TargetDir; got != "release/uploads" {
+		t.Fatalf("upload TargetDir = %q, want release/uploads", got)
 	}
 }
