@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/bpcoder16/Chestnut/v4/core/log"
+	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 )
 
@@ -227,6 +228,16 @@ func (c *PullConsumer) Messages(opts ...jetstream.PullMessagesOpt) (jetstream.Me
 //	    })
 //	})
 func (c *PullConsumer) ConsumeWithWorkers(ctx context.Context, numWorkers int, maxMessages int, handler func(msg jetstream.Msg)) error {
+	return c.ConsumeWithWorkersContext(ctx, numWorkers, maxMessages, func(_ context.Context, msg jetstream.Msg) {
+		handler(msg)
+	})
+}
+
+// ConsumeWithWorkersContext 使用固定数量的 goroutine 并发消费消息，并为每条消息注入消息级 context。
+//
+// handler 接收的 msgCtx 中已从消息 Header 还原发布方传递的 logId；若 Header 中没有 logId，则自动生成。
+// 调用方应使用 msgCtx 打印消息处理日志，避免多个消息共用启动协程的外层 ctx。
+func (c *PullConsumer) ConsumeWithWorkersContext(ctx context.Context, numWorkers int, maxMessages int, handler func(context.Context, jetstream.Msg)) error {
 	ctx = context.WithValue(ctx, log.DefaultDownstreamKey, "NATS")
 	if numWorkers <= 0 {
 		numWorkers = 5
@@ -277,14 +288,14 @@ func (c *PullConsumer) ConsumeWithWorkers(ctx context.Context, numWorkers int, m
 				wg.Done()
 				<-sem
 			}()
-			msgCtx := extractLogIdFromJSMsg(context.Background(), m)
+			msgCtx := buildPullConsumerMessageContext(ctx, m.Headers())
 			c.logger.WithContext(msgCtx).InfoW(
 				"NATS.Action", "ConsumeWithWorkers.ReceivedMessage",
 				"subject", m.Subject(),
 				"data", string(m.Data()),
 				"headers", m.Headers(),
 			)
-			handler(m)
+			handler(msgCtx, m)
 		}(msg)
 	}
 
@@ -297,4 +308,8 @@ func (c *PullConsumer) ConsumeWithWorkers(ctx context.Context, numWorkers int, m
 		return nil
 	}
 	return ctx.Err()
+}
+
+func buildPullConsumerMessageContext(parent context.Context, header nats.Header) context.Context {
+	return extractLogIdFromHeader(parent, header)
 }
