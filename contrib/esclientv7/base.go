@@ -8,7 +8,10 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"time"
 
+	"github.com/bpcoder16/Chestnut/v4/appconfig/env"
+	"github.com/bpcoder16/Chestnut/v4/core/log"
 	"github.com/elastic/go-elasticsearch/v7/esapi"
 )
 
@@ -99,6 +102,13 @@ func (m *Manager) Search(ctx context.Context, index string, dsl any, hitsHitsDes
 }
 
 func (m *Manager) search(ctx context.Context, index string, dsl any, hitsHitsDest any, aggregationsDest any, o ...func(*esapi.SearchRequest)) (total Total, maxScore float64, err error) {
+	startAt := time.Now()
+	if m.shouldLogSearchDebug() {
+		defer func() {
+			m.logSearchDebug(ctx, index, dsl, total, maxScore, time.Since(startAt), err)
+		}()
+	}
+
 	var buf bytes.Buffer
 	if err = json.NewEncoder(&buf).Encode(dsl); err != nil {
 		return
@@ -159,6 +169,36 @@ func (m *Manager) search(ctx context.Context, index string, dsl any, hitsHitsDes
 	}
 
 	return
+}
+
+func shouldLogSearchDebug() bool {
+	return env.RunMode() != env.RunModeRelease
+}
+
+func (m *Manager) shouldLogSearchDebug() bool {
+	return shouldLogSearchDebug() && m != nil && m.logger != nil
+}
+
+func (m *Manager) logSearchDebug(ctx context.Context, index string, dsl any, total Total, maxScore float64, costTime time.Duration, err error) {
+	ctx = context.WithValue(ctx, log.DefaultDownstreamKey, "Elasticsearch")
+	m.logger.WithContext(ctx).DebugW(
+		"ESSearch", "Search",
+		"index", index,
+		"dsl", formatSearchDebugDSL(dsl),
+		"costTime", costTime.String(),
+		"total", total.Value,
+		"relation", total.Relation,
+		"maxScore", maxScore,
+		"err", err,
+	)
+}
+
+func formatSearchDebugDSL(dsl any) string {
+	data, err := json.Marshal(dsl)
+	if err != nil {
+		return fmt.Sprintf("%v", dsl)
+	}
+	return string(data)
 }
 
 func (m *Manager) DefaultCount(ctx context.Context, index string, params DSLParams, o ...func(*esapi.CountRequest)) (count int64, err error) {
