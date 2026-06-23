@@ -136,6 +136,7 @@ func (m *Manager) GetSceneConfig(scene string) (*SceneConfig, error) {
 }
 
 const transferRetryCnt = 3
+const processSignedURLExpireSeconds int64 = 10 * 60
 
 func ExtFromContentType(contentType string) string {
 	mediaType, _, err := mime.ParseMediaType(contentType)
@@ -287,12 +288,71 @@ func (m *Manager) ProcessObjectSaveAs(ctx context.Context, scene, sourceObjectKe
 		return nil, errors.New("oss: empty process")
 	}
 	process = strings.TrimSuffix(process, "|")
+	if entry.sceneConfig.BucketType == OSSBucketTypePrivate {
+		// 私有 bucket 不能直接用未签名的图片处理 URL，先生成带 x-oss-process 的签名 URL 获取处理结果，再保存到目标对象。
+		return m.processObjectSaveAsPrivate(ctx, entry, sourceObjectKey, targetObjectKey, process)
+	}
 	process = process + "|sys/saveas,o_" + base64.URLEncoding.EncodeToString([]byte(targetObjectKey))
 	return entry.client.ProcessObject(ctx, &v2oss.ProcessObjectRequest{
 		Bucket:  v2oss.Ptr(entry.sceneConfig.BucketName),
 		Key:     v2oss.Ptr(sourceObjectKey),
 		Process: v2oss.Ptr(process),
 	})
+}
+
+func (m *Manager) processObjectSaveAsPrivate(ctx context.Context, entry *sceneEntry, sourceObjectKey, targetObjectKey, process string) (*v2oss.ProcessObjectResult, error) {
+	presignResult, err := entry.client.Presign(ctx, &v2oss.GetObjectRequest{
+		Bucket:  v2oss.Ptr(entry.sceneConfig.BucketName),
+		Key:     v2oss.Ptr(sourceObjectKey),
+		Process: v2oss.Ptr(process),
+	}, v2oss.PresignExpires(time.Duration(processSignedURLExpireSeconds)*time.Second))
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, presignResult.URL, nil)
+	if err != nil {
+		return nil, err
+	}
+	for key, value := range presignResult.SignedHeaders {
+		req.Header.Set(key, value)
+	}
+	httpResp, err := imageHTTPClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer httpResp.Body.Close()
+	if httpResp.StatusCode >= http.StatusBadRequest {
+		return nil, errors.New("HTTPStatus:" + httpResp.Status)
+	}
+
+	body, err := io.ReadAll(httpResp.Body)
+	if err != nil {
+		return nil, err
+	}
+	putReq := &v2oss.PutObjectRequest{
+		Bucket: v2oss.Ptr(entry.sceneConfig.BucketName),
+		Key:    v2oss.Ptr(targetObjectKey),
+		Body:   bytes.NewReader(body),
+	}
+	if contentType := httpResp.Header.Get("Content-Type"); contentType != "" {
+		putReq.ContentType = v2oss.Ptr(contentType)
+	}
+	if _, err = entry.client.PutObject(ctx, putReq); err != nil {
+		return nil, err
+	}
+
+	return &v2oss.ProcessObjectResult{
+		Bucket:        entry.sceneConfig.BucketName,
+		FileSize:      len(body),
+		Object:        targetObjectKey,
+		ProcessStatus: "OK",
+		ResultCommon: v2oss.ResultCommon{
+			Status:     httpResp.Status,
+			StatusCode: httpResp.StatusCode,
+			Headers:    httpResp.Header,
+		},
+	}, nil
 }
 
 func (m *Manager) ProcessTextWatermarkSaveAs(ctx context.Context, scene, sourceObjectKey string, opts TextWatermarkOptions) (*v2oss.ProcessObjectResult, error) {
