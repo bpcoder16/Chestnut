@@ -3,8 +3,11 @@ package websocket
 import (
 	"context"
 	"errors"
+	"io"
 	"strings"
 	"testing"
+
+	"github.com/gorilla/websocket"
 )
 
 type clientReceiveTextController struct {
@@ -294,6 +297,43 @@ func TestClientReceiveTextMessageReturnsControllerErrors(t *testing.T) {
 			err := client.receiveTextMessage(context.Background(), []byte(`{"scene":"scene"}`))
 			if err == nil || !strings.Contains(err.Error(), tt.want) {
 				t.Fatalf("receiveTextMessage err = %v, want containing %q", err, tt.want)
+			}
+		})
+	}
+}
+
+func TestIsAbnormalUnexpectedEOFCloseError(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{
+			name: "abnormal unexpected eof",
+			err:  &websocket.CloseError{Code: websocket.CloseAbnormalClosure, Text: io.ErrUnexpectedEOF.Error()},
+			want: true,
+		},
+		{
+			name: "abnormal different text",
+			err:  &websocket.CloseError{Code: websocket.CloseAbnormalClosure, Text: "network reset"},
+			want: false,
+		},
+		{
+			name: "normal close",
+			err:  &websocket.CloseError{Code: websocket.CloseNormalClosure, Text: io.ErrUnexpectedEOF.Error()},
+			want: false,
+		},
+		{
+			name: "plain error",
+			err:  errors.New("unexpected EOF"),
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := isAbnormalUnexpectedEOFCloseError(tt.err); got != tt.want {
+				t.Fatalf("isAbnormalUnexpectedEOFCloseError() = %v, want %v", got, tt.want)
 			}
 		})
 	}
