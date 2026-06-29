@@ -53,6 +53,16 @@ func TestExtFromContentTypeSupportsDocumentsAndVideo(t *testing.T) {
 			contentType: "text/json; charset=utf-8",
 			want:        ".json",
 		},
+		{
+			name:        "pag",
+			contentType: "application/x-pag",
+			want:        ".pag",
+		},
+		{
+			name:        "tencent pag with parameters",
+			contentType: "application/vnd.tencent.pag; charset=binary",
+			want:        ".pag",
+		},
 	}
 
 	for _, tt := range tests {

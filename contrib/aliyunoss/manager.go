@@ -170,6 +170,8 @@ func ExtFromContentType(contentType string) string {
 		return ".csv"
 	case "application/json", "text/json":
 		return ".json"
+	case "application/x-pag", "application/vnd.tencent.pag":
+		return ".pag"
 	default:
 		return ""
 	}
