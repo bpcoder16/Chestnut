@@ -191,17 +191,22 @@ func normalizeObjectExt(fileExt string) string {
 		return ""
 	}
 	fileExt = "." + strings.TrimPrefix(strings.ToLower(fileExt), ".")
-	if fileExt == "." || strings.ContainsAny(fileExt, `/\`) {
+	if fileExt == "." || strings.ContainsAny(fileExt, `/\`) || strings.ContainsAny(fileExt, " \t\r\n") {
 		return ""
 	}
 	return fileExt
 }
 
-func transferObjectExt(contentType, fileExt string) string {
-	if ext := normalizeObjectExt(fileExt); ext != "" {
-		return ext
+// ObjectExt 返回上传对象使用的文件后缀，显式 fileExt 优先，空值时回退到 Content-Type 推导。
+func ObjectExt(contentType, fileExt string) string {
+	if strings.TrimSpace(fileExt) != "" {
+		return normalizeObjectExt(fileExt)
 	}
 	return ExtFromContentType(strings.ToLower(contentType))
+}
+
+func transferObjectExt(contentType, fileExt string) string {
+	return ObjectExt(contentType, fileExt)
 }
 
 // BuildTargetOSSPath 根据场景配置和 Content-Type 生成 OSS object key。

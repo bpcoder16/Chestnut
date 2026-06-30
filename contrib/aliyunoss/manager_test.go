@@ -105,6 +105,28 @@ func TestBuildTargetOSSPathWithExtUsesManualExt(t *testing.T) {
 	}
 }
 
+func TestObjectExtPrefersManualExt(t *testing.T) {
+	if got := ObjectExt("application/octet-stream", "patch"); got != ".patch" {
+		t.Fatalf("ObjectExt() = %q, want %q", got, ".patch")
+	}
+}
+
+func TestObjectExtFallsBackToContentType(t *testing.T) {
+	if got := ObjectExt("application/vnd.android.package-archive", ""); got != ".apk" {
+		t.Fatalf("ObjectExt() = %q, want %q", got, ".apk")
+	}
+}
+
+func TestObjectExtRejectsInvalidManualExtWithoutContentTypeFallback(t *testing.T) {
+	for _, fileExt := range []string{".", "../apk", "bad ext"} {
+		t.Run(fileExt, func(t *testing.T) {
+			if got := ObjectExt("image/png", fileExt); got != "" {
+				t.Fatalf("ObjectExt() = %q, want empty", got)
+			}
+		})
+	}
+}
+
 func TestTransferObjectExtPrefersManualExt(t *testing.T) {
 	if got := transferObjectExt("image/png", "jpg"); got != ".jpg" {
 		t.Fatalf("transferObjectExt() = %q, want %q", got, ".jpg")
