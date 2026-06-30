@@ -63,6 +63,16 @@ func TestExtFromContentTypeSupportsDocumentsAndVideo(t *testing.T) {
 			contentType: "application/vnd.tencent.pag; charset=binary",
 			want:        ".pag",
 		},
+		{
+			name:        "android apk",
+			contentType: "application/vnd.android.package-archive",
+			want:        ".apk",
+		},
+		{
+			name:        "patch",
+			contentType: "text/x-patch",
+			want:        ".patch",
+		},
 	}
 
 	for _, tt := range tests {
@@ -71,6 +81,27 @@ func TestExtFromContentTypeSupportsDocumentsAndVideo(t *testing.T) {
 				t.Fatalf("ExtFromContentType(%q) = %q, want %q", tt.contentType, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestBuildTargetOSSPathWithExtUsesManualExt(t *testing.T) {
+	m := &Manager{
+		scenes: map[string]*sceneEntry{
+			"app-update": {
+				sceneConfig: &SceneConfig{TargetDir: "test/app/update"},
+			},
+		},
+	}
+
+	got, err := m.BuildTargetOSSPathWithExt("app-update", "patch")
+	if err != nil {
+		t.Fatalf("BuildTargetOSSPathWithExt() error = %v", err)
+	}
+	if !strings.HasPrefix(got, "test/app/update/") {
+		t.Fatalf("object key = %q, want prefix test/app/update/", got)
+	}
+	if !strings.HasSuffix(got, ".patch") {
+		t.Fatalf("object key = %q, want .patch suffix", got)
 	}
 }
 

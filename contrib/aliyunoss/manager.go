@@ -172,6 +172,10 @@ func ExtFromContentType(contentType string) string {
 		return ".json"
 	case "application/x-pag", "application/vnd.tencent.pag":
 		return ".pag"
+	case "application/vnd.android.package-archive":
+		return ".apk"
+	case "text/x-patch", "text/x-diff", "application/x-patch", "application/x-diff":
+		return ".patch"
 	default:
 		return ""
 	}
@@ -181,10 +185,21 @@ func formatFromExt(ext string) string {
 	return strings.ToLower(strings.TrimPrefix(ext, "."))
 }
 
-func transferObjectExt(contentType, fileExt string) string {
+func normalizeObjectExt(fileExt string) string {
 	fileExt = strings.TrimSpace(fileExt)
-	if fileExt != "" {
-		return "." + strings.TrimPrefix(strings.ToLower(fileExt), ".")
+	if fileExt == "" {
+		return ""
+	}
+	fileExt = "." + strings.TrimPrefix(strings.ToLower(fileExt), ".")
+	if fileExt == "." || strings.ContainsAny(fileExt, `/\`) {
+		return ""
+	}
+	return fileExt
+}
+
+func transferObjectExt(contentType, fileExt string) string {
+	if ext := normalizeObjectExt(fileExt); ext != "" {
+		return ext
 	}
 	return ExtFromContentType(strings.ToLower(contentType))
 }
@@ -197,6 +212,16 @@ func BuildTargetOSSPath(scene string, contentType string, extraDirs ...string) (
 // BuildTargetOSSPath 根据场景配置和 Content-Type 生成 OSS object key。
 func (m *Manager) BuildTargetOSSPath(scene string, contentType string, extraDirs ...string) (string, error) {
 	return m.buildTargetOSSPathWithObjectExt(scene, ExtFromContentType(strings.ToLower(contentType)), extraDirs...)
+}
+
+// BuildTargetOSSPathWithExt 根据场景配置和文件后缀生成 OSS object key。
+func BuildTargetOSSPathWithExt(scene string, fileExt string, extraDirs ...string) (string, error) {
+	return DefaultManager.BuildTargetOSSPathWithExt(scene, fileExt, extraDirs...)
+}
+
+// BuildTargetOSSPathWithExt 根据场景配置和文件后缀生成 OSS object key。
+func (m *Manager) BuildTargetOSSPathWithExt(scene string, fileExt string, extraDirs ...string) (string, error) {
+	return m.buildTargetOSSPathWithObjectExt(scene, normalizeObjectExt(fileExt), extraDirs...)
 }
 
 func (m *Manager) buildTargetOSSPathWithObjectExt(scene string, ext string, extraDirs ...string) (string, error) {
