@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"reflect"
 	"sync"
@@ -286,7 +287,7 @@ func (c *Client) readPump(ctx context.Context, _ *http.Request, _ http.ResponseW
 				"function", "client.readPump",
 				"err", "c.conn.ReadMessage().Err:" + err.Error(),
 			}
-			if isAbnormalUnexpectedEOFCloseError(err) {
+			if isDebugLevelReadPumpError(err) {
 				c.debugLog(ctx, keyValues...)
 			} else {
 				c.warnLog(ctx, keyValues...)
@@ -351,6 +352,15 @@ func isAbnormalUnexpectedEOFCloseError(err error) bool {
 	}
 	// 1006 + unexpected EOF 通常是对端直接断开，不作为服务端告警噪音记录。
 	return closeErr.Code == websocket.CloseAbnormalClosure && closeErr.Text == io.ErrUnexpectedEOF.Error()
+}
+
+func isDebugLevelReadPumpError(err error) bool {
+	return isAbnormalUnexpectedEOFCloseError(err) || isTimeoutError(err)
+}
+
+func isTimeoutError(err error) bool {
+	var netErr net.Error
+	return errors.As(err, &netErr) && netErr.Timeout()
 }
 
 func (c *Client) sendPingMessage(ctx context.Context) error {

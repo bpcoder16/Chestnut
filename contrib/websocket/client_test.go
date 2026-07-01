@@ -42,6 +42,20 @@ func (c *clientReceiveProcessErrorController) Process(context.Context) error {
 	return errors.New("process failed")
 }
 
+type clientTimeoutError struct{}
+
+func (clientTimeoutError) Error() string {
+	return "i/o timeout"
+}
+
+func (clientTimeoutError) Timeout() bool {
+	return true
+}
+
+func (clientTimeoutError) Temporary() bool {
+	return true
+}
+
 func TestNewClientInitialState(t *testing.T) {
 	client := NewClient(nil, "uuid-1", "user-1")
 
@@ -334,6 +348,38 @@ func TestIsAbnormalUnexpectedEOFCloseError(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := isAbnormalUnexpectedEOFCloseError(tt.err); got != tt.want {
 				t.Fatalf("isAbnormalUnexpectedEOFCloseError() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestIsDebugLevelReadPumpError(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{
+			name: "read timeout",
+			err:  clientTimeoutError{},
+			want: true,
+		},
+		{
+			name: "abnormal unexpected eof",
+			err:  &websocket.CloseError{Code: websocket.CloseAbnormalClosure, Text: io.ErrUnexpectedEOF.Error()},
+			want: true,
+		},
+		{
+			name: "ordinary read error",
+			err:  errors.New("connection reset by peer"),
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := isDebugLevelReadPumpError(tt.err); got != tt.want {
+				t.Fatalf("isDebugLevelReadPumpError() = %v, want %v", got, tt.want)
 			}
 		})
 	}
