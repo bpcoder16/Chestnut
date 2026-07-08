@@ -346,6 +346,70 @@ func (m *Manager) BulkUpsert(ctx context.Context, index string, docs []Document)
 	return nil
 }
 
+// BulkIndex 批量覆盖写入 ES 文档。
+func (m *Manager) BulkIndex(ctx context.Context, index string, docs []Document) error {
+	var buf bytes.Buffer
+
+	for _, doc := range docs {
+		// 第一行：index 指令，存在则整体覆盖，不存在则创建。
+		meta := map[string]any{
+			"index": map[string]any{
+				"_index": index,
+				"_id":    doc.ID,
+			},
+		}
+		metaLine, errM := json.Marshal(meta)
+		if errM != nil {
+			return fmt.Errorf("failed to marshal meta: %w", errM)
+		}
+		buf.Write(metaLine)
+		buf.WriteByte('\n')
+
+		dataLine, errD := json.Marshal(doc.Content)
+		if errD != nil {
+			return fmt.Errorf("failed to marshal data: %w", errD)
+		}
+		buf.Write(dataLine)
+		buf.WriteByte('\n')
+	}
+
+	// 发送 Bulk 请求
+	res, errB := m.client.Bulk(bytes.NewReader(buf.Bytes()), m.client.Bulk.WithContext(ctx))
+	if errB != nil {
+		return fmt.Errorf("bulk request failed: %w", errB)
+	}
+	defer func() {
+		_ = res.Body.Close()
+	}()
+
+	if res.IsError() {
+		return fmt.Errorf("bulk response error: %s", res.String())
+	}
+
+	var resp map[string]interface{}
+	if err := json.NewDecoder(res.Body).Decode(&resp); err != nil {
+		return fmt.Errorf("failed to decode bulk response: %w", err)
+	}
+
+	// 检查是否有失败项
+	if resp["errors"].(bool) {
+		var failedItems []string
+		for _, item := range resp["items"].([]interface{}) {
+			for action, result := range item.(map[string]interface{}) {
+				status := int(result.(map[string]interface{})["status"].(float64))
+				if status >= 300 {
+					id := result.(map[string]interface{})["_id"]
+					errorReason := result.(map[string]interface{})["error"]
+					failedItems = append(failedItems, fmt.Sprintf("ID: %v, Action: %s, Error: %v", id, action, errorReason))
+				}
+			}
+		}
+		return fmt.Errorf("bulk index partially failed: %s", strings.Join(failedItems, "; "))
+	}
+
+	return nil
+}
+
 type AnalyzeParams struct {
 	Analyzer string `json:"analyzer"`
 }

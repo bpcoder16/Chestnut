@@ -2,8 +2,11 @@ package esclientv7
 
 import (
 	"context"
+	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/bpcoder16/Chestnut/v4/appconfig/env"
@@ -104,6 +107,81 @@ func TestSearchSkipsDebugInRelease(t *testing.T) {
 	if len(logger.entries) != 0 {
 		t.Fatalf("log entries len = %d, want 0", len(logger.entries))
 	}
+}
+
+func TestBulkIndexUsesIndexAction(t *testing.T) {
+	var gotPath string
+	var gotBody string
+	manager, cleanup := newTestBulkManager(t, func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		if r.URL.Path != "/_bulk" {
+			t.Fatalf("request path = %q, want /_bulk", r.URL.Path)
+		}
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Fatalf("read request body: %v", err)
+		}
+		gotBody = string(body)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"errors":false,"items":[{"index":{"_id":"doc-1","status":200}}]}`))
+	})
+	defer cleanup()
+
+	err := manager.BulkIndex(context.Background(), "checklist_confirmed_cards_v1_test", []Document{
+		{ID: "doc-1", Content: map[string]any{"uuid": "doc-1"}},
+	})
+	if err != nil {
+		t.Fatalf("BulkIndex error = %v", err)
+	}
+	if gotPath != "/_bulk" {
+		t.Fatalf("path = %q, want /_bulk", gotPath)
+	}
+	lines := strings.Split(strings.TrimSpace(gotBody), "\n")
+	if len(lines) != 2 {
+		t.Fatalf("bulk body lines = %d, want 2: %q", len(lines), gotBody)
+	}
+	var meta map[string]map[string]string
+	if err := json.Unmarshal([]byte(lines[0]), &meta); err != nil {
+		t.Fatalf("unmarshal meta line: %v", err)
+	}
+	if _, ok := meta["update"]; ok {
+		t.Fatalf("bulk meta uses update action: %#v", meta)
+	}
+	indexMeta, ok := meta["index"]
+	if !ok {
+		t.Fatalf("bulk meta = %#v, want index action", meta)
+	}
+	if indexMeta["_index"] != "checklist_confirmed_cards_v1_test" || indexMeta["_id"] != "doc-1" {
+		t.Fatalf("index meta = %#v", indexMeta)
+	}
+	var doc map[string]string
+	if err := json.Unmarshal([]byte(lines[1]), &doc); err != nil {
+		t.Fatalf("unmarshal doc line: %v", err)
+	}
+	if doc["uuid"] != "doc-1" {
+		t.Fatalf("doc line = %#v", doc)
+	}
+}
+
+func newTestBulkManager(t *testing.T, handler http.HandlerFunc) (*Manager, func()) {
+	t.Helper()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Elastic-Product", "Elasticsearch")
+		if r.URL.Path == "/" {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"version":{"number":"7.17.0"}}`))
+			return
+		}
+		handler(w, r)
+	}))
+	client, err := elasticsearch.NewClient(elasticsearch.Config{Addresses: []string{server.URL}})
+	if err != nil {
+		server.Close()
+		t.Fatalf("new elasticsearch client: %v", err)
+	}
+	return &Manager{
+		client: client,
+	}, server.Close
 }
 
 func newTestSearchManager(t *testing.T, logger log.Logger) (*Manager, func()) {
