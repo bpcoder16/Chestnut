@@ -30,6 +30,11 @@ const (
 	statusClassLabelName = "status_class"
 )
 
+// 保持默认 bucket 数量不变，用 800ms 监控边界替换对 API 延迟价值较低的 5ms 边界。
+var httpRequestDurationBuckets = []float64{
+	0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 0.8, 1, 2.5, 5, 10,
+}
+
 type prometheusHTTPMetrics struct {
 	excludedPaths        map[string]struct{}
 	excludedStatusCodes  map[int]struct{}
@@ -44,7 +49,7 @@ type prometheusHTTPMetrics struct {
 func newPrometheusHTTPMetrics(config appconfig.Prometheus) *prometheusHTTPMetrics {
 	constLabels := prometheus.Labels{serviceLabelName: config.ServiceName}
 	httpRequestLabels := []string{methodLabelName, routeLabelName, statusClassLabelName}
-	httpRequestDurationLabels := []string{methodLabelName, routeLabelName, statusClassLabelName}
+	httpRequestDurationLabels := []string{methodLabelName, routeLabelName}
 	registry := prometheus.NewRegistry()
 	metrics := &prometheusHTTPMetrics{
 		excludedPaths:       make(map[string]struct{}, len(config.ExcludedPaths)+1),
@@ -62,7 +67,7 @@ func newPrometheusHTTPMetrics(config appconfig.Prometheus) *prometheusHTTPMetric
 			Name:        httpRequestDurationMetricName,
 			Help:        "Duration in seconds of completed HTTP requests handled by the Chestnut server, excluding WebSocket upgrade requests.",
 			ConstLabels: constLabels,
-			Buckets:     prometheus.DefBuckets,
+			Buckets:     httpRequestDurationBuckets,
 		}, httpRequestDurationLabels),
 		requestsInFlight: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace:   prometheusNamespace,
@@ -142,7 +147,7 @@ func (m *prometheusHTTPMetrics) middleware() gin.HandlerFunc {
 			if webSocketUpgrade {
 				return
 			}
-			m.requestDuration.WithLabelValues(ctx.Request.Method, route, statusClass).Observe(time.Since(startedAt).Seconds())
+			m.requestDuration.WithLabelValues(ctx.Request.Method, route).Observe(time.Since(startedAt).Seconds())
 		}()
 
 		ctx.Next()

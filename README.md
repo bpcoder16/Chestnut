@@ -163,7 +163,7 @@ prometheus:
 | 指标 | 类型 | 标签 | 用途 |
 |---|---|---|---|
 | `chestnut_http_server_requests_total` | Counter | `service`, `method`, `route`, `status_class` | 已完成且未排除的 HTTP 请求数，按 `2xx` 等状态类别聚合 |
-| `chestnut_http_server_request_duration_seconds` | Histogram | `service`, `method`, `route`, `status_class` | 普通 HTTP 请求耗时，按 `2xx` 等状态类别聚合并使用 `prometheus.DefBuckets` |
+| `chestnut_http_server_request_duration_seconds` | Histogram | `service`, `method`, `route` | 普通 HTTP 请求耗时，按请求方法和路由模板聚合；bucket 边界为 `0.01`, `0.025`, `0.05`, `0.1`, `0.25`, `0.5`, `0.8`, `1`, `2.5`, `5`, `10` 秒 |
 | `chestnut_http_server_requests_in_flight` | Gauge | `service` | 当前正在处理的匹配业务请求总数，包含活跃 WebSocket Handler |
 | `chestnut_http_server_websocket_connections` | Gauge | `service` | 当前 WebSocket Upgrade 请求数；升级成功后在连接关闭前表示活跃连接数 |
 | `chestnut_http_server_recovered_panics_total` | Counter | `service`, `method`, `route` | 被 Chestnut Recovery 实际捕获的 panic 数 |

@@ -34,6 +34,18 @@ func TestHTTPHandlersKeepPrometheusDisabledByDefault(t *testing.T) {
 	}
 }
 
+func TestPrometheusRequestDurationBuckets(t *testing.T) {
+	want := []float64{0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 0.8, 1, 2.5, 5, 10}
+	if len(httpRequestDurationBuckets) != len(want) {
+		t.Fatalf("request duration bucket count = %d, want %d", len(httpRequestDurationBuckets), len(want))
+	}
+	for index := range want {
+		if httpRequestDurationBuckets[index] != want[index] {
+			t.Fatalf("request duration bucket[%d] = %v, want %v", index, httpRequestDurationBuckets[index], want[index])
+		}
+	}
+}
+
 func TestPrometheusEndpointExposesEngineAndDefaultMetrics(t *testing.T) {
 	handler := newPrometheusTestEngine(testPrometheusConfig(), nil)
 	performRequest(handler, http.MethodGet, "/test/123")
@@ -75,9 +87,10 @@ func TestPrometheusRecordsRouteTemplateHTTPStatusClassAndIgnoresBusinessBody(t *
 	assertMetricValue(t, metrics, "chestnut_http_server_requests_total", 2,
 		`service="test-api"`, `method="GET"`, `route="/test/:id"`, `status_class="2xx"`)
 	assertMetricValue(t, metrics, "chestnut_http_server_request_duration_seconds_count", 2,
-		`service="test-api"`, `method="GET"`, `route="/test/:id"`, `status_class="2xx"`)
+		`service="test-api"`, `method="GET"`, `route="/test/:id"`)
 	assertMetricAbsent(t, metrics, "chestnut_http_server_requests_total", `status=`)
 	assertMetricAbsent(t, metrics, "chestnut_http_server_request_duration_seconds_count", `status=`)
+	assertMetricAbsent(t, metrics, "chestnut_http_server_request_duration_seconds_count", `status_class=`)
 	assertMetricValue(t, metrics, "chestnut_http_server_requests_total", 1,
 		`service="test-api"`, `method="GET"`, `route="/business-error"`, `status_class="2xx"`)
 
@@ -181,7 +194,7 @@ func TestPrometheusRecordsRecoveredPanicSeparatelyFromActiveHTTP500(t *testing.T
 		assertMetricValue(t, metrics, "chestnut_http_server_requests_total", 1,
 			`service="test-api"`, `method="GET"`, `route="`+route+`"`, `status_class="5xx"`)
 		assertMetricValue(t, metrics, "chestnut_http_server_request_duration_seconds_count", 1,
-			`service="test-api"`, `method="GET"`, `route="`+route+`"`, `status_class="5xx"`)
+			`service="test-api"`, `method="GET"`, `route="`+route+`"`)
 	}
 	assertMetricValue(t, metrics, "chestnut_http_server_recovered_panics_total", 1,
 		`service="test-api"`, `method="GET"`, `route="/panic"`)
@@ -219,7 +232,7 @@ func TestPrometheusPreservesCommittedResponseAfterRecoveredPanic(t *testing.T) {
 	assertMetricValue(t, metrics, "chestnut_http_server_requests_total", 1,
 		`service="test-api"`, `method="GET"`, `route="/committed-panic"`, `status_class="2xx"`)
 	assertMetricValue(t, metrics, "chestnut_http_server_request_duration_seconds_count", 1,
-		`service="test-api"`, `method="GET"`, `route="/committed-panic"`, `status_class="2xx"`)
+		`service="test-api"`, `method="GET"`, `route="/committed-panic"`)
 	assertMetricValue(t, metrics, "chestnut_http_server_recovered_panics_total", 1,
 		`service="test-api"`, `method="GET"`, `route="/committed-panic"`)
 	assertMetricValue(t, metrics, "chestnut_http_server_requests_in_flight", 0, `service="test-api"`)

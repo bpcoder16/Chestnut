@@ -198,15 +198,22 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "当前筛选节点正在处理的普通 HTTP 请求数，由总 in-flight 减去 WebSocket 连接数得到；背景趋势覆盖 Dashboard 顶部所选时间范围。",
+      "description": "当前筛选节点正在处理的普通 HTTP 请求数，由总 in-flight 减去 WebSocket 连接数得到；每个点表示对应采样时刻的请求数，时间范围跟随 Dashboard 顶部选择，无序列时补 0。",
       "fieldConfig": {
         "defaults": {
           "color": {
             "fixedColor": "semi-dark-blue",
             "mode": "fixed"
           },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "pointSize": 5,
+            "showPoints": "always"
+          },
           "min": 0,
-          "noValue": "无节点数据",
+          "noValue": "0",
           "unit": "short"
         },
         "overrides": []
@@ -219,40 +226,46 @@
       },
       "id": 5,
       "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "values": false
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
         }
       },
       "targets": [
         {
-          "expr": "clamp_min(sum(chestnut_http_server_requests_in_flight{job=\"chestnut-api\",node=~\"$node\"}) - (sum(chestnut_http_server_websocket_connections{job=\"chestnut-api\",node=~\"$node\"}) or vector(0)), 0)",
+          "expr": "clamp_min((sum(chestnut_http_server_requests_in_flight{job=\"chestnut-api\",node=~\"$node\"}) or vector(0)) - (sum(chestnut_http_server_websocket_connections{job=\"chestnut-api\",node=~\"$node\"}) or vector(0)), 0)",
           "instant": false,
-          "legendFormat": "HTTP 请求",
+          "legendFormat": "HTTP 请求数",
           "refId": "A"
         }
       ],
-      "title": "当前 HTTP 请求数",
-      "type": "stat"
+      "title": "HTTP 并发请求趋势",
+      "type": "timeseries"
     },
     {
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "当前筛选节点的活跃 WebSocket 连接数；背景趋势覆盖 Dashboard 顶部所选时间范围。",
+      "description": "当前筛选节点的活跃 WebSocket 连接数；每个点表示对应采样时刻的连接数，时间范围跟随 Dashboard 顶部选择，无序列时补 0。",
       "fieldConfig": {
         "defaults": {
           "color": {
-            "fixedColor": "semi-dark-purple",
+            "fixedColor": "semi-dark-blue",
             "mode": "fixed"
           },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "pointSize": 5,
+            "showPoints": "always"
+          },
           "min": 0,
-          "noValue": "无 WebSocket 数据",
+          "noValue": "0",
           "unit": "short"
         },
         "overrides": []
@@ -265,25 +278,24 @@
       },
       "id": 38,
       "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "values": false
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
         }
       },
       "targets": [
         {
-          "expr": "sum(chestnut_http_server_websocket_connections{job=\"chestnut-api\",node=~\"$node\"})",
+          "expr": "sum(chestnut_http_server_websocket_connections{job=\"chestnut-api\",node=~\"$node\"}) or vector(0)",
           "instant": false,
-          "legendFormat": "WebSocket 连接",
+          "legendFormat": "WebSocket 连接数",
           "refId": "A"
         }
       ],
-      "title": "当前 WebSocket 连接数",
-      "type": "stat"
+      "title": "WebSocket 连接数趋势",
+      "type": "timeseries"
     },
     {
       "datasource": {

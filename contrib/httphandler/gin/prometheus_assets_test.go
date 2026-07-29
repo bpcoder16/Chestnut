@@ -107,6 +107,13 @@ type grafanaPanel struct {
 				FixedColor string `json:"fixedColor"`
 				Mode       string `json:"mode"`
 			} `json:"color"`
+			Custom struct {
+				DrawStyle   string `json:"drawStyle"`
+				FillOpacity int    `json:"fillOpacity"`
+				LineWidth   int    `json:"lineWidth"`
+				PointSize   int    `json:"pointSize"`
+				ShowPoints  string `json:"showPoints"`
+			} `json:"custom"`
 			Decimals   *float64 `json:"decimals"`
 			NoValue    string   `json:"noValue"`
 			Unit       string   `json:"unit"`
@@ -120,22 +127,51 @@ type grafanaPanel struct {
 			} `json:"thresholds"`
 			Mappings []grafanaValueMapping `json:"mappings"`
 		} `json:"defaults"`
+		Overrides []struct {
+			Matcher struct {
+				Options string `json:"options"`
+			} `json:"matcher"`
+			Properties []struct {
+				ID    string          `json:"id"`
+				Value json.RawMessage `json:"value"`
+			} `json:"properties"`
+		} `json:"overrides"`
 	} `json:"fieldConfig"`
 	Options struct {
 		GraphMode string `json:"graphMode"`
+		Color     struct {
+			Mode    string `json:"mode"`
+			Reverse bool   `json:"reverse"`
+			Scheme  string `json:"scheme"`
+			Steps   int    `json:"steps"`
+		} `json:"color"`
+		Legend struct {
+			DisplayMode string `json:"displayMode"`
+			Placement   string `json:"placement"`
+		} `json:"legend"`
+		Tooltip struct {
+			Mode string `json:"mode"`
+		} `json:"tooltip"`
 	} `json:"options"`
 	Targets []struct {
 		Expr         string `json:"expr"`
 		Format       string `json:"format"`
 		Instant      bool   `json:"instant"`
 		LegendFormat string `json:"legendFormat"`
+		RefID        string `json:"refId"`
 	} `json:"targets"`
 	Transformations []struct {
 		ID      string `json:"id"`
 		Options struct {
+			ByField       string            `json:"byField"`
 			ExcludeByName map[string]bool   `json:"excludeByName"`
 			IndexByName   map[string]int    `json:"indexByName"`
+			Mode          string            `json:"mode"`
 			RenameByName  map[string]string `json:"renameByName"`
+			Sort          []struct {
+				Descending bool   `json:"desc"`
+				Field      string `json:"field"`
+			} `json:"sort"`
 		} `json:"options"`
 	} `json:"transformations"`
 }
@@ -146,6 +182,26 @@ type grafanaValueMapping struct {
 		Color string `json:"color"`
 		Text  string `json:"text"`
 	} `json:"options"`
+}
+
+func grafanaFieldOverrideNumber(t *testing.T, panel grafanaPanel, fieldName string, propertyID string) (float64, bool) {
+	t.Helper()
+	for _, override := range panel.FieldConfig.Overrides {
+		if override.Matcher.Options != fieldName {
+			continue
+		}
+		for _, property := range override.Properties {
+			if property.ID != propertyID {
+				continue
+			}
+			var value float64
+			if err := json.Unmarshal(property.Value, &value); err != nil {
+				t.Fatalf("decode field %q property %q: %v", fieldName, propertyID, err)
+			}
+			return value, true
+		}
+	}
+	return 0, false
 }
 
 func TestPrometheusScrapeAssetSupportsThreeNodeCluster(t *testing.T) {
@@ -232,7 +288,7 @@ func TestGrafanaDashboardAssetsCoverAPIClusterOperations(t *testing.T) {
 			refresh: "30s",
 			panelTitles: []string{
 				"可用节点数", "不可用节点数", "节点可用率", "节点采集明细", "最近启动节点运行时长",
-				"当前 HTTP 请求数", "当前 WebSocket 连接数",
+				"HTTP 并发请求趋势", "WebSocket 连接数趋势",
 				"集群总 QPS", "HTTP 状态类别趋势", "所选时段 HTTP 5xx 比例", "所选时段 Recovery Panic 次数", "Recovery Panic 趋势",
 				"HTTP 请求延迟分位数", "HTTP 平均响应耗时",
 			},
@@ -243,7 +299,8 @@ func TestGrafanaDashboardAssetsCoverAPIClusterOperations(t *testing.T) {
 			title:   "Chestnut API 路由分析",
 			refresh: "1m",
 			panelTitles: []string{
-				"P95 最慢路由 Top 10", "各路由 P95", "路由 QPS Top 10", "各路由 5xx 比例", "请求明细",
+				"所选时段 P95 最慢路由 Top 10", "所选时段请求数量最高的路由 Top 10", "整体请求延迟分布热力图",
+				"路由 QPS Top 10", "各路由 5xx 比例", "请求明细",
 			},
 		},
 		{
@@ -431,19 +488,174 @@ func assertDashboardDiagnosticSemantics(t *testing.T, panels map[string]grafanaP
 		}
 	}
 
-	for _, title := range []string{"P95 最慢路由 Top 10", "路由 QPS Top 10"} {
-		panel := panels[title]
-		if panel.Type != "table" || len(panel.Targets) != 1 || !panel.Targets[0].Instant {
-			t.Fatalf("panel %q must be an instant Top-N table", title)
+	routeQPS := panels["路由 QPS Top 10"]
+	if routeQPS.Type != "table" || len(routeQPS.Targets) != 1 || !routeQPS.Targets[0].Instant {
+		t.Fatal("路由 QPS Top 10 must be an instant Top-N table")
+	}
+	gotQPSTransformations := make([]string, 0, len(routeQPS.Transformations))
+	for _, transformation := range routeQPS.Transformations {
+		gotQPSTransformations = append(gotQPSTransformations, transformation.ID)
+	}
+	if strings.Join(gotQPSTransformations, ",") != "seriesToRows,sortBy,organize" {
+		t.Fatalf("路由 QPS Top 10 transformations = %v, want seriesToRows,sortBy,organize", gotQPSTransformations)
+	}
+
+	selectedRangeP95 := panels["所选时段 P95 最慢路由 Top 10"]
+	if selectedRangeP95.Type != "table" || len(selectedRangeP95.Targets) != 3 {
+		t.Fatal("所选时段 P95 最慢路由 Top 10 must combine P95, sample count, and slow-request ratio")
+	}
+	for index, target := range selectedRangeP95.Targets {
+		if !target.Instant || target.Format != "table" {
+			t.Fatalf("所选时段 P95 最慢路由 Top 10 target[%d] must be an instant table query", index)
 		}
-		wantTransformations := "seriesToRows,sortBy,organize"
-		gotTransformations := make([]string, 0, len(panel.Transformations))
-		for _, transformation := range panel.Transformations {
-			gotTransformations = append(gotTransformations, transformation.ID)
+	}
+	gotP95Transformations := make([]string, 0, len(selectedRangeP95.Transformations))
+	for _, transformation := range selectedRangeP95.Transformations {
+		gotP95Transformations = append(gotP95Transformations, transformation.ID)
+	}
+	if strings.Join(gotP95Transformations, ",") != "joinByField,sortBy,organize" ||
+		selectedRangeP95.Transformations[0].Options.ByField != "route" ||
+		selectedRangeP95.Transformations[0].Options.Mode != "inner" {
+		t.Fatalf("所选时段 P95 最慢路由 Top 10 must inner-join table queries by route: %v", gotP95Transformations)
+	}
+	if sortOptions := selectedRangeP95.Transformations[1].Options.Sort; len(sortOptions) != 1 ||
+		!sortOptions[0].Descending || sortOptions[0].Field != "Value #A" {
+		t.Fatal("所选时段 P95 最慢路由 Top 10 must sort the joined table by P95 descending")
+	}
+	renamedFields := selectedRangeP95.Transformations[2].Options.RenameByName
+	if renamedFields["route"] != "Route" || renamedFields["Value #A"] != "P95" ||
+		renamedFields["Value #B"] != "请求数" || renamedFields["Value #C"] != ">500ms 比例" {
+		t.Fatalf("所选时段 P95 最慢路由 Top 10 renamed fields = %v", renamedFields)
+	}
+	if expression := selectedRangeP95.Targets[0].Expr; !strings.Contains(expression, "increase(") ||
+		!strings.Contains(expression, "[$__range]") || strings.Contains(expression, "rate(") {
+		t.Fatalf("所选时段 P95 最慢路由 Top 10 must aggregate the full selected range: %q", expression)
+	}
+	sampleCountTarget := selectedRangeP95.Targets[1]
+	if sampleCountTarget.RefID != "B" ||
+		!strings.Contains(sampleCountTarget.Expr, "sum by (route)") ||
+		!strings.Contains(sampleCountTarget.Expr, "chestnut_http_server_request_duration_seconds_count") ||
+		strings.Count(sampleCountTarget.Expr, "increase(") != 1 ||
+		strings.Count(sampleCountTarget.Expr, "[$__range]") != 1 ||
+		strings.Contains(sampleCountTarget.Expr, "requests_total") {
+		t.Fatalf("所选时段 P95 最慢路由 Top 10 sample-count query is invalid: %q", sampleCountTarget.Expr)
+	}
+	slowRequestTarget := selectedRangeP95.Targets[2]
+	if slowRequestTarget.RefID != "C" ||
+		!strings.Contains(slowRequestTarget.Expr, `le="0.5"`) ||
+		!strings.Contains(slowRequestTarget.Expr, "chestnut_http_server_request_duration_seconds_bucket") ||
+		!strings.Contains(slowRequestTarget.Expr, "chestnut_http_server_request_duration_seconds_count") ||
+		strings.Count(slowRequestTarget.Expr, "increase(") != 2 ||
+		strings.Count(slowRequestTarget.Expr, "[$__range]") != 2 ||
+		strings.Contains(slowRequestTarget.Expr, "requests_total") {
+		t.Fatalf("所选时段 P95 最慢路由 Top 10 slow-request ratio query is invalid: %q", slowRequestTarget.Expr)
+	}
+	p95Steps := selectedRangeP95.FieldConfig.Defaults.Thresholds.Steps
+	if selectedRangeP95.FieldConfig.Defaults.Color.Mode != "thresholds" ||
+		len(p95Steps) != 3 || p95Steps[0].Color != "green" || p95Steps[0].Value != nil ||
+		p95Steps[1].Color != "orange" || p95Steps[1].Value == nil || *p95Steps[1].Value != 0.5 ||
+		p95Steps[2].Color != "red" || p95Steps[2].Value == nil || *p95Steps[2].Value != 0.8 {
+		t.Fatal("所选时段 P95 最慢路由 Top 10 must use fixed green/orange/red thresholds at 500ms and 800ms")
+	}
+	if p95Max, exists := grafanaFieldOverrideNumber(t, selectedRangeP95, "P95", "max"); !exists || p95Max != 1 {
+		t.Fatalf("所选时段 P95 最慢路由 Top 10 P95 max = %v, want 1 second", p95Max)
+	}
+
+	selectedRangeTraffic := panels["所选时段请求数量最高的路由 Top 10"]
+	if selectedRangeTraffic.Type != "table" || len(selectedRangeTraffic.Targets) != 3 {
+		t.Fatal("所选时段请求数量最高的路由 Top 10 must combine sample count, P95, and slow-request ratio")
+	}
+	for index, target := range selectedRangeTraffic.Targets {
+		if !target.Instant || target.Format != "table" {
+			t.Fatalf("所选时段请求数量最高的路由 Top 10 target[%d] must be an instant table query", index)
 		}
-		if strings.Join(gotTransformations, ",") != wantTransformations {
-			t.Fatalf("panel %q transformations = %v, want %s", title, gotTransformations, wantTransformations)
-		}
+	}
+	gotTrafficTransformations := make([]string, 0, len(selectedRangeTraffic.Transformations))
+	for _, transformation := range selectedRangeTraffic.Transformations {
+		gotTrafficTransformations = append(gotTrafficTransformations, transformation.ID)
+	}
+	if strings.Join(gotTrafficTransformations, ",") != "joinByField,sortBy,organize" ||
+		selectedRangeTraffic.Transformations[0].Options.ByField != "route" ||
+		selectedRangeTraffic.Transformations[0].Options.Mode != "inner" {
+		t.Fatalf("所选时段请求数量最高的路由 Top 10 must inner-join table queries by route: %v", gotTrafficTransformations)
+	}
+	if sortOptions := selectedRangeTraffic.Transformations[1].Options.Sort; len(sortOptions) != 1 ||
+		!sortOptions[0].Descending || sortOptions[0].Field != "Value #A" {
+		t.Fatal("所选时段请求数量最高的路由 Top 10 must sort the joined table by request count descending")
+	}
+	renamedTrafficFields := selectedRangeTraffic.Transformations[2].Options.RenameByName
+	if renamedTrafficFields["route"] != "Route" || renamedTrafficFields["Value #A"] != "请求数" ||
+		renamedTrafficFields["Value #B"] != "P95" || renamedTrafficFields["Value #C"] != ">500ms 比例" {
+		t.Fatalf("所选时段请求数量最高的路由 Top 10 renamed fields = %v", renamedTrafficFields)
+	}
+	trafficCountTarget := selectedRangeTraffic.Targets[0]
+	if trafficCountTarget.RefID != "A" ||
+		!strings.Contains(trafficCountTarget.Expr, "topk(10") ||
+		!strings.Contains(trafficCountTarget.Expr, "sum by (route)") ||
+		!strings.Contains(trafficCountTarget.Expr, "chestnut_http_server_request_duration_seconds_count") ||
+		strings.Count(trafficCountTarget.Expr, "increase(") != 1 ||
+		strings.Count(trafficCountTarget.Expr, "[$__range]") != 1 ||
+		strings.Contains(trafficCountTarget.Expr, "requests_total") {
+		t.Fatalf("所选时段请求数量最高的路由 Top 10 request-count query is invalid: %q", trafficCountTarget.Expr)
+	}
+	trafficP95Target := selectedRangeTraffic.Targets[1]
+	if trafficP95Target.RefID != "B" ||
+		!strings.Contains(trafficP95Target.Expr, "histogram_quantile(0.95") ||
+		!strings.Contains(trafficP95Target.Expr, "sum by (le, route)") ||
+		!strings.Contains(trafficP95Target.Expr, "chestnut_http_server_request_duration_seconds_bucket") ||
+		strings.Count(trafficP95Target.Expr, "increase(") != 1 ||
+		strings.Count(trafficP95Target.Expr, "[$__range]") != 1 {
+		t.Fatalf("所选时段请求数量最高的路由 Top 10 P95 query is invalid: %q", trafficP95Target.Expr)
+	}
+	trafficSlowRequestTarget := selectedRangeTraffic.Targets[2]
+	if trafficSlowRequestTarget.RefID != "C" ||
+		!strings.Contains(trafficSlowRequestTarget.Expr, `le="0.5"`) ||
+		!strings.Contains(trafficSlowRequestTarget.Expr, "chestnut_http_server_request_duration_seconds_bucket") ||
+		!strings.Contains(trafficSlowRequestTarget.Expr, "chestnut_http_server_request_duration_seconds_count") ||
+		strings.Count(trafficSlowRequestTarget.Expr, "increase(") != 2 ||
+		strings.Count(trafficSlowRequestTarget.Expr, "[$__range]") != 2 ||
+		strings.Contains(trafficSlowRequestTarget.Expr, "requests_total") {
+		t.Fatalf("所选时段请求数量最高的路由 Top 10 slow-request ratio query is invalid: %q", trafficSlowRequestTarget.Expr)
+	}
+	trafficP95Steps := selectedRangeTraffic.FieldConfig.Defaults.Thresholds.Steps
+	if selectedRangeTraffic.FieldConfig.Defaults.Color.Mode != "thresholds" ||
+		len(trafficP95Steps) != 3 || trafficP95Steps[0].Color != "green" || trafficP95Steps[0].Value != nil ||
+		trafficP95Steps[1].Color != "orange" || trafficP95Steps[1].Value == nil || *trafficP95Steps[1].Value != 0.5 ||
+		trafficP95Steps[2].Color != "red" || trafficP95Steps[2].Value == nil || *trafficP95Steps[2].Value != 0.8 {
+		t.Fatal("所选时段请求数量最高的路由 Top 10 must use fixed green/orange/red P95 thresholds at 500ms and 800ms")
+	}
+	if p95Max, exists := grafanaFieldOverrideNumber(t, selectedRangeTraffic, "P95", "max"); !exists || p95Max != 1 {
+		t.Fatalf("所选时段请求数量最高的路由 Top 10 P95 max = %v, want 1 second", p95Max)
+	}
+
+	if selectedRangeP95.GridPos.X != 0 || selectedRangeP95.GridPos.Y != 11 ||
+		selectedRangeP95.GridPos.Height != 13 || selectedRangeP95.GridPos.Width != 12 ||
+		selectedRangeTraffic.GridPos.X != 12 || selectedRangeTraffic.GridPos.Y != 11 ||
+		selectedRangeTraffic.GridPos.Height != 13 || selectedRangeTraffic.GridPos.Width != 12 ||
+		panels["路由 QPS Top 10"].GridPos.Y != 25 || panels["各路由 5xx 比例"].GridPos.Y != 25 ||
+		panels["请求明细"].GridPos.Y != 25 {
+		t.Fatal("route dashboard must place both selected-range Top 10 tables side by side below the heatmap")
+	}
+
+	latencyHeatmap := panels["整体请求延迟分布热力图"]
+	if latencyHeatmap.Type != "heatmap" || len(latencyHeatmap.Targets) != 1 ||
+		latencyHeatmap.Targets[0].Format != "heatmap" || latencyHeatmap.Targets[0].Instant {
+		t.Fatal("整体请求延迟分布热力图 must use one range heatmap query")
+	}
+	if expression := latencyHeatmap.Targets[0].Expr; !strings.Contains(expression, "sum by (le)") ||
+		!strings.Contains(expression, "chestnut_http_server_request_duration_seconds_bucket") ||
+		!strings.Contains(expression, "[$__rate_interval]") ||
+		strings.Contains(expression, "le, route") || strings.Contains(expression, `route=~`) {
+		t.Fatalf("整体请求延迟分布热力图 must aggregate all routes only by latency bucket: %q", expression)
+	}
+	if latencyHeatmap.GridPos.X != 0 || latencyHeatmap.GridPos.Y != 1 ||
+		latencyHeatmap.GridPos.Width != 24 || latencyHeatmap.GridPos.Height != 10 {
+		t.Fatal("整体请求延迟分布热力图 must occupy the first full-width row in the latency section")
+	}
+	heatmapColor := latencyHeatmap.Options.Color
+	if heatmapColor.Mode != "scheme" || heatmapColor.Scheme != "YlOrRd" ||
+		heatmapColor.Reverse || heatmapColor.Steps != 64 {
+		t.Fatal("整体请求延迟分布热力图 must use a 64-step low-to-high YlOrRd color scheme")
 	}
 
 	selectedRange5xx := panels["所选时段 HTTP 5xx 比例"]
@@ -503,20 +715,26 @@ func assertOverviewSummaryPresentation(t *testing.T, panels map[string]grafanaPa
 		}
 	}
 
-	httpInFlight := panels["当前 HTTP 请求数"]
+	httpInFlight := panels["HTTP 并发请求趋势"]
 	if httpInFlight.GridPos.Width != 12 || httpInFlight.GridPos.X != 0 || httpInFlight.GridPos.Y != 20 ||
-		httpInFlight.Options.GraphMode != "area" || len(httpInFlight.Targets) != 1 || httpInFlight.Targets[0].Instant ||
+		httpInFlight.Type != "timeseries" || len(httpInFlight.Targets) != 1 || httpInFlight.Targets[0].Instant ||
+		httpInFlight.FieldConfig.Defaults.Custom.ShowPoints != "always" ||
+		httpInFlight.Options.Tooltip.Mode != "multi" ||
 		!strings.Contains(httpInFlight.Targets[0].Expr, "chestnut_http_server_requests_in_flight") ||
-		!strings.Contains(httpInFlight.Targets[0].Expr, "chestnut_http_server_websocket_connections") {
-		t.Fatalf("当前 HTTP 请求数 must show the selected-range non-WebSocket in-flight sparkline")
+		!strings.Contains(httpInFlight.Targets[0].Expr, "chestnut_http_server_websocket_connections") ||
+		strings.Count(httpInFlight.Targets[0].Expr, "vector(0)") != 2 {
+		t.Fatalf("HTTP 并发请求趋势 must show hoverable selected-range points and fill missing data with zero")
 	}
 
-	webSocketConnections := panels["当前 WebSocket 连接数"]
+	webSocketConnections := panels["WebSocket 连接数趋势"]
 	if webSocketConnections.GridPos.Width != 12 || webSocketConnections.GridPos.X != 12 ||
-		webSocketConnections.GridPos.Y != 20 || webSocketConnections.Options.GraphMode != "area" ||
+		webSocketConnections.GridPos.Y != 20 || webSocketConnections.Type != "timeseries" ||
 		len(webSocketConnections.Targets) != 1 || webSocketConnections.Targets[0].Instant ||
-		!strings.Contains(webSocketConnections.Targets[0].Expr, "chestnut_http_server_websocket_connections") {
-		t.Fatalf("当前 WebSocket 连接数 must share the selected-range live-load row")
+		webSocketConnections.FieldConfig.Defaults.Custom.ShowPoints != "always" ||
+		webSocketConnections.Options.Tooltip.Mode != "multi" ||
+		!strings.Contains(webSocketConnections.Targets[0].Expr, "chestnut_http_server_websocket_connections") ||
+		!strings.Contains(webSocketConnections.Targets[0].Expr, "or vector(0)") {
+		t.Fatalf("WebSocket 连接数趋势 must show hoverable selected-range points and fill missing data with zero")
 	}
 
 	uptime := panels["最近启动节点运行时长"]
@@ -638,7 +856,7 @@ func assertTargetHealthPanels(t *testing.T, panels map[string]grafanaPanel) {
 		t.Fatalf("节点采集明细 mapping options = %v, want 1=green 正常 and 0=red 异常", mappingOptions)
 	}
 	if detailPanel.GridPos.Height != 6 || detailPanel.GridPos.Y != 5 ||
-		panels["集群总 QPS"].GridPos.Y != 12 || panels["当前 HTTP 请求数"].GridPos.Y != 20 ||
+		panels["集群总 QPS"].GridPos.Y != 12 || panels["HTTP 并发请求趋势"].GridPos.Y != 20 ||
 		panels["所选时段 Recovery Panic 次数"].GridPos.Y != 27 ||
 		panels["HTTP 请求延迟分位数"].GridPos.Y != 35 {
 		t.Fatal("节点采集明细及后续区域 must use the compact vertical layout")
