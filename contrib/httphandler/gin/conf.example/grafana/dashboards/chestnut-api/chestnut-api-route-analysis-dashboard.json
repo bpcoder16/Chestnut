@@ -40,7 +40,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "基于 Dashboard 顶部所选完整时间范围聚合普通 HTTP 延迟样本，排除 /api/*path，按 P95 从高到低列出最慢十条路由，并补充同一批样本的请求数与超过 800ms 的比例。",
+      "description": "基于 Dashboard 顶部所选完整时间范围聚合普通 HTTP 延迟样本，排除 /api/*path，按 P95 从高到低列出最慢十条路由，并补充同一批样本的请求数、超过 800ms 的请求数与比例。",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -78,7 +78,7 @@
             "properties": [
               {
                 "id": "custom.width",
-                "value": 360
+                "value": 380
               }
             ]
           },
@@ -88,6 +88,10 @@
               "options": "P95"
             },
             "properties": [
+              {
+                "id": "custom.width",
+                "value": 160
+              },
               {
                 "id": "min",
                 "value": 0
@@ -113,6 +117,10 @@
             },
             "properties": [
               {
+                "id": "custom.width",
+                "value": 90
+              },
+              {
                 "id": "decimals",
                 "value": 0
               },
@@ -129,6 +137,10 @@
             },
             "properties": [
               {
+                "id": "custom.width",
+                "value": 130
+              },
+              {
                 "id": "decimals",
                 "value": 2
               },
@@ -143,6 +155,26 @@
               {
                 "id": "unit",
                 "value": "percent"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": ">800ms 请求数"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 140
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "unit",
+                "value": "short"
               }
             ]
           }
@@ -189,6 +221,13 @@
           "instant": true,
           "legendFormat": "{{route}}",
           "refId": "C"
+        },
+        {
+          "expr": "clamp_min(sum by (route) (increase(chestnut_http_server_request_duration_seconds_count{job=\"chestnut-api\",node=~\"$node\",route!=\"/api/*path\"}[$__range])) - sum by (route) (increase(chestnut_http_server_request_duration_seconds_bucket{job=\"chestnut-api\",node=~\"$node\",route!=\"/api/*path\",le=\"0.8\"}[$__range])), 0)",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "{{route}}",
+          "refId": "D"
         }
       ],
       "title": "所选时段 P95 最慢路由 Top 10",
@@ -219,19 +258,22 @@
               "Time": true,
               "Time 1": true,
               "Time 2": true,
-              "Time 3": true
+              "Time 3": true,
+              "Time 4": true
             },
             "includeByName": {},
             "indexByName": {
               "Value #A": 2,
               "Value #B": 1,
-              "Value #C": 3,
+              "Value #C": 4,
+              "Value #D": 3,
               "route": 0
             },
             "renameByName": {
               "Value #A": "P95",
               "Value #B": "请求数",
               "Value #C": ">800ms 比例",
+              "Value #D": ">800ms 请求数",
               "route": "Route"
             }
           }
@@ -244,7 +286,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "基于 Dashboard 顶部所选完整时间范围聚合普通 HTTP 延迟样本，排除 /api/*path，按请求数从高到低列出最繁忙的十条路由，并补充同一批样本的 P95 与超过 800ms 的比例。",
+      "description": "基于 Dashboard 顶部所选完整时间范围聚合普通 HTTP 延迟样本，排除 /api/*path，按请求数从高到低列出最繁忙的十条路由，并补充同一批样本的 P95、超过 800ms 的请求数与比例。",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -282,7 +324,7 @@
             "properties": [
               {
                 "id": "custom.width",
-                "value": 360
+                "value": 380
               }
             ]
           },
@@ -292,6 +334,10 @@
               "options": "P95"
             },
             "properties": [
+              {
+                "id": "custom.width",
+                "value": 160
+              },
               {
                 "id": "min",
                 "value": 0
@@ -317,6 +363,10 @@
             },
             "properties": [
               {
+                "id": "custom.width",
+                "value": 90
+              },
+              {
                 "id": "decimals",
                 "value": 0
               },
@@ -333,6 +383,10 @@
             },
             "properties": [
               {
+                "id": "custom.width",
+                "value": 130
+              },
+              {
                 "id": "decimals",
                 "value": 2
               },
@@ -347,6 +401,26 @@
               {
                 "id": "unit",
                 "value": "percent"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": ">800ms 请求数"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 140
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "unit",
+                "value": "short"
               }
             ]
           }
@@ -393,6 +467,13 @@
           "instant": true,
           "legendFormat": "{{route}}",
           "refId": "C"
+        },
+        {
+          "expr": "clamp_min(sum by (route) (increase(chestnut_http_server_request_duration_seconds_count{job=\"chestnut-api\",node=~\"$node\",route!=\"/api/*path\"}[$__range])) - sum by (route) (increase(chestnut_http_server_request_duration_seconds_bucket{job=\"chestnut-api\",node=~\"$node\",route!=\"/api/*path\",le=\"0.8\"}[$__range])), 0)",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "{{route}}",
+          "refId": "D"
         }
       ],
       "title": "所选时段请求数量最高的路由 Top 10",
@@ -423,19 +504,22 @@
               "Time": true,
               "Time 1": true,
               "Time 2": true,
-              "Time 3": true
+              "Time 3": true,
+              "Time 4": true
             },
             "includeByName": {},
             "indexByName": {
               "Value #A": 1,
               "Value #B": 2,
-              "Value #C": 3,
+              "Value #C": 4,
+              "Value #D": 3,
               "route": 0
             },
             "renameByName": {
               "Value #A": "请求数",
               "Value #B": "P95",
               "Value #C": ">800ms 比例",
+              "Value #D": ">800ms 请求数",
               "route": "Route"
             }
           }
@@ -529,7 +613,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "基于 Dashboard 顶部所选完整时间范围统计普通 HTTP 请求，排除 /api/*path，按各路由 5xx 比例从高到低列出前十名，并补充同一时段的请求数；有请求但无 5xx 的路由按 0% 参与排序。",
+      "description": "基于 Dashboard 顶部所选完整时间范围统计普通 HTTP 请求，排除 /api/*path，仅展示至少发生一次 5xx 的路由，按 5xx 比例从高到低列出前十名，并补充同一时段的请求数与 5xx 次数。",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -539,7 +623,7 @@
           "mappings": [],
           "max": 100,
           "min": 0,
-          "noValue": "无请求数据",
+          "noValue": "所选时段无 HTTP 5xx",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -576,6 +660,22 @@
             "matcher": {
               "id": "byName",
               "options": "请求数"
+            },
+            "properties": [
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "unit",
+                "value": "short"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "5xx 次数"
             },
             "properties": [
               {
@@ -628,18 +728,25 @@
       },
       "targets": [
         {
-          "expr": "topk(10, 100 * ((sum by (route) (increase(chestnut_http_server_requests_total{job=\"chestnut-api\",node=~\"$node\",route!=\"/api/*path\",status_class=\"5xx\"}[$__range])) or 0 * sum by (route) (increase(chestnut_http_server_requests_total{job=\"chestnut-api\",node=~\"$node\",route!=\"/api/*path\"}[$__range]))) / (sum by (route) (increase(chestnut_http_server_requests_total{job=\"chestnut-api\",node=~\"$node\",route!=\"/api/*path\"}[$__range])) > 0)))",
+          "expr": "topk(10, 100 * ((sum by (route) (increase(chestnut_http_server_requests_total{job=\"chestnut-api\",node=~\"$node\",route!=\"/api/*path\",status_class=\"5xx\"}[$__range])) > 0) / (sum by (route) (increase(chestnut_http_server_requests_total{job=\"chestnut-api\",node=~\"$node\",route!=\"/api/*path\"}[$__range])) > 0)))",
           "format": "table",
           "instant": true,
           "legendFormat": "{{route}}",
           "refId": "A"
         },
         {
-          "expr": "sum by (route) (increase(chestnut_http_server_requests_total{job=\"chestnut-api\",node=~\"$node\",route!=\"/api/*path\"}[$__range]))",
+          "expr": "sum by (route) (increase(chestnut_http_server_requests_total{job=\"chestnut-api\",node=~\"$node\",route!=\"/api/*path\"}[$__range])) and on (route) topk(10, 100 * ((sum by (route) (increase(chestnut_http_server_requests_total{job=\"chestnut-api\",node=~\"$node\",route!=\"/api/*path\",status_class=\"5xx\"}[$__range])) > 0) / (sum by (route) (increase(chestnut_http_server_requests_total{job=\"chestnut-api\",node=~\"$node\",route!=\"/api/*path\"}[$__range])) > 0)))",
           "format": "table",
           "instant": true,
           "legendFormat": "{{route}}",
           "refId": "B"
+        },
+        {
+          "expr": "sum by (route) (increase(chestnut_http_server_requests_total{job=\"chestnut-api\",node=~\"$node\",route!=\"/api/*path\",status_class=\"5xx\"}[$__range])) and on (route) topk(10, 100 * ((sum by (route) (increase(chestnut_http_server_requests_total{job=\"chestnut-api\",node=~\"$node\",route!=\"/api/*path\",status_class=\"5xx\"}[$__range])) > 0) / (sum by (route) (increase(chestnut_http_server_requests_total{job=\"chestnut-api\",node=~\"$node\",route!=\"/api/*path\"}[$__range])) > 0)))",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "{{route}}",
+          "refId": "C"
         }
       ],
       "title": "各路由 5xx 比例最高的 Top10",
@@ -669,17 +776,20 @@
             "excludeByName": {
               "Time": true,
               "Time 1": true,
-              "Time 2": true
+              "Time 2": true,
+              "Time 3": true
             },
             "includeByName": {},
             "indexByName": {
-              "Value #A": 2,
+              "Value #A": 3,
               "Value #B": 1,
+              "Value #C": 2,
               "route": 0
             },
             "renameByName": {
               "Value #A": "5xx 比例",
               "Value #B": "请求数",
+              "Value #C": "5xx 次数",
               "route": "Route"
             }
           }
