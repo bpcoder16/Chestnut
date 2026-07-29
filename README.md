@@ -97,8 +97,9 @@ import (
 	"github.com/bpcoder16/Chestnut/v4/bootstrap"
 	"github.com/bpcoder16/Chestnut/v4/core/cdefer"
 	"github.com/bpcoder16/Chestnut/v4/core/gtask"
-	"github.com/bpcoder16/Chestnut/v4/contrib/httphandler/gin"
+	ginhandler "github.com/bpcoder16/Chestnut/v4/contrib/httphandler/gin"
 	"github.com/bpcoder16/Chestnut/v4/modules/httpserver"
+	"github.com/gin-gonic/gin"
 )
 
 func main() {
@@ -118,15 +119,17 @@ func main() {
 	g.Go(func() error {
 		return httpserver.NewManager(
 			path.Join(env.ConfigDirPath(), "http.yaml"),
-			gin.HTTPHandler(
+			ginhandler.HTTPHandlerWithConfig(
+				config,
+				nil,
 				// 在此注册路由
 				func(rg *gin.RouterGroup) {
 					// rg.POST("/api/...", handler)
 				},
 				// 可选：启用 Swagger UI
-				// gin.SwaggerRegister,
+				// ginhandler.SwaggerRegister,
 				// 可选：启用 pprof 性能分析
-				// gin.PProfRegister,
+				// ginhandler.PProfRegister,
 			),
 		).Run(ctx)
 	})
@@ -134,6 +137,54 @@ func main() {
 	g.Wait()
 }
 ```
+
+### Prometheus API 监控
+
+使用 `HTTPHandlerWithConfig` 时，可通过应用主配置启用 Engine 级 Prometheus 指标。`HTTPHandler` 和 `HTTPHandlerWithMiddlewares` 保持兼容且默认不注册指标；`prometheus.enabled=false` 时，配置感知入口同样不会创建 collectors 或 `/metrics`。
+
+```yaml
+prometheus:
+  enabled: true
+  serviceName: "replace-with-service-name"
+  # 仅支持精确 URL Path；不支持正则、glob 或 query 条件。
+  excludedPaths:
+    - "/metrics"
+    - "/health"
+    - "/ready"
+  # 根据最终 HTTP 状态排除已完成请求；404 不会污染 QPS 和延迟。
+  excludedStatusCodes:
+    - 404
+```
+
+启用时，`serviceName` 必须非空；非法 path 或 `[100, 599]` 之外的 HTTP 状态会在 `AppConfig.Check()` 阶段阻止启动。
+
+指标契约：
+
+| 指标 | 类型 | 标签 | 用途 |
+|---|---|---|---|
+| `chestnut_http_server_requests_total` | Counter | `service`, `method`, `route`, `status` | 已完成且未排除的 HTTP 请求数 |
+| `chestnut_http_server_request_duration_seconds` | Histogram | `service`, `method`, `route`, `status_class` | 请求耗时，按 `2xx` 等状态类别聚合并使用 `prometheus.DefBuckets` |
+| `chestnut_http_server_requests_in_flight` | Gauge | `service` | 当前正在处理的匹配业务请求数 |
+| `chestnut_http_server_recovered_panics_total` | Counter | `service`, `method`, `route` | 被 Chestnut Recovery 实际捕获的 panic 数 |
+
+每个 Gin Engine 使用独立 registry，创建多个 Engine 不会重复注册或共享请求计数。`/metrics` 同时合并 Prometheus 默认 gatherer，因此仍可采集 `go_*`、`process_*` 和应用已注册到默认 registry 的自定义指标。
+
+采集只使用 Gin `FullPath()` 路由模板、HTTP method 和最终 HTTP status，不读取请求体、响应体或业务 JSON `Response.Code`。请求 Counter 保留精确 `status`，Histogram 使用 `status_class`（如 `2xx`、`5xx`）控制时序基数。未匹配路由不会产生 `unknown` 或原始 URI 时序；`/metrics` 由框架强制排除，配置中的探活路径在开始计时和增加 in-flight 前排除，配置的 HTTP 404 在请求完成后排除。最终返回排除状态的请求在处理期间可能短暂计入 in-flight，但结束后会归零。
+
+启用后的中间件顺序是 `Prometheus -> Recovery -> 调用方中间件 -> 路由`。响应尚未提交时发生 panic，Recovery 返回 HTTP 500；响应已经提交后发生 panic，Recovery 保持客户端实际收到的状态、Header 和 body，不缓存或重放响应。两种情况都会增加 Recovery Counter，请求 Counter 和 Histogram 使用客户端实际状态；即使实际状态位于 `excludedStatusCodes`，请求 Counter/Histogram 仍按规则排除，但 Recovery Counter 会保留真实 panic 信号。业务主动返回 HTTP 500 不会增加 Recovery Counter。
+
+集群抓取与 Dashboard 示例：
+
+- Prometheus：`contrib/httphandler/gin/conf.example/prometheus/scrape.d/chestnut-api.yaml`
+- Grafana：`contrib/httphandler/gin/conf.example/grafana/dashboards/chestnut-api/chestnut-api-overview-dashboard.json`
+
+把 scrape 文件复制到 Qilin 监控 package 的 `config/prometheus/scrape.d/`，逐台替换文档 target、`environment`、`cluster` 和 `node`；把 Dashboard JSON 复制到 `config/grafana/dashboards/chestnut-api/`。Dashboard 使用已 provision 的 Prometheus datasource UID `prometheus` 和稳定 UID `chestnut-api-overview`，文件为只读交付，不需要在 Grafana UI 手工创建面板。
+
+Dashboard 的 `job`、`environment`、`cluster`、`node`、`instance` 变量直接从 Prometheus `up` 级联读取，因此仍在 scrape 配置中的失败 target 会以 `up=0` 保留在变量和“Target 健康明细”中；`service` 和 `route` 来自 Chestnut HTTP 指标。健康区只使用 target labels，不受 `service` 或 `route` 过滤：全部健康、单节点 down、全部 down 分别显示对应可用数、不可用数、可用率和 UP/DOWN 明细，只有当前筛选范围不存在任何 `up` 序列时才显示“无 target 数据”。不要在 target labels 重复添加 `service`，否则 Prometheus 默认 `honor_labels=false` 会产生 `exported_service` 冲突。运行时 `go_*`、`process_*` 指标没有应用 `service` 标签，Dashboard 对这些指标使用 target 标签筛选。
+
+`/metrics` 会暴露路由模板和进程状态，生产环境必须通过网络、反向代理、防火墙或既有白名单限制为 Prometheus/管理网络访问，示例不提供应用层鉴权或凭据。
+
+从旧应用指标迁移时，`de_card_*` 不会双写为 `chestnut_*`。滚动发布期间，新 Dashboard 的请求面板只覆盖已升级节点；先用基于 `up` 的 target 健康明细确认所有目标可见且可用，再下线旧查询。应用回滚会恢复旧指标增长；若只把 `prometheus.enabled` 改为 `false`，还需同步停用对应 scrape job，避免 target 被报告为 down。Prometheus 历史时序不需要删除或回填。
 
 ### 定时任务
 

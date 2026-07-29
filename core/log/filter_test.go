@@ -120,14 +120,14 @@ func TestFilterFuncLoggerPrefix(t *testing.T) {
 				With(NewStdLogger(buf), "caller", "caller"),
 				FilterFunc(testFilterFuncWithLoggerPrefix),
 			),
-			want: "INFO caller=caller msg=msg filtered=***\n",
+			want: "INFO caller=caller msg=msg filtered=" + fuzzyStr + "\n",
 		},
 		{
 			logger: NewFilter(
 				With(NewStdLogger(buf)),
 				FilterFunc(testFilterFuncWithLoggerPrefix),
 			),
-			want: "INFO msg=msg filtered=***\n",
+			want: "INFO msg=msg filtered=" + fuzzyStr + "\n",
 		},
 	}
 
@@ -219,7 +219,8 @@ func TestFilterWithContextConcurrent(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	expected := "INFO trace-id=world msg=done2\nINFO trace-id= msg=done1\n"
+	expected := "INFO trace-id=world " + DefaultMessageKey + "=done2\n" +
+		"INFO trace-id= " + DefaultMessageKey + "=done1\n"
 	if got := buf.String(); got != expected {
 		t.Errorf("got: %s, want: %s", got, expected)
 	}

@@ -1,0 +1,25 @@
+# Prometheus 动态 scrape 配置文件必须以 scrape_configs 映射开头。
+scrape_configs:
+  - job_name: "chestnut-api"
+    # API 指标默认每 15 秒抓取一次，5 秒超时为下一轮抓取保留充足余量。
+    scrape_interval: 15s
+    scrape_timeout: 5s
+    scheme: http
+    metrics_path: /metrics
+    # 记录抓取耗时、样本数和响应体大小，便于评估采集链路容量。
+    extra_scrape_metrics: true
+    static_configs:
+      # 以下地址使用 RFC 5737 文档网段。部署时逐台替换 target 和 node，且仅允许 Prometheus 访问 /metrics。
+      - targets:
+          - "192.0.2.11:8888"
+        labels:
+          node: "replace-with-api-node-01"
+      - targets:
+          - "192.0.2.12:8888"
+        labels:
+          node: "replace-with-api-node-02"
+      - targets:
+          - "192.0.2.13:8888"
+        labels:
+          node: "replace-with-api-node-03"
+    # 不要在 target labels 中添加 service；该标签由应用指标提供，避免产生 exported_service 冲突。

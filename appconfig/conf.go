@@ -2,8 +2,10 @@ package appconfig
 
 import (
 	"errors"
+	"fmt"
 	"path"
 	"path/filepath"
+	"strings"
 
 	"github.com/bpcoder16/Chestnut/v4/appconfig/env"
 	"github.com/bpcoder16/Chestnut/v4/core/utils"
@@ -18,6 +20,7 @@ type AppConfig struct {
 	Bootstrap    Bootstrap
 	AsyncService AsyncService
 	IPWhitelist  IPWhitelist
+	Prometheus   Prometheus
 }
 
 type Log struct {
@@ -61,6 +64,19 @@ type IPWhitelist struct {
 	AllowIPs []string
 }
 
+const (
+	minHTTPStatusCode = 100
+	maxHTTPStatusCode = 599
+)
+
+// Prometheus 定义 Gin HTTP 指标的启停、身份和排除规则。
+type Prometheus struct {
+	Enabled             bool
+	ServiceName         string
+	ExcludedPaths       []string
+	ExcludedStatusCodes []int
+}
+
 func (c *AppConfig) Check() (err error) {
 	if len(c.Env.AppName) == 0 {
 		err = errors.New("AppName required")
@@ -79,7 +95,31 @@ func (c *AppConfig) Check() (err error) {
 	if c.Default.CronDistributedLockSupport && !c.Default.RedisSupport {
 		err = errors.New("CronDistributedLockSupport requires RedisSupport to be enabled")
 	}
+	if c.Prometheus.Enabled {
+		if prometheusErr := c.Prometheus.check(); prometheusErr != nil {
+			return prometheusErr
+		}
+	}
 	return err
+}
+
+func (c Prometheus) check() error {
+	if strings.TrimSpace(c.ServiceName) == "" {
+		return errors.New("prometheus.serviceName required")
+	}
+
+	for _, excludedPath := range c.ExcludedPaths {
+		if excludedPath == "" || strings.TrimSpace(excludedPath) != excludedPath ||
+			!strings.HasPrefix(excludedPath, "/") || strings.ContainsAny(excludedPath, "?#") {
+			return fmt.Errorf("prometheus.excludedPaths contains invalid URL path %q", excludedPath)
+		}
+	}
+	for _, statusCode := range c.ExcludedStatusCodes {
+		if statusCode < minHTTPStatusCode || statusCode > maxHTTPStatusCode {
+			return fmt.Errorf("prometheus.excludedStatusCodes contains invalid HTTP status %d", statusCode)
+		}
+	}
+	return nil
 }
 
 func ParseConfig(confPath string, configPtr *AppConfig) (err error) {

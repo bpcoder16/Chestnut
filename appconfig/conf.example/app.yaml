@@ -19,6 +19,19 @@ ipWhitelist:
     - "127.0.0.1"
     - "::1"
 
+# 默认关闭。启用后 Chestnut 会注册 /metrics 并采集 Gin HTTP 指标。
+prometheus:
+  enabled: false
+  # 服务名会成为低基数指标标签；启用时必须显式填写非空值。
+  serviceName: "Chestnut"
+  # 仅支持精确 URL Path，不支持正则、glob 或 query 条件。
+  excludedPaths:
+    - "/metrics"
+    - "/health"
+  # 根据请求最终 HTTP 状态排除已完成请求指标。
+  excludedStatusCodes:
+    - 404
+
 default:
   MySQLSupport: false
   SQLiteSupport: false

@@ -124,6 +124,8 @@ func RecoveryWithWriter(out io.Writer) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		defer func() {
 			if err := recover(); err != nil {
+				// 只在实际 recover 分支标记，避免把业务主动返回的 HTTP 500 误认为 panic。
+				c.Set(recoveryMetricContextKey, true)
 				// Check for a broken connection, as it is not really a
 				// condition that warrants a panic stack trace.
 				var brokenPipe bool
@@ -152,6 +154,11 @@ func RecoveryWithWriter(out io.Writer) gin.HandlerFunc {
 					}
 				}
 
+				// 已提交响应不能追溯覆盖状态；此时仅终止剩余处理链，保留客户端实际输出。
+				if c.Writer.Written() {
+					c.Abort()
+					return
+				}
 				c.AbortWithStatus(http.StatusInternalServerError)
 			}
 		}()
