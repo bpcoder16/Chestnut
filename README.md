@@ -162,25 +162,28 @@ prometheus:
 
 | 指标 | 类型 | 标签 | 用途 |
 |---|---|---|---|
-| `chestnut_http_server_requests_total` | Counter | `service`, `method`, `route`, `status` | 已完成且未排除的 HTTP 请求数 |
+| `chestnut_http_server_requests_total` | Counter | `service`, `method`, `route`, `status_class` | 已完成且未排除的 HTTP 请求数，按 `2xx` 等状态类别聚合 |
 | `chestnut_http_server_request_duration_seconds` | Histogram | `service`, `method`, `route`, `status_class` | 请求耗时，按 `2xx` 等状态类别聚合并使用 `prometheus.DefBuckets` |
 | `chestnut_http_server_requests_in_flight` | Gauge | `service` | 当前正在处理的匹配业务请求数 |
 | `chestnut_http_server_recovered_panics_total` | Counter | `service`, `method`, `route` | 被 Chestnut Recovery 实际捕获的 panic 数 |
 
 每个 Gin Engine 使用独立 registry，创建多个 Engine 不会重复注册或共享请求计数。`/metrics` 同时合并 Prometheus 默认 gatherer，因此仍可采集 `go_*`、`process_*` 和应用已注册到默认 registry 的自定义指标。
 
-采集只使用 Gin `FullPath()` 路由模板、HTTP method 和最终 HTTP status，不读取请求体、响应体或业务 JSON `Response.Code`。请求 Counter 保留精确 `status`，Histogram 使用 `status_class`（如 `2xx`、`5xx`）控制时序基数。未匹配路由不会产生 `unknown` 或原始 URI 时序；`/metrics` 由框架强制排除，配置中的探活路径在开始计时和增加 in-flight 前排除，配置的 HTTP 404 在请求完成后排除。最终返回排除状态的请求在处理期间可能短暂计入 in-flight，但结束后会归零。
+采集只使用 Gin `FullPath()` 路由模板、HTTP method 和最终 HTTP status，不读取请求体、响应体或业务 JSON `Response.Code`。请求 Counter 和 Histogram 都使用 `status_class`（如 `2xx`、`5xx`），不保留精确状态码标签，以控制时序基数。未匹配路由不会产生 `unknown` 或原始 URI 时序；`/metrics` 由框架强制排除，配置中的探活路径在开始计时和增加 in-flight 前排除，配置的 HTTP 404 在请求完成后排除。最终返回排除状态的请求在处理期间可能短暂计入 in-flight，但结束后会归零。
 
 启用后的中间件顺序是 `Prometheus -> Recovery -> 调用方中间件 -> 路由`。响应尚未提交时发生 panic，Recovery 返回 HTTP 500；响应已经提交后发生 panic，Recovery 保持客户端实际收到的状态、Header 和 body，不缓存或重放响应。两种情况都会增加 Recovery Counter，请求 Counter 和 Histogram 使用客户端实际状态；即使实际状态位于 `excludedStatusCodes`，请求 Counter/Histogram 仍按规则排除，但 Recovery Counter 会保留真实 panic 信号。业务主动返回 HTTP 500 不会增加 Recovery Counter。
 
 集群抓取与 Dashboard 示例：
 
 - Prometheus：`contrib/httphandler/gin/conf.example/prometheus/scrape.d/chestnut-api.yaml`
-- Grafana：`contrib/httphandler/gin/conf.example/grafana/dashboards/chestnut-api/chestnut-api-overview-dashboard.json`
+- Grafana：
+  - `contrib/httphandler/gin/conf.example/grafana/dashboards/chestnut-api/chestnut-api-overview-dashboard.json`
+  - `contrib/httphandler/gin/conf.example/grafana/dashboards/chestnut-api/chestnut-api-route-analysis-dashboard.json`
+  - `contrib/httphandler/gin/conf.example/grafana/dashboards/chestnut-api/chestnut-api-instance-runtime-dashboard.json`
 
-把 scrape 文件复制到 Qilin 监控 package 的 `config/prometheus/scrape.d/`，逐台替换文档 target、`environment`、`cluster` 和 `node`；把 Dashboard JSON 复制到 `config/grafana/dashboards/chestnut-api/`。Dashboard 使用已 provision 的 Prometheus datasource UID `prometheus` 和稳定 UID `chestnut-api-overview`，文件为只读交付，不需要在 Grafana UI 手工创建面板。
+把 scrape 文件复制到 Qilin 监控 package 的 `config/prometheus/scrape.d/`，逐台替换文档 target、`environment`、`cluster` 和 `node`；把三个 Dashboard JSON 复制到 `config/grafana/dashboards/chestnut-api/`。Dashboard 使用已 provision 的 Prometheus datasource UID `prometheus`，稳定 UID 分别为 `chestnut-api-overview`、`chestnut-api-route-analysis` 和 `chestnut-api-instance-runtime`。概览页每 30 秒刷新，路由分析及实例与运行时页面每分钟刷新；三个页面通过 `chestnut` 标签下拉导航，并保留当前时间范围和同名变量。文件为只读交付，不需要在 Grafana UI 手工创建面板。
 
-Dashboard 的 `job`、`environment`、`cluster`、`node`、`instance` 变量直接从 Prometheus `up` 级联读取，因此仍在 scrape 配置中的失败 target 会以 `up=0` 保留在变量和“Target 健康明细”中；`service` 和 `route` 来自 Chestnut HTTP 指标。健康区只使用 target labels，不受 `service` 或 `route` 过滤：全部健康、单节点 down、全部 down 分别显示对应可用数、不可用数、可用率和 UP/DOWN 明细，只有当前筛选范围不存在任何 `up` 序列时才显示“无 target 数据”。不要在 target labels 重复添加 `service`，否则 Prometheus 默认 `honor_labels=false` 会产生 `exported_service` 冲突。运行时 `go_*`、`process_*` 指标没有应用 `service` 标签，Dashboard 对这些指标使用 target 标签筛选。
+三个 Dashboard 只保留 `node` 筛选变量，值直接从 Prometheus `up{job="chestnut-api"}` 读取；`job` 固定为 `chestnut-api`，`service`、`instance` 和 `route` 不作为筛选项，路由仅在分析面板中按指标标签聚合。仍在 scrape 配置中的失败 target 会以 `up=0` 保留在变量和“节点采集明细”中。健康区只使用 target labels：全部健康、单节点 down、全部 down 分别显示对应可用数、不可用数、可用率和正常/异常明细，只有当前筛选范围不存在任何 `up` 序列时才显示“无节点采集数据”。不要在 target labels 重复添加 `service`，否则 Prometheus 默认 `honor_labels=false` 会产生 `exported_service` 冲突。运行时 `go_*`、`process_*` 指标没有应用 `service` 标签，Dashboard 对这些指标使用 target 标签筛选。
 
 `/metrics` 会暴露路由模板和进程状态，生产环境必须通过网络、反向代理、防火墙或既有白名单限制为 Prometheus/管理网络访问，示例不提供应用层鉴权或凭据。
 

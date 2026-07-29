@@ -11,10 +11,12 @@ import (
 )
 
 const (
-	prometheusScrapeAssetPath = "conf.example/prometheus/scrape.d/chestnut-api.yaml"
-	grafanaDashboardAssetPath = "conf.example/grafana/dashboards/chestnut-api/chestnut-api-overview-dashboard.json"
-	prometheusDatasourceUID   = "prometheus"
-	minimumScrapeTargets      = 3
+	prometheusScrapeAssetPath                = "conf.example/prometheus/scrape.d/chestnut-api.yaml"
+	grafanaOverviewDashboardAssetPath        = "conf.example/grafana/dashboards/chestnut-api/chestnut-api-overview-dashboard.json"
+	grafanaRouteDashboardAssetPath           = "conf.example/grafana/dashboards/chestnut-api/chestnut-api-route-analysis-dashboard.json"
+	grafanaInstanceRuntimeDashboardAssetPath = "conf.example/grafana/dashboards/chestnut-api/chestnut-api-instance-runtime-dashboard.json"
+	prometheusDatasourceUID                  = "prometheus"
+	minimumScrapeTargets                     = 3
 )
 
 type prometheusScrapeAsset struct {
@@ -37,24 +39,45 @@ type prometheusStaticConfig struct {
 }
 
 type grafanaDashboardAsset struct {
-	Title         string `json:"title"`
-	UID           string `json:"uid"`
-	Editable      bool   `json:"editable"`
-	Refresh       string `json:"refresh"`
-	SchemaVersion int    `json:"schemaVersion"`
+	Title         string                 `json:"title"`
+	UID           string                 `json:"uid"`
+	Editable      bool                   `json:"editable"`
+	LiveNow       *bool                  `json:"liveNow"`
+	Preload       *bool                  `json:"preload"`
+	Refresh       string                 `json:"refresh"`
+	SchemaVersion int                    `json:"schemaVersion"`
+	Style         string                 `json:"style"`
+	Tags          []string               `json:"tags"`
+	Timezone      string                 `json:"timezone"`
+	WeekStart     string                 `json:"weekStart"`
+	Links         []grafanaDashboardLink `json:"links"`
 	Time          struct {
 		From string `json:"from"`
 		To   string `json:"to"`
 	} `json:"time"`
+	Timepicker struct {
+		RefreshIntervals []string `json:"refresh_intervals"`
+	} `json:"timepicker"`
 	Templating struct {
 		List []grafanaVariable `json:"list"`
 	} `json:"templating"`
 	Panels []grafanaPanel `json:"panels"`
 }
 
+type grafanaDashboardLink struct {
+	AsDropdown  bool     `json:"asDropdown"`
+	IncludeVars bool     `json:"includeVars"`
+	KeepTime    bool     `json:"keepTime"`
+	Tags        []string `json:"tags"`
+	Type        string   `json:"type"`
+}
+
 type grafanaVariable struct {
 	Name       string            `json:"name"`
 	Definition string            `json:"definition"`
+	AllValue   string            `json:"allValue"`
+	IncludeAll bool              `json:"includeAll"`
+	Multi      bool              `json:"multi"`
 	Datasource grafanaDatasource `json:"datasource"`
 	Query      struct {
 		Query string `json:"query"`
@@ -80,16 +103,41 @@ type grafanaPanel struct {
 	} `json:"gridPos"`
 	FieldConfig struct {
 		Defaults struct {
-			NoValue  string                `json:"noValue"`
+			Color struct {
+				FixedColor string `json:"fixedColor"`
+				Mode       string `json:"mode"`
+			} `json:"color"`
+			Decimals   *float64 `json:"decimals"`
+			NoValue    string   `json:"noValue"`
+			Unit       string   `json:"unit"`
+			Min        *float64 `json:"min"`
+			Thresholds struct {
+				Mode  string `json:"mode"`
+				Steps []struct {
+					Color string   `json:"color"`
+					Value *float64 `json:"value"`
+				} `json:"steps"`
+			} `json:"thresholds"`
 			Mappings []grafanaValueMapping `json:"mappings"`
 		} `json:"defaults"`
 	} `json:"fieldConfig"`
+	Options struct {
+		GraphMode string `json:"graphMode"`
+	} `json:"options"`
 	Targets []struct {
 		Expr         string `json:"expr"`
 		Format       string `json:"format"`
 		Instant      bool   `json:"instant"`
 		LegendFormat string `json:"legendFormat"`
 	} `json:"targets"`
+	Transformations []struct {
+		ID      string `json:"id"`
+		Options struct {
+			ExcludeByName map[string]bool   `json:"excludeByName"`
+			IndexByName   map[string]int    `json:"indexByName"`
+			RenameByName  map[string]string `json:"renameByName"`
+		} `json:"options"`
+	} `json:"transformations"`
 }
 
 type grafanaValueMapping struct {
@@ -130,16 +178,28 @@ func TestPrometheusScrapeAssetSupportsThreeNodeCluster(t *testing.T) {
 
 	targetCount := 0
 	nodes := make(map[string]struct{}, minimumScrapeTargets)
+	targetNodes := make(map[string]string, minimumScrapeTargets)
 	for _, staticConfig := range job.StaticConfigs {
 		targetCount += len(staticConfig.Targets)
-		if strings.TrimSpace(staticConfig.Labels["node"]) == "" {
+		node := strings.TrimSpace(staticConfig.Labels["node"])
+		if node == "" {
 			t.Fatalf("static config %v has empty node label", staticConfig.Targets)
+		}
+		if len(staticConfig.Targets) != 1 {
+			t.Fatalf("node %q targets = %v, want exactly one target", node, staticConfig.Targets)
+		}
+		if _, exists := nodes[node]; exists {
+			t.Fatalf("node %q appears in multiple static configs", node)
 		}
 		if _, exists := staticConfig.Labels["service"]; exists {
 			t.Fatalf("static config %v must not define conflicting service target label", staticConfig.Targets)
 		}
-		nodes[staticConfig.Labels["node"]] = struct{}{}
+		nodes[node] = struct{}{}
 		for _, target := range staticConfig.Targets {
+			if previousNode, exists := targetNodes[target]; exists {
+				t.Fatalf("target %q is assigned to both node %q and %q", target, previousNode, node)
+			}
+			targetNodes[target] = node
 			if !strings.HasPrefix(target, "192.0.2.") {
 				t.Fatalf("target %q must use RFC 5737 documentation address space", target)
 			}
@@ -150,90 +210,164 @@ func TestPrometheusScrapeAssetSupportsThreeNodeCluster(t *testing.T) {
 	}
 }
 
-func TestGrafanaDashboardAssetCoversAPIClusterOperations(t *testing.T) {
-	raw, err := os.ReadFile(grafanaDashboardAssetPath)
-	if err != nil {
-		t.Fatalf("os.ReadFile(%q): %v", grafanaDashboardAssetPath, err)
-	}
-	var dashboard grafanaDashboardAsset
-	if err := json.Unmarshal(raw, &dashboard); err != nil {
-		t.Fatalf("json.Unmarshal dashboard: %v", err)
-	}
-
-	if dashboard.UID != "chestnut-api-overview" || dashboard.Editable {
-		t.Fatalf("dashboard identity = (uid=%q, editable=%v), want stable read-only identity", dashboard.UID, dashboard.Editable)
-	}
-	if dashboard.Refresh != "30s" || dashboard.Time.From != "now-1h" || dashboard.Time.To != "now" {
-		t.Fatalf("dashboard time = (refresh=%q, from=%q, to=%q), want (30s, now-1h, now)", dashboard.Refresh, dashboard.Time.From, dashboard.Time.To)
-	}
-	if dashboard.SchemaVersion == 0 {
-		t.Fatal("dashboard schemaVersion must be set")
-	}
-
+func TestGrafanaDashboardAssetsCoverAPIClusterOperations(t *testing.T) {
 	wantVariables := []struct {
 		name  string
 		query string
 	}{
-		{name: "job", query: "label_values(up, job)"},
-		{name: "node", query: `label_values(up{job=~"$job"}, node)`},
-		{name: "instance", query: `label_values(up{job=~"$job",node=~"$node"}, instance)`},
-		{name: "service", query: `label_values(chestnut_http_server_requests_in_flight{job=~"$job",node=~"$node",instance=~"$instance"}, service)`},
-		{name: "route", query: `label_values(chestnut_http_server_requests_total{job=~"$job",service=~"$service",node=~"$node",instance=~"$instance"}, route)`},
-	}
-	variables := make(map[string]grafanaVariable, len(dashboard.Templating.List))
-	if len(dashboard.Templating.List) != len(wantVariables) {
-		t.Fatalf("len(dashboard variables) = %d, want %d", len(dashboard.Templating.List), len(wantVariables))
-	}
-	for index, variable := range dashboard.Templating.List {
-		variables[variable.Name] = variable
-		if variable.Datasource.UID != prometheusDatasourceUID {
-			t.Fatalf("variable %q datasource UID = %q, want %q", variable.Name, variable.Datasource.UID, prometheusDatasourceUID)
-		}
-		if strings.TrimSpace(variable.Query.Query) == "" {
-			t.Fatalf("variable %q has empty query", variable.Name)
-		}
-		want := wantVariables[index]
-		if variable.Name != want.name || variable.Query.Query != want.query || variable.Definition != want.query {
-			t.Fatalf("dashboard variable[%d] = (name=%q, query=%q, definition=%q), want (%q, %q, %q)",
-				index, variable.Name, variable.Query.Query, variable.Definition, want.name, want.query, want.query)
-		}
+		{name: "node", query: `label_values(up{job="chestnut-api"}, node)`},
 	}
 
-	wantPanels := []string{
-		"Target 可用数", "Target 不可用数", "Target 可用率", "Target 健康明细", "当前 In-flight", "进程 Uptime",
-		"集群总 QPS", "HTTP 状态趋势", "HTTP 5xx 比例",
-		"Recovery Panic 增量", "Recovery Panic 趋势", "集群延迟分位数", "平均耗时", "P95 最慢路由 Top 10",
-		"路由 QPS Top 10", "各路由 P95", "各路由 5xx 比例", "请求明细", "各实例 QPS",
-		"各实例 P95", "各实例 5xx", "各实例 In-flight", "进程 CPU", "进程 RSS", "Go Heap",
-		"Goroutine", "GC 次数", "GC Pause",
+	dashboardAssets := []struct {
+		path        string
+		uid         string
+		title       string
+		refresh     string
+		panelTitles []string
+	}{
+		{
+			path:    grafanaOverviewDashboardAssetPath,
+			uid:     "chestnut-api-overview",
+			title:   "Chestnut API 监控概览",
+			refresh: "30s",
+			panelTitles: []string{
+				"可用节点数", "不可用节点数", "节点可用率", "节点采集明细", "当前并发请求数", "最近启动节点运行时长",
+				"集群总 QPS", "HTTP 状态类别趋势", "HTTP 5xx 比例", "Recovery Panic 增量", "Recovery Panic 趋势",
+				"集群延迟分位数", "平均耗时",
+			},
+		},
+		{
+			path:    grafanaRouteDashboardAssetPath,
+			uid:     "chestnut-api-route-analysis",
+			title:   "Chestnut API 路由分析",
+			refresh: "1m",
+			panelTitles: []string{
+				"P95 最慢路由 Top 10", "各路由 P95", "路由 QPS Top 10", "各路由 5xx 比例", "请求明细",
+			},
+		},
+		{
+			path:    grafanaInstanceRuntimeDashboardAssetPath,
+			uid:     "chestnut-api-instance-runtime",
+			title:   "Chestnut API 节点与运行时",
+			refresh: "1m",
+			panelTitles: []string{
+				"各节点 QPS", "各节点 P95", "各节点 5xx", "各节点并发请求数", "进程 CPU", "进程 RSS",
+				"Go Heap", "Goroutine", "GC 次数", "GC Pause",
+			},
+		},
 	}
-	panels := make(map[string]grafanaPanel, len(dashboard.Panels))
-	panelIDs := make(map[int]string, len(dashboard.Panels))
-	allExpressions := make([]string, 0, len(dashboard.Panels))
-	for _, panel := range dashboard.Panels {
-		panels[panel.Title] = panel
-		if previousTitle, exists := panelIDs[panel.ID]; exists {
-			t.Fatalf("dashboard panels %q and %q share id %d", previousTitle, panel.Title, panel.ID)
+
+	panels := make(map[string]grafanaPanel)
+	allExpressions := make([]string, 0)
+	var allRaw strings.Builder
+	for _, asset := range dashboardAssets {
+		raw, err := os.ReadFile(asset.path)
+		if err != nil {
+			t.Fatalf("os.ReadFile(%q): %v", asset.path, err)
 		}
-		panelIDs[panel.ID] = panel.Title
-		if panel.Type != "row" {
+		allRaw.Write(raw)
+
+		var dashboard grafanaDashboardAsset
+		if err := json.Unmarshal(raw, &dashboard); err != nil {
+			t.Fatalf("json.Unmarshal dashboard %q: %v", asset.path, err)
+		}
+		if dashboard.UID != asset.uid || dashboard.Title != asset.title || dashboard.Editable {
+			t.Fatalf("dashboard %q identity = (uid=%q, title=%q, editable=%v), want (%q, %q, false)",
+				asset.path, dashboard.UID, dashboard.Title, dashboard.Editable, asset.uid, asset.title)
+		}
+		if dashboard.Refresh != asset.refresh || dashboard.Time.From != "now-1h" || dashboard.Time.To != "now" {
+			t.Fatalf("dashboard %q time = (refresh=%q, from=%q, to=%q), want (%q, now-1h, now)",
+				asset.path, dashboard.Refresh, dashboard.Time.From, dashboard.Time.To, asset.refresh)
+		}
+		if dashboard.SchemaVersion != 42 {
+			t.Fatalf("dashboard %q schemaVersion = %d, want 42", asset.path, dashboard.SchemaVersion)
+		}
+		if dashboard.LiveNow == nil || *dashboard.LiveNow || dashboard.Preload == nil || *dashboard.Preload {
+			t.Fatalf("dashboard %q must explicitly disable liveNow and preload", asset.path)
+		}
+		if dashboard.Style != "light" || dashboard.Timezone != "Asia/Shanghai" || dashboard.WeekStart != "monday" {
+			t.Fatalf("dashboard %q display settings = (style=%q, timezone=%q, weekStart=%q), want (light, Asia/Shanghai, monday)",
+				asset.path, dashboard.Style, dashboard.Timezone, dashboard.WeekStart)
+		}
+		if strings.Join(dashboard.Tags, ",") != "chestnut,api" {
+			t.Fatalf("dashboard %q tags = %v, want [chestnut api]", asset.path, dashboard.Tags)
+		}
+		if strings.Join(dashboard.Timepicker.RefreshIntervals, ",") != "30s,1m,5m,15m,30m,1h,2h,1d" {
+			t.Fatalf("dashboard %q refresh intervals = %v, want standard dashboard intervals",
+				asset.path, dashboard.Timepicker.RefreshIntervals)
+		}
+		if len(dashboard.Links) != 1 || dashboard.Links[0].Type != "dashboards" ||
+			!dashboard.Links[0].AsDropdown || !dashboard.Links[0].IncludeVars || !dashboard.Links[0].KeepTime ||
+			len(dashboard.Links[0].Tags) != 1 || dashboard.Links[0].Tags[0] != "chestnut" {
+			t.Fatalf("dashboard %q links = %#v, want one chestnut dashboard dropdown preserving variables and time", asset.path, dashboard.Links)
+		}
+		if len(dashboard.Templating.List) != len(wantVariables) {
+			t.Fatalf("dashboard %q variables = %d, want %d", asset.path, len(dashboard.Templating.List), len(wantVariables))
+		}
+		for index, variable := range dashboard.Templating.List {
+			if variable.Datasource.UID != prometheusDatasourceUID {
+				t.Fatalf("dashboard %q variable %q datasource UID = %q, want %q",
+					asset.path, variable.Name, variable.Datasource.UID, prometheusDatasourceUID)
+			}
+			want := wantVariables[index]
+			if variable.Name != want.name || variable.Query.Query != want.query || variable.Definition != want.query {
+				t.Fatalf("dashboard %q variable[%d] = (name=%q, query=%q, definition=%q), want (%q, %q, %q)",
+					asset.path, index, variable.Name, variable.Query.Query, variable.Definition, want.name, want.query, want.query)
+			}
+			if !variable.IncludeAll || !variable.Multi {
+				t.Fatalf("dashboard %q variable %q must support All and multi-select", asset.path, variable.Name)
+			}
+			if variable.AllValue != ".*" {
+				t.Fatalf("dashboard %q variable %q allValue = %q, want %q",
+					asset.path, variable.Name, variable.AllValue, ".*")
+			}
+		}
+
+		dashboardPanels := make(map[string]grafanaPanel, len(asset.panelTitles))
+		panelIDs := make(map[int]string, len(dashboard.Panels))
+		for _, panel := range dashboard.Panels {
+			if previousTitle, exists := panelIDs[panel.ID]; exists {
+				t.Fatalf("dashboard %q panels %q and %q share id %d", asset.path, previousTitle, panel.Title, panel.ID)
+			}
+			panelIDs[panel.ID] = panel.Title
+			if panel.Type == "row" {
+				continue
+			}
 			if panel.Datasource.UID != prometheusDatasourceUID {
-				t.Fatalf("panel %q datasource UID = %q, want %q", panel.Title, panel.Datasource.UID, prometheusDatasourceUID)
+				t.Fatalf("dashboard %q panel %q datasource UID = %q, want %q",
+					asset.path, panel.Title, panel.Datasource.UID, prometheusDatasourceUID)
 			}
 			if strings.TrimSpace(panel.FieldConfig.Defaults.NoValue) == "" {
-				t.Fatalf("panel %q must define noValue semantics", panel.Title)
+				t.Fatalf("dashboard %q panel %q must define noValue semantics", asset.path, panel.Title)
+			}
+			if panel.Type != "table" && (panel.FieldConfig.Defaults.Min == nil || *panel.FieldConfig.Defaults.Min != 0) {
+				t.Fatalf("dashboard %q panel %q must pin non-negative metrics to min=0", asset.path, panel.Title)
+			}
+			if previous, exists := panels[panel.Title]; exists {
+				t.Fatalf("panel %q appears in multiple dashboards: %#v and %q", panel.Title, previous, asset.path)
+			}
+			dashboardPanels[panel.Title] = panel
+			panels[panel.Title] = panel
+			for _, target := range panel.Targets {
+				if target.Expr != "" && !strings.Contains(target.Expr, `job="chestnut-api"`) {
+					t.Fatalf("dashboard %q panel %q expression must be scoped to chestnut-api: %q",
+						asset.path, panel.Title, target.Expr)
+				}
+				allExpressions = append(allExpressions, target.Expr)
 			}
 		}
-		for _, target := range panel.Targets {
-			allExpressions = append(allExpressions, target.Expr)
+		if len(dashboardPanels) != len(asset.panelTitles) {
+			t.Fatalf("dashboard %q data panels = %d, want %d", asset.path, len(dashboardPanels), len(asset.panelTitles))
 		}
-	}
-	for _, panelTitle := range wantPanels {
-		if _, exists := panels[panelTitle]; !exists {
-			t.Fatalf("dashboard panel %q not found", panelTitle)
+		for _, panelTitle := range asset.panelTitles {
+			if _, exists := dashboardPanels[panelTitle]; !exists {
+				t.Fatalf("dashboard %q panel %q not found", asset.path, panelTitle)
+			}
 		}
 	}
 	assertTargetHealthPanels(t, panels)
+	assertOverviewSummaryPresentation(t, panels)
+	assertDashboardDiagnosticSemantics(t, panels)
 
 	expressions := strings.Join(allExpressions, "\n")
 	for _, metricName := range []string{
@@ -257,21 +391,110 @@ func TestGrafanaDashboardAssetCoversAPIClusterOperations(t *testing.T) {
 		t.Fatal("dashboard latency expressions must aggregate buckets by le before histogram_quantile")
 	}
 	if strings.Contains(expressions, "avg(histogram_quantile") {
-		t.Fatal("dashboard must not average instance quantiles")
+		t.Fatal("dashboard must not average node quantiles")
 	}
-	for _, forbidden := range []string{"de_card_http_", "Response.Code", "nats_"} {
-		if strings.Contains(string(raw), forbidden) {
-			t.Fatalf("dashboard contains forbidden legacy or unrelated value %q", forbidden)
+	for _, forbidden := range []string{
+		"de_card_http_", "Response.Code", "nats_",
+		`"$instance"`, `"$service"`, `"$job"`, `"$route"`,
+		`status=~`, `by (status)`, `{{status}}`,
+	} {
+		if strings.Contains(allRaw.String(), forbidden) {
+			t.Fatalf("dashboards contain forbidden legacy or unrelated value %q", forbidden)
 		}
 	}
 
-	for _, panelTitle := range []string{"各实例 QPS", "各实例 P95", "各实例 5xx", "各实例 In-flight", "进程 CPU", "进程 RSS", "Go Heap", "Goroutine", "GC 次数", "GC Pause"} {
+	for _, panelTitle := range []string{"各节点 QPS", "各节点 P95", "各节点 5xx", "各节点并发请求数", "进程 CPU", "进程 RSS", "Go Heap", "Goroutine", "GC 次数", "GC Pause"} {
 		panel := panels[panelTitle]
 		for _, target := range panel.Targets {
-			if !strings.Contains(target.Expr, "instance") || !strings.Contains(target.LegendFormat, "instance") || !strings.Contains(target.LegendFormat, "node") {
-				t.Fatalf("panel %q must retain instance and show node/instance legend", panelTitle)
+			if !strings.Contains(target.Expr, "node") || target.LegendFormat != "{{node}}" {
+				t.Fatalf("panel %q must use node as its only operational identity", panelTitle)
 			}
 		}
+	}
+}
+
+func assertDashboardDiagnosticSemantics(t *testing.T, panels map[string]grafanaPanel) {
+	t.Helper()
+
+	statusTrend := panels["HTTP 状态类别趋势"]
+	wantStatusClasses := []string{"2xx", "3xx", "4xx", "5xx"}
+	if len(statusTrend.Targets) != len(wantStatusClasses) {
+		t.Fatalf("HTTP 状态类别趋势 targets = %d, want %d", len(statusTrend.Targets), len(wantStatusClasses))
+	}
+	for index, statusClass := range wantStatusClasses {
+		target := statusTrend.Targets[index]
+		if !strings.Contains(target.Expr, `status_class="`+statusClass+`"`) || target.LegendFormat != statusClass {
+			t.Fatalf("HTTP 状态类别趋势 target[%d] = (expr=%q, legend=%q), want status_class=%q",
+				index, target.Expr, target.LegendFormat, statusClass)
+		}
+	}
+
+	for _, title := range []string{"P95 最慢路由 Top 10", "路由 QPS Top 10"} {
+		panel := panels[title]
+		if panel.Type != "table" || len(panel.Targets) != 1 || !panel.Targets[0].Instant {
+			t.Fatalf("panel %q must be an instant Top-N table", title)
+		}
+		wantTransformations := "seriesToRows,sortBy,organize"
+		gotTransformations := make([]string, 0, len(panel.Transformations))
+		for _, transformation := range panel.Transformations {
+			gotTransformations = append(gotTransformations, transformation.ID)
+		}
+		if strings.Join(gotTransformations, ",") != wantTransformations {
+			t.Fatalf("panel %q transformations = %v, want %s", title, gotTransformations, wantTransformations)
+		}
+	}
+
+	if expression := panels["HTTP 5xx 比例"].Targets[0].Expr; !strings.Contains(expression, "or vector(0)") || !strings.Contains(expression, "> 0)") {
+		t.Fatalf("HTTP 5xx 比例 must distinguish zero errors from zero traffic: %q", expression)
+	}
+	for _, title := range []string{"各路由 5xx 比例", "各节点 5xx"} {
+		if expression := panels[title].Targets[0].Expr; !strings.Contains(expression, "or 0 *") {
+			t.Fatalf("panel %q must retain healthy zero-error series: %q", title, expression)
+		}
+	}
+	if expression := panels["Recovery Panic 增量"].Targets[0].Expr; !strings.Contains(expression, "[5m]") ||
+		!strings.Contains(expression, "or vector(0)") || !strings.Contains(expression, "count(up{") {
+		t.Fatalf("Recovery Panic 增量 must use a fixed window and preserve missing-target semantics: %q", expression)
+	}
+	if panels["GC Pause"].FieldConfig.Defaults.Unit != "percentunit" {
+		t.Fatalf("GC Pause unit = %q, want percentunit for seconds-per-second ratio",
+			panels["GC Pause"].FieldConfig.Defaults.Unit)
+	}
+}
+
+func assertOverviewSummaryPresentation(t *testing.T, panels map[string]grafanaPanel) {
+	t.Helper()
+
+	available := panels["可用节点数"]
+	if available.FieldConfig.Defaults.Color.Mode != "fixed" ||
+		available.FieldConfig.Defaults.Color.FixedColor != "semi-dark-blue" {
+		t.Fatalf("可用节点数 must use a neutral fixed color")
+	}
+
+	availability := panels["节点可用率"]
+	steps := availability.FieldConfig.Defaults.Thresholds.Steps
+	if availability.FieldConfig.Defaults.Decimals == nil || *availability.FieldConfig.Defaults.Decimals != 0 ||
+		len(steps) != 2 || steps[0].Color != "red" || steps[0].Value != nil ||
+		steps[1].Color != "green" || steps[1].Value == nil || *steps[1].Value != 100 {
+		t.Fatalf("节点可用率 must display whole percentages and turn green only at 100%%")
+	}
+
+	inFlight := panels["当前并发请求数"]
+	if inFlight.GridPos.Width != 6 || inFlight.GridPos.X != 12 ||
+		inFlight.Options.GraphMode != "area" || len(inFlight.Targets) != 1 || inFlight.Targets[0].Instant {
+		t.Fatalf("当前并发请求数 must occupy columns 12-17 and show a range-query sparkline")
+	}
+
+	uptime := panels["最近启动节点运行时长"]
+	uptimeSteps := uptime.FieldConfig.Defaults.Thresholds.Steps
+	if uptime.GridPos.Width != 6 || uptime.GridPos.X != 18 ||
+		uptime.FieldConfig.Defaults.Unit != "suffix: 小时" ||
+		uptime.FieldConfig.Defaults.Decimals == nil || *uptime.FieldConfig.Defaults.Decimals != 2 ||
+		len(uptime.Targets) != 1 || !strings.HasSuffix(uptime.Targets[0].Expr, "/ 3600") ||
+		len(uptimeSteps) != 3 || uptimeSteps[0].Color != "red" || uptimeSteps[0].Value != nil ||
+		uptimeSteps[1].Color != "yellow" || uptimeSteps[1].Value == nil || *uptimeSteps[1].Value != 0.25 ||
+		uptimeSteps[2].Color != "green" || uptimeSteps[2].Value == nil || *uptimeSteps[2].Value != 1 {
+		t.Fatalf("最近启动节点运行时长 must use Chinese hours and equivalent 15-minute/1-hour thresholds")
 	}
 }
 
@@ -326,9 +549,9 @@ func TestGrafanaDashboardTargetHealthSemantics(t *testing.T) {
 		})
 	}
 
-	raw, err := os.ReadFile(grafanaDashboardAssetPath)
+	raw, err := os.ReadFile(grafanaOverviewDashboardAssetPath)
 	if err != nil {
-		t.Fatalf("os.ReadFile(%q): %v", grafanaDashboardAssetPath, err)
+		t.Fatalf("os.ReadFile(%q): %v", grafanaOverviewDashboardAssetPath, err)
 	}
 	var dashboard grafanaDashboardAsset
 	if err := json.Unmarshal(raw, &dashboard); err != nil {
@@ -344,20 +567,20 @@ func TestGrafanaDashboardTargetHealthSemantics(t *testing.T) {
 func assertTargetHealthPanels(t *testing.T, panels map[string]grafanaPanel) {
 	t.Helper()
 
-	const targetFilters = `job=~"$job",node=~"$node",instance=~"$instance"`
+	const targetFilters = `job="chestnut-api",node=~"$node"`
 	wantExpressions := map[string]string{
-		"Target 可用数":  "sum(up{" + targetFilters + "})",
-		"Target 不可用数": "count(up{" + targetFilters + "}) - sum(up{" + targetFilters + "})",
-		"Target 可用率":  "100 * sum(up{" + targetFilters + "}) / count(up{" + targetFilters + "})",
-		"Target 健康明细": "max by (job, node, instance) (up{" + targetFilters + "})",
+		"可用节点数":  "sum(up{" + targetFilters + "})",
+		"不可用节点数": "count(up{" + targetFilters + "}) - sum(up{" + targetFilters + "})",
+		"节点可用率":  "100 * sum(up{" + targetFilters + "}) / count(up{" + targetFilters + "})",
+		"节点采集明细": "max by (job, node, instance) (up{" + targetFilters + "})",
 	}
 	for title, wantExpression := range wantExpressions {
 		panel, exists := panels[title]
 		if !exists {
 			t.Fatalf("dashboard panel %q not found", title)
 		}
-		if panel.FieldConfig.Defaults.NoValue != "无 target 数据" {
-			t.Fatalf("panel %q noValue = %q, want 无 target 数据", title, panel.FieldConfig.Defaults.NoValue)
+		if panel.FieldConfig.Defaults.NoValue != "无节点采集数据" {
+			t.Fatalf("panel %q noValue = %q, want 无节点采集数据", title, panel.FieldConfig.Defaults.NoValue)
 		}
 		if len(panel.Targets) != 1 || panel.Targets[0].Expr != wantExpression {
 			t.Fatalf("panel %q expression = %v, want %q", title, panel.Targets, wantExpression)
@@ -367,18 +590,38 @@ func assertTargetHealthPanels(t *testing.T, panels map[string]grafanaPanel) {
 		}
 	}
 
-	detailPanel := panels["Target 健康明细"]
+	detailPanel := panels["节点采集明细"]
 	if detailPanel.Type != "table" || !detailPanel.Targets[0].Instant || detailPanel.Targets[0].Format != "table" {
-		t.Fatalf("Target 健康明细 = (type=%q, instant=%v, format=%q), want table/true/table",
+		t.Fatalf("节点采集明细 = (type=%q, instant=%v, format=%q), want table/true/table",
 			detailPanel.Type, detailPanel.Targets[0].Instant, detailPanel.Targets[0].Format)
 	}
 	if len(detailPanel.FieldConfig.Defaults.Mappings) != 1 || detailPanel.FieldConfig.Defaults.Mappings[0].Type != "value" {
-		t.Fatalf("Target 健康明细 mappings = %v, want one value mapping", detailPanel.FieldConfig.Defaults.Mappings)
+		t.Fatalf("节点采集明细 mappings = %v, want one value mapping", detailPanel.FieldConfig.Defaults.Mappings)
 	}
 	mappingOptions := detailPanel.FieldConfig.Defaults.Mappings[0].Options
-	if mappingOptions["1"].Text != "UP" || mappingOptions["1"].Color != "green" ||
-		mappingOptions["0"].Text != "DOWN" || mappingOptions["0"].Color != "red" {
-		t.Fatalf("Target 健康明细 mapping options = %v, want 1=green UP and 0=red DOWN", mappingOptions)
+	if mappingOptions["1"].Text != "正常" || mappingOptions["1"].Color != "green" ||
+		mappingOptions["0"].Text != "异常" || mappingOptions["0"].Color != "red" {
+		t.Fatalf("节点采集明细 mapping options = %v, want 1=green 正常 and 0=red 异常", mappingOptions)
+	}
+	if detailPanel.GridPos.Height != 6 || detailPanel.GridPos.Y != 5 ||
+		panels["集群总 QPS"].GridPos.Y != 12 || panels["Recovery Panic 增量"].GridPos.Y != 20 ||
+		panels["集群延迟分位数"].GridPos.Y != 28 {
+		t.Fatal("节点采集明细及后续区域 must use the compact vertical layout")
+	}
+	if len(detailPanel.Transformations) != 3 ||
+		detailPanel.Transformations[0].ID != "labelsToFields" ||
+		detailPanel.Transformations[1].ID != "sortBy" ||
+		detailPanel.Transformations[2].ID != "organize" {
+		t.Fatalf("节点采集明细 transformations = %v, want labelsToFields/sortBy/organize",
+			detailPanel.Transformations)
+	}
+	organize := detailPanel.Transformations[2].Options
+	if len(organize.ExcludeByName) != 2 || !organize.ExcludeByName["job"] || !organize.ExcludeByName["instance"] ||
+		len(organize.IndexByName) != 3 || organize.IndexByName["Time"] != 0 ||
+		organize.IndexByName["node"] != 1 || organize.IndexByName["Value"] != 2 ||
+		organize.RenameByName["Time"] != "采集时间" || organize.RenameByName["node"] != "节点" ||
+		organize.RenameByName["Value"] != "采集状态" {
+		t.Fatalf("节点采集明细 organize options = %#v, want only 采集时间/节点/采集状态", organize)
 	}
 }
 

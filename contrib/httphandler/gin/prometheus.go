@@ -25,7 +25,6 @@ const (
 	serviceLabelName     = "service"
 	methodLabelName      = "method"
 	routeLabelName       = "route"
-	statusLabelName      = "status"
 	statusClassLabelName = "status_class"
 )
 
@@ -41,7 +40,7 @@ type prometheusHTTPMetrics struct {
 
 func newPrometheusHTTPMetrics(config appconfig.Prometheus) *prometheusHTTPMetrics {
 	constLabels := prometheus.Labels{serviceLabelName: config.ServiceName}
-	httpRequestLabels := []string{methodLabelName, routeLabelName, statusLabelName}
+	httpRequestLabels := []string{methodLabelName, routeLabelName, statusClassLabelName}
 	httpRequestDurationLabels := []string{methodLabelName, routeLabelName, statusClassLabelName}
 	registry := prometheus.NewRegistry()
 	metrics := &prometheusHTTPMetrics{
@@ -51,7 +50,7 @@ func newPrometheusHTTPMetrics(config appconfig.Prometheus) *prometheusHTTPMetric
 			Namespace:   prometheusNamespace,
 			Subsystem:   prometheusHTTPSubsystem,
 			Name:        httpRequestsMetricName,
-			Help:        "Total number of completed HTTP requests handled by the Chestnut server.",
+			Help:        "Total number of completed HTTP requests handled by the Chestnut server, grouped by HTTP status class.",
 			ConstLabels: constLabels,
 		}, httpRequestLabels),
 		requestDuration: prometheus.NewHistogramVec(prometheus.HistogramOpts{
@@ -119,10 +118,8 @@ func (m *prometheusHTTPMetrics) middleware() gin.HandlerFunc {
 				return
 			}
 
-			status := strconv.Itoa(statusCode)
-			m.requests.WithLabelValues(ctx.Request.Method, route, status).Inc()
-			// 延迟只保留状态类别，避免每个精确状态码复制整套 Histogram buckets。
 			statusClass := strconv.Itoa(statusCode/100) + "xx"
+			m.requests.WithLabelValues(ctx.Request.Method, route, statusClass).Inc()
 			m.requestDuration.WithLabelValues(ctx.Request.Method, route, statusClass).Observe(time.Since(startedAt).Seconds())
 		}()
 

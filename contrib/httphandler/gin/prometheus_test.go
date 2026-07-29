@@ -54,12 +54,16 @@ func TestPrometheusEndpointExposesEngineAndDefaultMetrics(t *testing.T) {
 	}
 }
 
-func TestPrometheusRecordsRouteTemplateHTTPStatusAndIgnoresBusinessBody(t *testing.T) {
+func TestPrometheusRecordsRouteTemplateHTTPStatusClassAndIgnoresBusinessBody(t *testing.T) {
 	handler := newPrometheusTestEngine(testPrometheusConfig(), nil)
 
 	created := performRequest(handler, http.MethodGet, "/test/123")
 	if created.Code != http.StatusCreated || created.Body.String() != "created" {
 		t.Fatalf("GET /test/123 = (%d, %q), want (%d, %q)", created.Code, created.Body.String(), http.StatusCreated, "created")
+	}
+	ok := performRequest(handler, http.MethodGet, "/test/ok")
+	if ok.Code != http.StatusOK || ok.Body.String() != "ok" {
+		t.Fatalf("GET /test/ok = (%d, %q), want (%d, %q)", ok.Code, ok.Body.String(), http.StatusOK, "ok")
 	}
 	businessError := performRequest(handler, http.MethodGet, "/business-error")
 	if businessError.Code != http.StatusOK {
@@ -67,15 +71,16 @@ func TestPrometheusRecordsRouteTemplateHTTPStatusAndIgnoresBusinessBody(t *testi
 	}
 
 	metrics := scrapeMetrics(t, handler)
-	assertMetricValue(t, metrics, "chestnut_http_server_requests_total", 1,
-		`service="test-api"`, `method="GET"`, `route="/test/:id"`, `status="201"`)
-	assertMetricValue(t, metrics, "chestnut_http_server_request_duration_seconds_count", 1,
+	assertMetricValue(t, metrics, "chestnut_http_server_requests_total", 2,
 		`service="test-api"`, `method="GET"`, `route="/test/:id"`, `status_class="2xx"`)
+	assertMetricValue(t, metrics, "chestnut_http_server_request_duration_seconds_count", 2,
+		`service="test-api"`, `method="GET"`, `route="/test/:id"`, `status_class="2xx"`)
+	assertMetricAbsent(t, metrics, "chestnut_http_server_requests_total", `status=`)
 	assertMetricAbsent(t, metrics, "chestnut_http_server_request_duration_seconds_count", `status=`)
 	assertMetricValue(t, metrics, "chestnut_http_server_requests_total", 1,
-		`service="test-api"`, `method="GET"`, `route="/business-error"`, `status="200"`)
+		`service="test-api"`, `method="GET"`, `route="/business-error"`, `status_class="2xx"`)
 
-	for _, forbidden := range []string{"/test/123", `code="400"`, "服务异常"} {
+	for _, forbidden := range []string{"/test/123", "/test/ok", `code="400"`, "服务异常"} {
 		if strings.Contains(metrics, forbidden) {
 			t.Fatalf("GET /metrics body contains forbidden request/body value %q", forbidden)
 		}
@@ -124,7 +129,7 @@ func TestPrometheusRecordsRecoveredPanicSeparatelyFromActiveHTTP500(t *testing.T
 	metrics := scrapeMetrics(t, handler)
 	for _, route := range []string{"/panic", "/active-500"} {
 		assertMetricValue(t, metrics, "chestnut_http_server_requests_total", 1,
-			`service="test-api"`, `method="GET"`, `route="`+route+`"`, `status="500"`)
+			`service="test-api"`, `method="GET"`, `route="`+route+`"`, `status_class="5xx"`)
 		assertMetricValue(t, metrics, "chestnut_http_server_request_duration_seconds_count", 1,
 			`service="test-api"`, `method="GET"`, `route="`+route+`"`, `status_class="5xx"`)
 	}
@@ -162,7 +167,7 @@ func TestPrometheusPreservesCommittedResponseAfterRecoveredPanic(t *testing.T) {
 
 	metrics := scrapeMetrics(t, handler)
 	assertMetricValue(t, metrics, "chestnut_http_server_requests_total", 1,
-		`service="test-api"`, `method="GET"`, `route="/committed-panic"`, `status="200"`)
+		`service="test-api"`, `method="GET"`, `route="/committed-panic"`, `status_class="2xx"`)
 	assertMetricValue(t, metrics, "chestnut_http_server_request_duration_seconds_count", 1,
 		`service="test-api"`, `method="GET"`, `route="/committed-panic"`, `status_class="2xx"`)
 	assertMetricValue(t, metrics, "chestnut_http_server_recovered_panics_total", 1,
@@ -241,9 +246,9 @@ func TestPrometheusRegistriesAreIsolatedPerEngine(t *testing.T) {
 	}
 
 	assertMetricValue(t, scrapeMetrics(t, engineA), "chestnut_http_server_requests_total", 1,
-		`service="test-api"`, `method="GET"`, `route="/test/:id"`, `status="201"`)
+		`service="test-api"`, `method="GET"`, `route="/test/:id"`, `status_class="2xx"`)
 	assertMetricAbsent(t, scrapeMetrics(t, engineB), "chestnut_http_server_requests_total",
-		`service="test-api"`, `method="GET"`, `route="/test/:id"`, `status="201"`)
+		`service="test-api"`, `method="GET"`, `route="/test/:id"`, `status_class="2xx"`)
 }
 
 func testPrometheusConfig() *appconfig.AppConfig {
@@ -260,6 +265,10 @@ func testPrometheusConfig() *appconfig.AppConfig {
 func newPrometheusTestEngine(config *appconfig.AppConfig, extraRoutes func(*ginframework.RouterGroup)) *ginframework.Engine {
 	return HTTPHandlerWithConfig(config, nil, func(router *ginframework.RouterGroup) {
 		router.GET("/test/:id", func(ctx *ginframework.Context) {
+			if ctx.Param("id") == "ok" {
+				ctx.String(http.StatusOK, "ok")
+				return
+			}
 			ctx.String(http.StatusCreated, "created")
 		})
 		router.GET("/business-error", func(ctx *ginframework.Context) {
