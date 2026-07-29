@@ -44,6 +44,7 @@ func TestPrometheusEndpointExposesEngineAndDefaultMetrics(t *testing.T) {
 		"# HELP chestnut_http_server_requests_total",
 		"# HELP chestnut_http_server_request_duration_seconds",
 		"# HELP chestnut_http_server_requests_in_flight",
+		"# HELP chestnut_http_server_websocket_connections",
 		"# HELP chestnut_http_server_recovered_panics_total",
 		"# HELP go_goroutines",
 		"# HELP process_cpu_seconds_total",
@@ -85,6 +86,55 @@ func TestPrometheusRecordsRouteTemplateHTTPStatusClassAndIgnoresBusinessBody(t *
 			t.Fatalf("GET /metrics body contains forbidden request/body value %q", forbidden)
 		}
 	}
+}
+
+func TestPrometheusTracksWebSocketConnectionAndExcludesItFromHTTPRequestDuration(t *testing.T) {
+	started := make(chan struct{})
+	release := make(chan struct{})
+	handler := newPrometheusTestEngine(testPrometheusConfig(), func(router *ginframework.RouterGroup) {
+		router.GET("/websocket-upgrade", func(ctx *ginframework.Context) {
+			close(started)
+			<-release
+			ctx.Status(http.StatusOK)
+		})
+	})
+
+	done := make(chan *httptest.ResponseRecorder, 1)
+	go func() {
+		request := httptest.NewRequest(http.MethodGet, "/websocket-upgrade", nil)
+		request.Header.Set("Connection", "keep-alive, Upgrade")
+		request.Header.Set("Upgrade", "websocket")
+		recorder := httptest.NewRecorder()
+		handler.ServeHTTP(recorder, request)
+		done <- recorder
+	}()
+
+	select {
+	case <-started:
+	case <-time.After(testRequestTimeout):
+		t.Fatal("WebSocket handler did not start before timeout")
+	}
+	activeMetrics := scrapeMetrics(t, handler)
+	assertMetricValue(t, activeMetrics, "chestnut_http_server_requests_in_flight", 1, `service="test-api"`)
+	assertMetricValue(t, activeMetrics, "chestnut_http_server_websocket_connections", 1, `service="test-api"`)
+
+	close(release)
+	select {
+	case recorder := <-done:
+		if recorder.Code != http.StatusOK {
+			t.Fatalf("GET /websocket-upgrade status = %d, want %d", recorder.Code, http.StatusOK)
+		}
+	case <-time.After(testRequestTimeout):
+		t.Fatal("WebSocket handler did not finish before timeout")
+	}
+
+	metrics := scrapeMetrics(t, handler)
+	assertMetricValue(t, metrics, "chestnut_http_server_requests_total", 1,
+		`service="test-api"`, `method="GET"`, `route="/websocket-upgrade"`, `status_class="2xx"`)
+	assertMetricAbsent(t, metrics, "chestnut_http_server_request_duration_seconds_count",
+		`service="test-api"`, `method="GET"`, `route="/websocket-upgrade"`)
+	assertMetricValue(t, metrics, "chestnut_http_server_requests_in_flight", 0, `service="test-api"`)
+	assertMetricValue(t, metrics, "chestnut_http_server_websocket_connections", 0, `service="test-api"`)
 }
 
 func TestPrometheusExcludesUnmatchedConfiguredAndStatusRequests(t *testing.T) {
@@ -223,6 +273,7 @@ func TestPrometheusTracksInFlightRequestUntilCompletion(t *testing.T) {
 		t.Fatal("blocked handler did not start before timeout")
 	}
 	assertMetricValue(t, scrapeMetrics(t, handler), "chestnut_http_server_requests_in_flight", 1, `service="test-api"`)
+	assertMetricValue(t, scrapeMetrics(t, handler), "chestnut_http_server_websocket_connections", 0, `service="test-api"`)
 
 	close(release)
 	select {

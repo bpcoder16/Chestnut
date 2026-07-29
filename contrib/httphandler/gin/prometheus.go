@@ -7,6 +7,7 @@ import (
 
 	"github.com/bpcoder16/Chestnut/v4/appconfig"
 	"github.com/gin-gonic/gin"
+	"github.com/gorilla/websocket"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
@@ -20,6 +21,7 @@ const (
 	httpRequestsMetricName         = "requests_total"
 	httpRequestDurationMetricName  = "request_duration_seconds"
 	httpRequestsInFlightMetricName = "requests_in_flight"
+	httpWebSocketConnectionsName   = "websocket_connections"
 	httpRecoveredPanicsMetricName  = "recovered_panics_total"
 
 	serviceLabelName     = "service"
@@ -29,13 +31,14 @@ const (
 )
 
 type prometheusHTTPMetrics struct {
-	excludedPaths       map[string]struct{}
-	excludedStatusCodes map[int]struct{}
-	requests            *prometheus.CounterVec
-	requestDuration     *prometheus.HistogramVec
-	requestsInFlight    prometheus.Gauge
-	recoveredPanics     *prometheus.CounterVec
-	gatherer            prometheus.Gatherer
+	excludedPaths        map[string]struct{}
+	excludedStatusCodes  map[int]struct{}
+	requests             *prometheus.CounterVec
+	requestDuration      *prometheus.HistogramVec
+	requestsInFlight     prometheus.Gauge
+	webSocketConnections prometheus.Gauge
+	recoveredPanics      *prometheus.CounterVec
+	gatherer             prometheus.Gatherer
 }
 
 func newPrometheusHTTPMetrics(config appconfig.Prometheus) *prometheusHTTPMetrics {
@@ -57,7 +60,7 @@ func newPrometheusHTTPMetrics(config appconfig.Prometheus) *prometheusHTTPMetric
 			Namespace:   prometheusNamespace,
 			Subsystem:   prometheusHTTPSubsystem,
 			Name:        httpRequestDurationMetricName,
-			Help:        "Duration in seconds of completed HTTP requests handled by the Chestnut server.",
+			Help:        "Duration in seconds of completed HTTP requests handled by the Chestnut server, excluding WebSocket upgrade requests.",
 			ConstLabels: constLabels,
 			Buckets:     prometheus.DefBuckets,
 		}, httpRequestDurationLabels),
@@ -65,7 +68,14 @@ func newPrometheusHTTPMetrics(config appconfig.Prometheus) *prometheusHTTPMetric
 			Namespace:   prometheusNamespace,
 			Subsystem:   prometheusHTTPSubsystem,
 			Name:        httpRequestsInFlightMetricName,
-			Help:        "Current number of matched HTTP requests being handled by the Chestnut server.",
+			Help:        "Current number of matched HTTP requests being handled by the Chestnut server, including active WebSocket handlers.",
+			ConstLabels: constLabels,
+		}),
+		webSocketConnections: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace:   prometheusNamespace,
+			Subsystem:   prometheusHTTPSubsystem,
+			Name:        httpWebSocketConnectionsName,
+			Help:        "Current number of active WebSocket connections and in-progress upgrade requests handled by the Chestnut server.",
 			ConstLabels: constLabels,
 		}),
 		recoveredPanics: prometheus.NewCounterVec(prometheus.CounterOpts{
@@ -89,6 +99,7 @@ func newPrometheusHTTPMetrics(config appconfig.Prometheus) *prometheusHTTPMetric
 		metrics.requests,
 		metrics.requestDuration,
 		metrics.requestsInFlight,
+		metrics.webSocketConnections,
 		metrics.recoveredPanics,
 	)
 	metrics.gatherer = prometheus.Gatherers{registry, prometheus.DefaultGatherer}
@@ -103,10 +114,17 @@ func (m *prometheusHTTPMetrics) middleware() gin.HandlerFunc {
 			return
 		}
 
+		webSocketUpgrade := websocket.IsWebSocketUpgrade(ctx.Request)
 		startedAt := time.Now()
 		m.requestsInFlight.Inc()
+		if webSocketUpgrade {
+			m.webSocketConnections.Inc()
+		}
 		defer func() {
 			m.requestsInFlight.Dec()
+			if webSocketUpgrade {
+				m.webSocketConnections.Dec()
+			}
 
 			// Recovery 是独立异常事实，即使最终状态被排除也必须保留该信号。
 			if recovered, exists := ctx.Get(recoveryMetricContextKey); exists && recovered == true {
@@ -120,6 +138,10 @@ func (m *prometheusHTTPMetrics) middleware() gin.HandlerFunc {
 
 			statusClass := strconv.Itoa(statusCode/100) + "xx"
 			m.requests.WithLabelValues(ctx.Request.Method, route, statusClass).Inc()
+			// WebSocket Handler 在连接关闭后才返回，记录该耗时会把连接存活时间误当成 HTTP 响应延迟。
+			if webSocketUpgrade {
+				return
+			}
 			m.requestDuration.WithLabelValues(ctx.Request.Method, route, statusClass).Observe(time.Since(startedAt).Seconds())
 		}()
 

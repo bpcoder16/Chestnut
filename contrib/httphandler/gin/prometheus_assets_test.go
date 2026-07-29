@@ -231,9 +231,10 @@ func TestGrafanaDashboardAssetsCoverAPIClusterOperations(t *testing.T) {
 			title:   "Chestnut API 监控概览",
 			refresh: "30s",
 			panelTitles: []string{
-				"可用节点数", "不可用节点数", "节点可用率", "节点采集明细", "当前并发请求数", "最近启动节点运行时长",
-				"集群总 QPS", "HTTP 状态类别趋势", "HTTP 5xx 比例", "Recovery Panic 增量", "Recovery Panic 趋势",
-				"集群延迟分位数", "平均耗时",
+				"可用节点数", "不可用节点数", "节点可用率", "节点采集明细", "最近启动节点运行时长",
+				"当前 HTTP 请求数", "当前 WebSocket 连接数",
+				"集群总 QPS", "HTTP 状态类别趋势", "所选时段 HTTP 5xx 比例", "所选时段 Recovery Panic 次数", "Recovery Panic 趋势",
+				"HTTP 请求延迟分位数", "HTTP 平均响应耗时",
 			},
 		},
 		{
@@ -374,6 +375,7 @@ func TestGrafanaDashboardAssetsCoverAPIClusterOperations(t *testing.T) {
 		"chestnut_http_server_requests_total",
 		"chestnut_http_server_request_duration_seconds_bucket",
 		"chestnut_http_server_requests_in_flight",
+		"chestnut_http_server_websocket_connections",
 		"chestnut_http_server_recovered_panics_total",
 		"process_cpu_seconds_total",
 		"process_resident_memory_bytes",
@@ -444,17 +446,32 @@ func assertDashboardDiagnosticSemantics(t *testing.T, panels map[string]grafanaP
 		}
 	}
 
-	if expression := panels["HTTP 5xx 比例"].Targets[0].Expr; !strings.Contains(expression, "or vector(0)") || !strings.Contains(expression, "> 0)") {
-		t.Fatalf("HTTP 5xx 比例 must distinguish zero errors from zero traffic: %q", expression)
+	selectedRange5xx := panels["所选时段 HTTP 5xx 比例"]
+	if len(selectedRange5xx.Targets) != 1 || !selectedRange5xx.Targets[0].Instant {
+		t.Fatal("所选时段 HTTP 5xx 比例 must use one instant query")
+	}
+	if expression := selectedRange5xx.Targets[0].Expr; strings.Count(expression, "increase(") != 2 ||
+		strings.Count(expression, "[$__range]") != 2 || strings.Contains(expression, "rate(") ||
+		!strings.Contains(expression, "or vector(0)") || !strings.Contains(expression, "> 0)") {
+		t.Fatalf("所选时段 HTTP 5xx 比例 must cover the selected range and distinguish zero errors from zero traffic: %q", expression)
 	}
 	for _, title := range []string{"各路由 5xx 比例", "各节点 5xx"} {
 		if expression := panels[title].Targets[0].Expr; !strings.Contains(expression, "or 0 *") {
 			t.Fatalf("panel %q must retain healthy zero-error series: %q", title, expression)
 		}
 	}
-	if expression := panels["Recovery Panic 增量"].Targets[0].Expr; !strings.Contains(expression, "[5m]") ||
+	selectedRangePanics := panels["所选时段 Recovery Panic 次数"]
+	if len(selectedRangePanics.Targets) != 1 || !selectedRangePanics.Targets[0].Instant {
+		t.Fatal("所选时段 Recovery Panic 次数 must use one instant query")
+	}
+	if expression := selectedRangePanics.Targets[0].Expr; !strings.Contains(expression, "increase(") ||
+		strings.Count(expression, "[$__range]") != 1 || strings.Contains(expression, "[5m]") ||
 		!strings.Contains(expression, "or vector(0)") || !strings.Contains(expression, "count(up{") {
-		t.Fatalf("Recovery Panic 增量 must use a fixed window and preserve missing-target semantics: %q", expression)
+		t.Fatalf("所选时段 Recovery Panic 次数 must cover the selected range and preserve missing-target semantics: %q", expression)
+	}
+	if expression := panels["Recovery Panic 趋势"].Targets[0].Expr; !strings.Contains(expression, "or 0 * max by (node) (up{") ||
+		!strings.Contains(expression, "== 1)") {
+		t.Fatalf("Recovery Panic 趋势 must fill zero only for healthy nodes: %q", expression)
 	}
 	if panels["GC Pause"].FieldConfig.Defaults.Unit != "percentunit" {
 		t.Fatalf("GC Pause unit = %q, want percentunit for seconds-per-second ratio",
@@ -479,10 +496,27 @@ func assertOverviewSummaryPresentation(t *testing.T, panels map[string]grafanaPa
 		t.Fatalf("节点可用率 must display whole percentages and turn green only at 100%%")
 	}
 
-	inFlight := panels["当前并发请求数"]
-	if inFlight.GridPos.Width != 6 || inFlight.GridPos.X != 12 ||
-		inFlight.Options.GraphMode != "area" || len(inFlight.Targets) != 1 || inFlight.Targets[0].Instant {
-		t.Fatalf("当前并发请求数 must occupy columns 12-17 and show a range-query sparkline")
+	for index, title := range []string{"可用节点数", "不可用节点数", "节点可用率", "最近启动节点运行时长"} {
+		panel := panels[title]
+		if panel.GridPos.Width != 6 || panel.GridPos.X != index*6 || panel.GridPos.Y != 1 {
+			t.Fatalf("summary panel %q must occupy one quarter of the health row", title)
+		}
+	}
+
+	httpInFlight := panels["当前 HTTP 请求数"]
+	if httpInFlight.GridPos.Width != 12 || httpInFlight.GridPos.X != 0 || httpInFlight.GridPos.Y != 20 ||
+		httpInFlight.Options.GraphMode != "area" || len(httpInFlight.Targets) != 1 || httpInFlight.Targets[0].Instant ||
+		!strings.Contains(httpInFlight.Targets[0].Expr, "chestnut_http_server_requests_in_flight") ||
+		!strings.Contains(httpInFlight.Targets[0].Expr, "chestnut_http_server_websocket_connections") {
+		t.Fatalf("当前 HTTP 请求数 must show the selected-range non-WebSocket in-flight sparkline")
+	}
+
+	webSocketConnections := panels["当前 WebSocket 连接数"]
+	if webSocketConnections.GridPos.Width != 12 || webSocketConnections.GridPos.X != 12 ||
+		webSocketConnections.GridPos.Y != 20 || webSocketConnections.Options.GraphMode != "area" ||
+		len(webSocketConnections.Targets) != 1 || webSocketConnections.Targets[0].Instant ||
+		!strings.Contains(webSocketConnections.Targets[0].Expr, "chestnut_http_server_websocket_connections") {
+		t.Fatalf("当前 WebSocket 连接数 must share the selected-range live-load row")
 	}
 
 	uptime := panels["最近启动节点运行时长"]
@@ -604,8 +638,9 @@ func assertTargetHealthPanels(t *testing.T, panels map[string]grafanaPanel) {
 		t.Fatalf("节点采集明细 mapping options = %v, want 1=green 正常 and 0=red 异常", mappingOptions)
 	}
 	if detailPanel.GridPos.Height != 6 || detailPanel.GridPos.Y != 5 ||
-		panels["集群总 QPS"].GridPos.Y != 12 || panels["Recovery Panic 增量"].GridPos.Y != 20 ||
-		panels["集群延迟分位数"].GridPos.Y != 28 {
+		panels["集群总 QPS"].GridPos.Y != 12 || panels["当前 HTTP 请求数"].GridPos.Y != 20 ||
+		panels["所选时段 Recovery Panic 次数"].GridPos.Y != 27 ||
+		panels["HTTP 请求延迟分位数"].GridPos.Y != 35 {
 		t.Fatal("节点采集明细及后续区域 must use the compact vertical layout")
 	}
 	if len(detailPanel.Transformations) != 3 ||

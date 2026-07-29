@@ -55,7 +55,7 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 4,
+        "w": 6,
         "x": 0,
         "y": 1
       },
@@ -110,8 +110,8 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 4,
-        "x": 4,
+        "w": 6,
+        "x": 6,
         "y": 1
       },
       "id": 3,
@@ -167,8 +167,8 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 4,
-        "x": 8,
+        "w": 6,
+        "x": 12,
         "y": 1
       },
       "id": 4,
@@ -198,7 +198,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "当前筛选节点正在处理且未按路径排除的业务请求总数；背景趋势展示所选时间范围内的变化。",
+      "description": "当前筛选节点正在处理的普通 HTTP 请求数，由总 in-flight 减去 WebSocket 连接数得到；背景趋势覆盖 Dashboard 顶部所选时间范围。",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -212,10 +212,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 12,
-        "y": 1
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 20
       },
       "id": 5,
       "options": {
@@ -230,13 +230,59 @@
       },
       "targets": [
         {
-          "expr": "sum(chestnut_http_server_requests_in_flight{job=\"chestnut-api\",node=~\"$node\"})",
+          "expr": "clamp_min(sum(chestnut_http_server_requests_in_flight{job=\"chestnut-api\",node=~\"$node\"}) - (sum(chestnut_http_server_websocket_connections{job=\"chestnut-api\",node=~\"$node\"}) or vector(0)), 0)",
           "instant": false,
-          "legendFormat": "处理中请求",
+          "legendFormat": "HTTP 请求",
           "refId": "A"
         }
       ],
-      "title": "当前并发请求数",
+      "title": "当前 HTTP 请求数",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "当前筛选节点的活跃 WebSocket 连接数；背景趋势覆盖 Dashboard 顶部所选时间范围。",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "semi-dark-purple",
+            "mode": "fixed"
+          },
+          "min": 0,
+          "noValue": "无 WebSocket 数据",
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 20
+      },
+      "id": 38,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(chestnut_http_server_websocket_connections{job=\"chestnut-api\",node=~\"$node\"})",
+          "instant": false,
+          "legendFormat": "WebSocket 连接",
+          "refId": "A"
+        }
+      ],
+      "title": "当前 WebSocket 连接数",
       "type": "stat"
     },
     {
@@ -607,7 +653,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "HTTP 5xx 请求速率占全部业务请求速率的百分比；有请求但无 5xx 时显示 0%，无请求时保持无数据。",
+      "description": "Dashboard 顶部所选时间范围内，HTTP 5xx 请求数占全部业务请求数的百分比；有请求但无 5xx 时显示 0%，无请求时保持无数据。",
       "fieldConfig": {
         "defaults": {
           "decimals": 2,
@@ -654,13 +700,13 @@
       },
       "targets": [
         {
-          "expr": "100 * (sum(rate(chestnut_http_server_requests_total{job=\"chestnut-api\",node=~\"$node\",status_class=\"5xx\"}[$__rate_interval])) or vector(0)) / (sum(rate(chestnut_http_server_requests_total{job=\"chestnut-api\",node=~\"$node\"}[$__rate_interval])) > 0)",
+          "expr": "100 * (sum(increase(chestnut_http_server_requests_total{job=\"chestnut-api\",node=~\"$node\",status_class=\"5xx\"}[$__range])) or vector(0)) / (sum(increase(chestnut_http_server_requests_total{job=\"chestnut-api\",node=~\"$node\"}[$__range])) > 0)",
           "instant": true,
-          "legendFormat": "5xx 比例",
+          "legendFormat": "所选时段 5xx 比例",
           "refId": "A"
         }
       ],
-      "title": "HTTP 5xx 比例",
+      "title": "所选时段 HTTP 5xx 比例",
       "type": "stat"
     },
     {
@@ -668,7 +714,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "最近 5 分钟被 Recovery 捕获的 panic 数量；目标存在且从未发生 panic 时显示 0，目标数据缺失时保持不可用。",
+      "description": "Dashboard 顶部所选时间范围内被 Recovery 捕获的 panic 总次数；目标存在且未发生 panic 时显示 0，目标数据缺失时保持不可用。",
       "fieldConfig": {
         "defaults": {
           "decimals": 0,
@@ -695,7 +741,7 @@
         "h": 7,
         "w": 6,
         "x": 0,
-        "y": 20
+        "y": 27
       },
       "id": 14,
       "options": {
@@ -710,13 +756,13 @@
       },
       "targets": [
         {
-          "expr": "(sum(increase(chestnut_http_server_recovered_panics_total{job=\"chestnut-api\",node=~\"$node\"}[5m])) or vector(0)) and on() (count(up{job=\"chestnut-api\",node=~\"$node\"}) > 0)",
+          "expr": "(sum(increase(chestnut_http_server_recovered_panics_total{job=\"chestnut-api\",node=~\"$node\"}[$__range])) or vector(0)) and on() (count(up{job=\"chestnut-api\",node=~\"$node\"}) > 0)",
           "instant": true,
-          "legendFormat": "Recovered panic",
+          "legendFormat": "所选时段 Recovery Panic 次数",
           "refId": "A"
         }
       ],
-      "title": "Recovery Panic 增量",
+      "title": "所选时段 Recovery Panic 次数",
       "type": "stat"
     },
     {
@@ -724,7 +770,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "按 node 展示 Recovery panic 速率。",
+      "description": "按 node 展示 Recovery panic 速率；健康节点从未发生或当前没有 panic 时补齐为 0，不可采集节点不补零。",
       "fieldConfig": {
         "defaults": {
           "min": 0,
@@ -737,7 +783,7 @@
         "h": 7,
         "w": 18,
         "x": 6,
-        "y": 20
+        "y": 27
       },
       "id": 15,
       "options": {
@@ -751,7 +797,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (node) (rate(chestnut_http_server_recovered_panics_total{job=\"chestnut-api\",node=~\"$node\"}[$__rate_interval]))",
+          "expr": "sum by (node) (rate(chestnut_http_server_recovered_panics_total{job=\"chestnut-api\",node=~\"$node\"}[$__rate_interval])) or 0 * max by (node) (up{job=\"chestnut-api\",node=~\"$node\"} == 1)",
           "legendFormat": "{{node}}",
           "refId": "A"
         }
@@ -765,7 +811,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 27
+        "y": 34
       },
       "id": 16,
       "panels": [],
@@ -777,7 +823,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "先跨节点按 le 聚合 classic Histogram bucket，再计算集群分位数。",
+      "description": "普通 HTTP 请求先跨节点按 le 聚合 classic Histogram bucket，再计算集群分位数；WebSocket 升级请求在采集端排除。",
       "fieldConfig": {
         "defaults": {
           "min": 0,
@@ -790,7 +836,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 28
+        "y": 35
       },
       "id": 17,
       "options": {
@@ -824,7 +870,7 @@
           "refId": "D"
         }
       ],
-      "title": "集群延迟分位数",
+      "title": "HTTP 请求延迟分位数",
       "type": "timeseries"
     },
     {
@@ -832,7 +878,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Histogram sum 增长率除以 count 增长率。",
+      "description": "普通 HTTP 请求的 Histogram sum 增长率除以 count 增长率；WebSocket 升级请求在采集端排除。",
       "fieldConfig": {
         "defaults": {
           "min": 0,
@@ -845,7 +891,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 28
+        "y": 35
       },
       "id": 18,
       "options": {
@@ -860,11 +906,11 @@
       "targets": [
         {
           "expr": "sum(rate(chestnut_http_server_request_duration_seconds_sum{job=\"chestnut-api\",node=~\"$node\"}[$__rate_interval])) / (sum(rate(chestnut_http_server_request_duration_seconds_count{job=\"chestnut-api\",node=~\"$node\"}[$__rate_interval])) > 0)",
-          "legendFormat": "平均耗时",
+          "legendFormat": "HTTP 平均响应耗时",
           "refId": "A"
         }
       ],
-      "title": "平均耗时",
+      "title": "HTTP 平均响应耗时",
       "type": "timeseries"
     }
   ],
