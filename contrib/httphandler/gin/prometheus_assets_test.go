@@ -300,7 +300,7 @@ func TestGrafanaDashboardAssetsCoverAPIClusterOperations(t *testing.T) {
 			refresh: "1m",
 			panelTitles: []string{
 				"所选时段 P95 最慢路由 Top 10", "所选时段请求数量最高的路由 Top 10", "整体请求延迟分布热力图",
-				"路由 QPS Top 10", "各路由 5xx 比例", "请求明细",
+				"各路由 5xx 比例最高的 Top10", "各路由 Recovery Panic 次数最高的 Top10",
 			},
 		},
 		{
@@ -488,18 +488,6 @@ func assertDashboardDiagnosticSemantics(t *testing.T, panels map[string]grafanaP
 		}
 	}
 
-	routeQPS := panels["路由 QPS Top 10"]
-	if routeQPS.Type != "table" || len(routeQPS.Targets) != 1 || !routeQPS.Targets[0].Instant {
-		t.Fatal("路由 QPS Top 10 must be an instant Top-N table")
-	}
-	gotQPSTransformations := make([]string, 0, len(routeQPS.Transformations))
-	for _, transformation := range routeQPS.Transformations {
-		gotQPSTransformations = append(gotQPSTransformations, transformation.ID)
-	}
-	if strings.Join(gotQPSTransformations, ",") != "seriesToRows,sortBy,organize" {
-		t.Fatalf("路由 QPS Top 10 transformations = %v, want seriesToRows,sortBy,organize", gotQPSTransformations)
-	}
-
 	selectedRangeP95 := panels["所选时段 P95 最慢路由 Top 10"]
 	if selectedRangeP95.Type != "table" || len(selectedRangeP95.Targets) != 3 {
 		t.Fatal("所选时段 P95 最慢路由 Top 10 must combine P95, sample count, and slow-request ratio")
@@ -507,6 +495,10 @@ func assertDashboardDiagnosticSemantics(t *testing.T, panels map[string]grafanaP
 	for index, target := range selectedRangeP95.Targets {
 		if !target.Instant || target.Format != "table" {
 			t.Fatalf("所选时段 P95 最慢路由 Top 10 target[%d] must be an instant table query", index)
+		}
+		if strings.Count(target.Expr, `route!="/api/*path"`) != strings.Count(target.Expr, "increase(") {
+			t.Fatalf("所选时段 P95 最慢路由 Top 10 target[%d] must exclude /api/*path from every range aggregation: %q",
+				index, target.Expr)
 		}
 	}
 	gotP95Transformations := make([]string, 0, len(selectedRangeP95.Transformations))
@@ -524,7 +516,7 @@ func assertDashboardDiagnosticSemantics(t *testing.T, panels map[string]grafanaP
 	}
 	renamedFields := selectedRangeP95.Transformations[2].Options.RenameByName
 	if renamedFields["route"] != "Route" || renamedFields["Value #A"] != "P95" ||
-		renamedFields["Value #B"] != "请求数" || renamedFields["Value #C"] != ">500ms 比例" {
+		renamedFields["Value #B"] != "请求数" || renamedFields["Value #C"] != ">800ms 比例" {
 		t.Fatalf("所选时段 P95 最慢路由 Top 10 renamed fields = %v", renamedFields)
 	}
 	if expression := selectedRangeP95.Targets[0].Expr; !strings.Contains(expression, "increase(") ||
@@ -542,7 +534,7 @@ func assertDashboardDiagnosticSemantics(t *testing.T, panels map[string]grafanaP
 	}
 	slowRequestTarget := selectedRangeP95.Targets[2]
 	if slowRequestTarget.RefID != "C" ||
-		!strings.Contains(slowRequestTarget.Expr, `le="0.5"`) ||
+		!strings.Contains(slowRequestTarget.Expr, `le="0.8"`) ||
 		!strings.Contains(slowRequestTarget.Expr, "chestnut_http_server_request_duration_seconds_bucket") ||
 		!strings.Contains(slowRequestTarget.Expr, "chestnut_http_server_request_duration_seconds_count") ||
 		strings.Count(slowRequestTarget.Expr, "increase(") != 2 ||
@@ -569,6 +561,10 @@ func assertDashboardDiagnosticSemantics(t *testing.T, panels map[string]grafanaP
 		if !target.Instant || target.Format != "table" {
 			t.Fatalf("所选时段请求数量最高的路由 Top 10 target[%d] must be an instant table query", index)
 		}
+		if strings.Count(target.Expr, `route!="/api/*path"`) != strings.Count(target.Expr, "increase(") {
+			t.Fatalf("所选时段请求数量最高的路由 Top 10 target[%d] must exclude /api/*path from every range aggregation: %q",
+				index, target.Expr)
+		}
 	}
 	gotTrafficTransformations := make([]string, 0, len(selectedRangeTraffic.Transformations))
 	for _, transformation := range selectedRangeTraffic.Transformations {
@@ -585,7 +581,7 @@ func assertDashboardDiagnosticSemantics(t *testing.T, panels map[string]grafanaP
 	}
 	renamedTrafficFields := selectedRangeTraffic.Transformations[2].Options.RenameByName
 	if renamedTrafficFields["route"] != "Route" || renamedTrafficFields["Value #A"] != "请求数" ||
-		renamedTrafficFields["Value #B"] != "P95" || renamedTrafficFields["Value #C"] != ">500ms 比例" {
+		renamedTrafficFields["Value #B"] != "P95" || renamedTrafficFields["Value #C"] != ">800ms 比例" {
 		t.Fatalf("所选时段请求数量最高的路由 Top 10 renamed fields = %v", renamedTrafficFields)
 	}
 	trafficCountTarget := selectedRangeTraffic.Targets[0]
@@ -609,7 +605,7 @@ func assertDashboardDiagnosticSemantics(t *testing.T, panels map[string]grafanaP
 	}
 	trafficSlowRequestTarget := selectedRangeTraffic.Targets[2]
 	if trafficSlowRequestTarget.RefID != "C" ||
-		!strings.Contains(trafficSlowRequestTarget.Expr, `le="0.5"`) ||
+		!strings.Contains(trafficSlowRequestTarget.Expr, `le="0.8"`) ||
 		!strings.Contains(trafficSlowRequestTarget.Expr, "chestnut_http_server_request_duration_seconds_bucket") ||
 		!strings.Contains(trafficSlowRequestTarget.Expr, "chestnut_http_server_request_duration_seconds_count") ||
 		strings.Count(trafficSlowRequestTarget.Expr, "increase(") != 2 ||
@@ -631,10 +627,147 @@ func assertDashboardDiagnosticSemantics(t *testing.T, panels map[string]grafanaP
 	if selectedRangeP95.GridPos.X != 0 || selectedRangeP95.GridPos.Y != 11 ||
 		selectedRangeP95.GridPos.Height != 13 || selectedRangeP95.GridPos.Width != 12 ||
 		selectedRangeTraffic.GridPos.X != 12 || selectedRangeTraffic.GridPos.Y != 11 ||
-		selectedRangeTraffic.GridPos.Height != 13 || selectedRangeTraffic.GridPos.Width != 12 ||
-		panels["路由 QPS Top 10"].GridPos.Y != 25 || panels["各路由 5xx 比例"].GridPos.Y != 25 ||
-		panels["请求明细"].GridPos.Y != 25 {
+		selectedRangeTraffic.GridPos.Height != 13 || selectedRangeTraffic.GridPos.Width != 12 {
 		t.Fatal("route dashboard must place both selected-range Top 10 tables side by side below the heatmap")
+	}
+
+	route5xxTop10 := panels["各路由 5xx 比例最高的 Top10"]
+	if route5xxTop10.Type != "table" || len(route5xxTop10.Targets) != 2 {
+		t.Fatal("各路由 5xx 比例最高的 Top10 must combine the 5xx ratio and request count")
+	}
+	for index, target := range route5xxTop10.Targets {
+		if !target.Instant || target.Format != "table" {
+			t.Fatalf("各路由 5xx 比例最高的 Top10 target[%d] must be an instant table query", index)
+		}
+		if strings.Count(target.Expr, `route!="/api/*path"`) != strings.Count(target.Expr, "increase(") {
+			t.Fatalf("各路由 5xx 比例最高的 Top10 target[%d] must exclude /api/*path from every range aggregation: %q",
+				index, target.Expr)
+		}
+	}
+	gotRoute5xxTransformations := make([]string, 0, len(route5xxTop10.Transformations))
+	for _, transformation := range route5xxTop10.Transformations {
+		gotRoute5xxTransformations = append(gotRoute5xxTransformations, transformation.ID)
+	}
+	if strings.Join(gotRoute5xxTransformations, ",") != "joinByField,sortBy,organize" ||
+		route5xxTop10.Transformations[0].Options.ByField != "route" ||
+		route5xxTop10.Transformations[0].Options.Mode != "inner" {
+		t.Fatalf("各路由 5xx 比例最高的 Top10 must inner-join table queries by route: %v", gotRoute5xxTransformations)
+	}
+	if sortOptions := route5xxTop10.Transformations[1].Options.Sort; len(sortOptions) != 1 ||
+		!sortOptions[0].Descending || sortOptions[0].Field != "Value #A" {
+		t.Fatal("各路由 5xx 比例最高的 Top10 must sort the joined table by 5xx ratio descending")
+	}
+	renamedRoute5xxFields := route5xxTop10.Transformations[2].Options.RenameByName
+	if renamedRoute5xxFields["route"] != "Route" || renamedRoute5xxFields["Value #A"] != "5xx 比例" ||
+		renamedRoute5xxFields["Value #B"] != "请求数" {
+		t.Fatalf("各路由 5xx 比例最高的 Top10 renamed fields = %v", renamedRoute5xxFields)
+	}
+	route5xxRatioTarget := route5xxTop10.Targets[0]
+	if route5xxRatioTarget.RefID != "A" ||
+		!strings.Contains(route5xxRatioTarget.Expr, "topk(10") ||
+		!strings.Contains(route5xxRatioTarget.Expr, `status_class="5xx"`) ||
+		!strings.Contains(route5xxRatioTarget.Expr, "or 0 *") ||
+		!strings.Contains(route5xxRatioTarget.Expr, "> 0)") ||
+		!strings.Contains(route5xxRatioTarget.Expr, "chestnut_http_server_requests_total") ||
+		strings.Count(route5xxRatioTarget.Expr, "increase(") != 3 ||
+		strings.Count(route5xxRatioTarget.Expr, "[$__range]") != 3 ||
+		strings.Contains(route5xxRatioTarget.Expr, "rate(") {
+		t.Fatalf("各路由 5xx 比例最高的 Top10 ratio query is invalid: %q", route5xxRatioTarget.Expr)
+	}
+	routeRequestCountTarget := route5xxTop10.Targets[1]
+	if routeRequestCountTarget.RefID != "B" ||
+		!strings.Contains(routeRequestCountTarget.Expr, "sum by (route)") ||
+		!strings.Contains(routeRequestCountTarget.Expr, "chestnut_http_server_requests_total") ||
+		strings.Count(routeRequestCountTarget.Expr, "increase(") != 1 ||
+		strings.Count(routeRequestCountTarget.Expr, "[$__range]") != 1 ||
+		strings.Contains(routeRequestCountTarget.Expr, "rate(") ||
+		strings.Contains(routeRequestCountTarget.Expr, `status_class=`) {
+		t.Fatalf("各路由 5xx 比例最高的 Top10 request-count query is invalid: %q", routeRequestCountTarget.Expr)
+	}
+	route5xxSteps := route5xxTop10.FieldConfig.Defaults.Thresholds.Steps
+	if route5xxTop10.FieldConfig.Defaults.Color.Mode != "thresholds" ||
+		route5xxTop10.FieldConfig.Defaults.Unit != "percent" ||
+		len(route5xxSteps) != 3 || route5xxSteps[0].Color != "green" || route5xxSteps[0].Value != nil ||
+		route5xxSteps[1].Color != "yellow" || route5xxSteps[1].Value == nil || *route5xxSteps[1].Value != 1 ||
+		route5xxSteps[2].Color != "red" || route5xxSteps[2].Value == nil || *route5xxSteps[2].Value != 5 {
+		t.Fatal("各路由 5xx 比例最高的 Top10 must use percentage thresholds at 1% and 5%")
+	}
+	if route5xxTop10.GridPos.X != 0 || route5xxTop10.GridPos.Y != 25 ||
+		route5xxTop10.GridPos.Width != 12 || route5xxTop10.GridPos.Height != selectedRangeP95.GridPos.Height {
+		t.Fatal("各路由 5xx 比例最高的 Top10 must occupy the left half of the route-analysis row")
+	}
+
+	routePanicTop10 := panels["各路由 Recovery Panic 次数最高的 Top10"]
+	if routePanicTop10.Type != "table" || len(routePanicTop10.Targets) != 2 {
+		t.Fatal("各路由 Recovery Panic 次数最高的 Top10 must combine the panic count and request count")
+	}
+	for index, target := range routePanicTop10.Targets {
+		if !target.Instant || target.Format != "table" {
+			t.Fatalf("各路由 Recovery Panic 次数最高的 Top10 target[%d] must be an instant table query", index)
+		}
+		if strings.Count(target.Expr, `route!="/api/*path"`) != strings.Count(target.Expr, "increase(") {
+			t.Fatalf("各路由 Recovery Panic 次数最高的 Top10 target[%d] must exclude /api/*path from every range aggregation: %q",
+				index, target.Expr)
+		}
+	}
+	gotRoutePanicTransformations := make([]string, 0, len(routePanicTop10.Transformations))
+	for _, transformation := range routePanicTop10.Transformations {
+		gotRoutePanicTransformations = append(gotRoutePanicTransformations, transformation.ID)
+	}
+	if strings.Join(gotRoutePanicTransformations, ",") != "joinByField,sortBy,organize" ||
+		routePanicTop10.Transformations[0].Options.ByField != "route" ||
+		routePanicTop10.Transformations[0].Options.Mode != "inner" {
+		t.Fatalf("各路由 Recovery Panic 次数最高的 Top10 must inner-join table queries by route: %v", gotRoutePanicTransformations)
+	}
+	if sortOptions := routePanicTop10.Transformations[1].Options.Sort; len(sortOptions) != 1 ||
+		!sortOptions[0].Descending || sortOptions[0].Field != "Value #A" {
+		t.Fatal("各路由 Recovery Panic 次数最高的 Top10 must sort by panic count descending")
+	}
+	renamedRoutePanicFields := routePanicTop10.Transformations[2].Options.RenameByName
+	if renamedRoutePanicFields["route"] != "Route" ||
+		renamedRoutePanicFields["Value #A"] != "Recovery Panic 次数" ||
+		renamedRoutePanicFields["Value #B"] != "请求数" {
+		t.Fatalf("各路由 Recovery Panic 次数最高的 Top10 renamed fields = %v", renamedRoutePanicFields)
+	}
+	routePanicCountTarget := routePanicTop10.Targets[0]
+	if routePanicCountTarget.RefID != "A" ||
+		!strings.Contains(routePanicCountTarget.Expr, "topk(10") ||
+		!strings.Contains(routePanicCountTarget.Expr, "chestnut_http_server_recovered_panics_total") ||
+		!strings.Contains(routePanicCountTarget.Expr, "> 0)") ||
+		strings.Count(routePanicCountTarget.Expr, "increase(") != 1 ||
+		strings.Count(routePanicCountTarget.Expr, "[$__range]") != 1 ||
+		strings.Contains(routePanicCountTarget.Expr, "rate(") {
+		t.Fatalf("各路由 Recovery Panic 次数最高的 Top10 panic-count query is invalid: %q", routePanicCountTarget.Expr)
+	}
+	panicRouteRequestCountTarget := routePanicTop10.Targets[1]
+	if panicRouteRequestCountTarget.RefID != "B" ||
+		!strings.Contains(panicRouteRequestCountTarget.Expr, "sum by (route)") ||
+		!strings.Contains(panicRouteRequestCountTarget.Expr, "chestnut_http_server_requests_total") ||
+		!strings.Contains(panicRouteRequestCountTarget.Expr, "chestnut_http_server_recovered_panics_total") ||
+		!strings.Contains(panicRouteRequestCountTarget.Expr, "and on (route)") ||
+		!strings.Contains(panicRouteRequestCountTarget.Expr, "topk(10") ||
+		!strings.Contains(panicRouteRequestCountTarget.Expr, "> 0)") ||
+		strings.Count(panicRouteRequestCountTarget.Expr, "increase(") != 2 ||
+		strings.Count(panicRouteRequestCountTarget.Expr, "[$__range]") != 2 ||
+		strings.Contains(panicRouteRequestCountTarget.Expr, "rate(") ||
+		strings.Contains(panicRouteRequestCountTarget.Expr, `status_class=`) {
+		t.Fatalf("各路由 Recovery Panic 次数最高的 Top10 request-count query is invalid: %q", panicRouteRequestCountTarget.Expr)
+	}
+	routePanicSteps := routePanicTop10.FieldConfig.Defaults.Thresholds.Steps
+	if routePanicTop10.FieldConfig.Defaults.Color.Mode != "thresholds" ||
+		routePanicTop10.FieldConfig.Defaults.Unit != "short" ||
+		len(routePanicSteps) != 2 || routePanicSteps[0].Color != "green" || routePanicSteps[0].Value != nil ||
+		routePanicSteps[1].Color != "red" || routePanicSteps[1].Value == nil || *routePanicSteps[1].Value != 1 {
+		t.Fatal("各路由 Recovery Panic 次数最高的 Top10 must turn red at one panic")
+	}
+	if routePanicTop10.GridPos.X != 12 || routePanicTop10.GridPos.Y != 25 ||
+		routePanicTop10.GridPos.Width != 12 || routePanicTop10.GridPos.Height != selectedRangeP95.GridPos.Height {
+		t.Fatal("各路由 Recovery Panic 次数最高的 Top10 must occupy the right half of the route-analysis row")
+	}
+	for _, removedTitle := range []string{"路由 QPS Top 10", "各路由 5xx 比例", "请求明细"} {
+		if _, exists := panels[removedTitle]; exists {
+			t.Fatalf("removed route-analysis panel %q must not remain in the dashboards", removedTitle)
+		}
 	}
 
 	latencyHeatmap := panels["整体请求延迟分布热力图"]
@@ -667,10 +800,8 @@ func assertDashboardDiagnosticSemantics(t *testing.T, panels map[string]grafanaP
 		!strings.Contains(expression, "or vector(0)") || !strings.Contains(expression, "> 0)") {
 		t.Fatalf("所选时段 HTTP 5xx 比例 must cover the selected range and distinguish zero errors from zero traffic: %q", expression)
 	}
-	for _, title := range []string{"各路由 5xx 比例", "各节点 5xx"} {
-		if expression := panels[title].Targets[0].Expr; !strings.Contains(expression, "or 0 *") {
-			t.Fatalf("panel %q must retain healthy zero-error series: %q", title, expression)
-		}
+	if expression := panels["各节点 5xx"].Targets[0].Expr; !strings.Contains(expression, "or 0 *") {
+		t.Fatalf("panel %q must retain healthy zero-error series: %q", "各节点 5xx", expression)
 	}
 	selectedRangePanics := panels["所选时段 Recovery Panic 次数"]
 	if len(selectedRangePanics.Targets) != 1 || !selectedRangePanics.Targets[0].Instant {

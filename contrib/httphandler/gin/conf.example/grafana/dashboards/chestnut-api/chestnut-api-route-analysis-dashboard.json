@@ -2,7 +2,7 @@
   "annotations": {
     "list": []
   },
-  "description": "按 Node 展示 Chestnut API 的整体请求延迟分布、路由 P95/QPS、错误率和请求明细。",
+  "description": "按 Node 展示 Chestnut API 的整体请求延迟分布、路由 P95、请求量、5xx 比例与 Recovery Panic 次数 Top 10。",
   "editable": false,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
@@ -40,7 +40,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "基于 Dashboard 顶部所选完整时间范围聚合普通 HTTP 延迟样本，按 P95 从高到低列出最慢十条路由，并补充同一批样本的请求数与超过 500ms 的比例。",
+      "description": "基于 Dashboard 顶部所选完整时间范围聚合普通 HTTP 延迟样本，排除 /api/*path，按 P95 从高到低列出最慢十条路由，并补充同一批样本的请求数与超过 800ms 的比例。",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -125,7 +125,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": ">500ms 比例"
+              "options": ">800ms 比例"
             },
             "properties": [
               {
@@ -170,21 +170,21 @@
       },
       "targets": [
         {
-          "expr": "topk(10, histogram_quantile(0.95, sum by (le, route) (increase(chestnut_http_server_request_duration_seconds_bucket{job=\"chestnut-api\",node=~\"$node\"}[$__range]))))",
+          "expr": "topk(10, histogram_quantile(0.95, sum by (le, route) (increase(chestnut_http_server_request_duration_seconds_bucket{job=\"chestnut-api\",node=~\"$node\",route!=\"/api/*path\"}[$__range]))))",
           "format": "table",
           "instant": true,
           "legendFormat": "{{route}}",
           "refId": "A"
         },
         {
-          "expr": "sum by (route) (increase(chestnut_http_server_request_duration_seconds_count{job=\"chestnut-api\",node=~\"$node\"}[$__range]))",
+          "expr": "sum by (route) (increase(chestnut_http_server_request_duration_seconds_count{job=\"chestnut-api\",node=~\"$node\",route!=\"/api/*path\"}[$__range]))",
           "format": "table",
           "instant": true,
           "legendFormat": "{{route}}",
           "refId": "B"
         },
         {
-          "expr": "100 * (1 - sum by (route) (increase(chestnut_http_server_request_duration_seconds_bucket{job=\"chestnut-api\",node=~\"$node\",le=\"0.5\"}[$__range])) / (sum by (route) (increase(chestnut_http_server_request_duration_seconds_count{job=\"chestnut-api\",node=~\"$node\"}[$__range])) > 0))",
+          "expr": "100 * (1 - sum by (route) (increase(chestnut_http_server_request_duration_seconds_bucket{job=\"chestnut-api\",node=~\"$node\",route!=\"/api/*path\",le=\"0.8\"}[$__range])) / (sum by (route) (increase(chestnut_http_server_request_duration_seconds_count{job=\"chestnut-api\",node=~\"$node\",route!=\"/api/*path\"}[$__range])) > 0))",
           "format": "table",
           "instant": true,
           "legendFormat": "{{route}}",
@@ -231,7 +231,7 @@
             "renameByName": {
               "Value #A": "P95",
               "Value #B": "请求数",
-              "Value #C": ">500ms 比例",
+              "Value #C": ">800ms 比例",
               "route": "Route"
             }
           }
@@ -244,7 +244,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "基于 Dashboard 顶部所选完整时间范围聚合普通 HTTP 延迟样本，按请求数从高到低列出最繁忙的十条路由，并补充同一批样本的 P95 与超过 500ms 的比例。",
+      "description": "基于 Dashboard 顶部所选完整时间范围聚合普通 HTTP 延迟样本，排除 /api/*path，按请求数从高到低列出最繁忙的十条路由，并补充同一批样本的 P95 与超过 800ms 的比例。",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -329,7 +329,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": ">500ms 比例"
+              "options": ">800ms 比例"
             },
             "properties": [
               {
@@ -374,21 +374,21 @@
       },
       "targets": [
         {
-          "expr": "topk(10, sum by (route) (increase(chestnut_http_server_request_duration_seconds_count{job=\"chestnut-api\",node=~\"$node\"}[$__range])))",
+          "expr": "topk(10, sum by (route) (increase(chestnut_http_server_request_duration_seconds_count{job=\"chestnut-api\",node=~\"$node\",route!=\"/api/*path\"}[$__range])))",
           "format": "table",
           "instant": true,
           "legendFormat": "{{route}}",
           "refId": "A"
         },
         {
-          "expr": "histogram_quantile(0.95, sum by (le, route) (increase(chestnut_http_server_request_duration_seconds_bucket{job=\"chestnut-api\",node=~\"$node\"}[$__range])))",
+          "expr": "histogram_quantile(0.95, sum by (le, route) (increase(chestnut_http_server_request_duration_seconds_bucket{job=\"chestnut-api\",node=~\"$node\",route!=\"/api/*path\"}[$__range])))",
           "format": "table",
           "instant": true,
           "legendFormat": "{{route}}",
           "refId": "B"
         },
         {
-          "expr": "100 * (1 - sum by (route) (increase(chestnut_http_server_request_duration_seconds_bucket{job=\"chestnut-api\",node=~\"$node\",le=\"0.5\"}[$__range])) / (sum by (route) (increase(chestnut_http_server_request_duration_seconds_count{job=\"chestnut-api\",node=~\"$node\"}[$__range])) > 0))",
+          "expr": "100 * (1 - sum by (route) (increase(chestnut_http_server_request_duration_seconds_bucket{job=\"chestnut-api\",node=~\"$node\",route!=\"/api/*path\",le=\"0.8\"}[$__range])) / (sum by (route) (increase(chestnut_http_server_request_duration_seconds_count{job=\"chestnut-api\",node=~\"$node\",route!=\"/api/*path\"}[$__range])) > 0))",
           "format": "table",
           "instant": true,
           "legendFormat": "{{route}}",
@@ -435,7 +435,7 @@
             "renameByName": {
               "Value #A": "请求数",
               "Value #B": "P95",
-              "Value #C": ">500ms 比例",
+              "Value #C": ">800ms 比例",
               "route": "Route"
             }
           }
@@ -529,136 +529,14 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "按当前请求速率从高到低列出十条最繁忙的 Gin 路由模板，便于快速定位主要流量入口。",
+      "description": "基于 Dashboard 顶部所选完整时间范围统计普通 HTTP 请求，排除 /api/*path，按各路由 5xx 比例从高到低列出前十名，并补充同一时段的请求数；有请求但无 5xx 的路由按 0% 参与排序。",
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "continuous-BlPu"
+            "mode": "thresholds"
           },
-          "mappings": [],
-          "min": 0,
-          "noValue": "无请求数据",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "unit": "reqps"
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Route"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 260
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "QPS"
-            },
-            "properties": [
-              {
-                "id": "min",
-                "value": 0
-              },
-              {
-                "id": "custom.cellOptions",
-                "value": {
-                  "mode": "basic",
-                  "type": "gauge",
-                  "valueDisplayMode": "text"
-                }
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 9,
-        "w": 8,
-        "x": 0,
-        "y": 25
-      },
-      "id": 22,
-      "options": {
-        "cellHeight": "sm",
-        "footer": {
-          "countRows": false,
-          "fields": "",
-          "reducer": [
-            "sum"
-          ],
-          "show": false
-        },
-        "showHeader": true,
-        "sortBy": []
-      },
-      "targets": [
-        {
-          "expr": "topk(10, sum by (route) (rate(chestnut_http_server_requests_total{job=\"chestnut-api\",node=~\"$node\"}[$__rate_interval])))",
-          "instant": true,
-          "legendFormat": "{{route}}",
-          "refId": "A"
-        }
-      ],
-      "title": "路由 QPS Top 10",
-      "transformations": [
-        {
-          "id": "seriesToRows",
-          "options": {}
-        },
-        {
-          "id": "sortBy",
-          "options": {
-            "fields": {},
-            "sort": [
-              {
-                "desc": true,
-                "field": "Value"
-              }
-            ]
-          }
-        },
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": {
-              "Time": true
-            },
-            "includeByName": {},
-            "indexByName": {
-              "Metric": 0,
-              "Value": 1
-            },
-            "renameByName": {
-              "Metric": "Route",
-              "Value": "QPS"
-            }
-          }
-        }
-      ],
-      "type": "table"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "各路由 5xx 速率占该路由全部请求速率的百分比；有请求但无 5xx 的路由仍显示为 0%，避免健康路由从图中消失。",
-      "fieldConfig": {
-        "defaults": {
           "decimals": 2,
+          "mappings": [],
           "max": 100,
           "min": 0,
           "noValue": "无请求数据",
@@ -681,45 +559,163 @@
           },
           "unit": "percent"
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Route"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 360
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "请求数"
+            },
+            "properties": [
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "unit",
+                "value": "short"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "5xx 比例"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "mode": "basic",
+                  "type": "gauge",
+                  "valueDisplayMode": "text"
+                }
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
-        "h": 9,
-        "w": 8,
-        "x": 8,
+        "h": 13,
+        "w": 12,
+        "x": 0,
         "y": 25
       },
-      "id": 23,
+      "id": 22,
       "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "right"
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
         },
-        "tooltip": {
-          "mode": "multi"
-        }
+        "showHeader": true,
+        "sortBy": []
       },
       "targets": [
         {
-          "expr": "100 * (sum by (route) (rate(chestnut_http_server_requests_total{job=\"chestnut-api\",node=~\"$node\",status_class=\"5xx\"}[$__rate_interval])) or 0 * sum by (route) (rate(chestnut_http_server_requests_total{job=\"chestnut-api\",node=~\"$node\"}[$__rate_interval]))) / (sum by (route) (rate(chestnut_http_server_requests_total{job=\"chestnut-api\",node=~\"$node\"}[$__rate_interval])) > 0)",
+          "expr": "topk(10, 100 * ((sum by (route) (increase(chestnut_http_server_requests_total{job=\"chestnut-api\",node=~\"$node\",route!=\"/api/*path\",status_class=\"5xx\"}[$__range])) or 0 * sum by (route) (increase(chestnut_http_server_requests_total{job=\"chestnut-api\",node=~\"$node\",route!=\"/api/*path\"}[$__range]))) / (sum by (route) (increase(chestnut_http_server_requests_total{job=\"chestnut-api\",node=~\"$node\",route!=\"/api/*path\"}[$__range])) > 0)))",
+          "format": "table",
+          "instant": true,
           "legendFormat": "{{route}}",
           "refId": "A"
+        },
+        {
+          "expr": "sum by (route) (increase(chestnut_http_server_requests_total{job=\"chestnut-api\",node=~\"$node\",route!=\"/api/*path\"}[$__range]))",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "{{route}}",
+          "refId": "B"
         }
       ],
-      "title": "各路由 5xx 比例",
-      "type": "timeseries"
+      "title": "各路由 5xx 比例最高的 Top10",
+      "transformations": [
+        {
+          "id": "joinByField",
+          "options": {
+            "byField": "route",
+            "mode": "inner"
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "desc": true,
+                "field": "Value #A"
+              }
+            ]
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "Time 1": true,
+              "Time 2": true
+            },
+            "includeByName": {},
+            "indexByName": {
+              "Value #A": 2,
+              "Value #B": 1,
+              "route": 0
+            },
+            "renameByName": {
+              "Value #A": "5xx 比例",
+              "Value #B": "请求数",
+              "route": "Route"
+            }
+          }
+        }
+      ],
+      "type": "table"
     },
     {
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "按请求方法、路由和最终 HTTP 状态类别聚合的请求速率，不区分具体状态码。",
+      "description": "基于 Dashboard 顶部所选完整时间范围统计普通 HTTP 请求，排除 /api/*path，按各路由 Recovery Panic 次数从高到低列出前十名，并补充同一时段的请求数；仅展示至少发生一次 Recovery Panic 的路由。",
       "fieldConfig": {
         "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "mappings": [],
           "min": 0,
-          "noValue": "无请求数据",
-          "unit": "reqps"
+          "noValue": "所选时段无 Recovery Panic",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "short"
         },
         "overrides": [
           {
@@ -730,37 +726,72 @@
             "properties": [
               {
                 "id": "custom.width",
-                "value": 240
+                "value": 360
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Recovery Panic 次数"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "mode": "basic",
+                  "type": "gauge",
+                  "valueDisplayMode": "text"
+                }
               }
             ]
           }
         ]
       },
       "gridPos": {
-        "h": 9,
-        "w": 8,
-        "x": 16,
+        "h": 13,
+        "w": 12,
+        "x": 12,
         "y": 25
       },
-      "id": 24,
+      "id": 27,
       "options": {
         "cellHeight": "sm",
-        "showHeader": true
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": []
       },
       "targets": [
         {
-          "expr": "sum by (method, route, status_class) (rate(chestnut_http_server_requests_total{job=\"chestnut-api\",node=~\"$node\"}[$__rate_interval]))",
+          "expr": "topk(10, sum by (route) (increase(chestnut_http_server_recovered_panics_total{job=\"chestnut-api\",node=~\"$node\",route!=\"/api/*path\"}[$__range])) > 0)",
           "format": "table",
           "instant": true,
-          "legendFormat": "{{method}} {{route}} HTTP {{status_class}}",
+          "legendFormat": "{{route}}",
           "refId": "A"
+        },
+        {
+          "expr": "sum by (route) (increase(chestnut_http_server_requests_total{job=\"chestnut-api\",node=~\"$node\",route!=\"/api/*path\"}[$__range])) and on (route) topk(10, sum by (route) (increase(chestnut_http_server_recovered_panics_total{job=\"chestnut-api\",node=~\"$node\",route!=\"/api/*path\"}[$__range])) > 0)",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "{{route}}",
+          "refId": "B"
         }
       ],
-      "title": "请求明细",
+      "title": "各路由 Recovery Panic 次数最高的 Top10",
       "transformations": [
         {
-          "id": "labelsToFields",
-          "options": {}
+          "id": "joinByField",
+          "options": {
+            "byField": "route",
+            "mode": "inner"
+          }
         },
         {
           "id": "sortBy",
@@ -769,7 +800,7 @@
             "sort": [
               {
                 "desc": true,
-                "field": "Value"
+                "field": "Value #A"
               }
             ]
           }
@@ -778,20 +809,20 @@
           "id": "organize",
           "options": {
             "excludeByName": {
-              "Time": true
+              "Time": true,
+              "Time 1": true,
+              "Time 2": true
             },
             "includeByName": {},
             "indexByName": {
-              "Value": 3,
-              "method": 0,
-              "route": 1,
-              "status_class": 2
+              "Value #A": 2,
+              "Value #B": 1,
+              "route": 0
             },
             "renameByName": {
-              "Value": "QPS",
-              "method": "请求方法",
-              "route": "路由",
-              "status_class": "状态类别"
+              "Value #A": "Recovery Panic 次数",
+              "Value #B": "请求数",
+              "route": "Route"
             }
           }
         }

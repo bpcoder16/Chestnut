@@ -166,7 +166,7 @@ prometheus:
 | `chestnut_http_server_request_duration_seconds` | Histogram | `service`, `method`, `route` | 普通 HTTP 请求耗时，按请求方法和路由模板聚合；bucket 边界为 `0.01`, `0.025`, `0.05`, `0.1`, `0.25`, `0.5`, `0.8`, `1`, `2.5`, `5`, `10` 秒 |
 | `chestnut_http_server_requests_in_flight` | Gauge | `service` | 当前正在处理的匹配业务请求总数，包含活跃 WebSocket Handler |
 | `chestnut_http_server_websocket_connections` | Gauge | `service` | 当前 WebSocket Upgrade 请求数；升级成功后在连接关闭前表示活跃连接数 |
-| `chestnut_http_server_recovered_panics_total` | Counter | `service`, `method`, `route` | 被 Chestnut Recovery 实际捕获的 panic 数 |
+| `chestnut_http_server_recovered_panics_total` | Counter | `service`, `method`, `route` | 被 Chestnut Recovery 实际捕获的 panic 数；已注册且未排除的路由在启动时预初始化为 0 |
 
 每个 Gin Engine 使用独立 registry，创建多个 Engine 不会重复注册或共享请求计数。`/metrics` 同时合并 Prometheus 默认 gatherer，因此仍可采集 `go_*`、`process_*` 和应用已注册到默认 registry 的自定义指标。
 

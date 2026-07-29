@@ -77,5 +77,8 @@ func buildHTTPHandler(prometheusConfig *appconfig.Prometheus, middlewares []gin.
 	for _, fn := range registerFuncs {
 		fn(&h.RouterGroup)
 	}
+	if metrics != nil {
+		metrics.initializeRecoveredPanicRoutes(h.Routes())
+	}
 	return h
 }

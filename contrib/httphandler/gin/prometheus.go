@@ -111,6 +111,16 @@ func newPrometheusHTTPMetrics(config appconfig.Prometheus) *prometheusHTTPMetric
 	return metrics
 }
 
+func (m *prometheusHTTPMetrics) initializeRecoveredPanicRoutes(routes gin.RoutesInfo) {
+	for _, route := range routes {
+		if m.isExcludedPath(route.Path) {
+			continue
+		}
+		// 在服务开始接收请求前暴露零值，为 Prometheus 抓取首次 Panic 的 0→1 增量提供基线。
+		m.recoveredPanics.WithLabelValues(route.Method, route.Path)
+	}
+}
+
 func (m *prometheusHTTPMetrics) middleware() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		route := ctx.FullPath()
