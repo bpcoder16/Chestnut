@@ -533,42 +533,46 @@ func TestGrafanaScenarioRouteAnalysisDashboards(t *testing.T) {
 	}
 
 	scenarios := []struct {
-		name         string
-		path         string
-		uid          string
-		title        string
-		routeRegex   string
-		matches      []string
-		doesNotMatch []string
+		name            string
+		path            string
+		uid             string
+		title           string
+		routeRegex      string
+		matches         []string
+		doesNotMatch    []string
+		webSocketRoutes []string
 	}{
 		{
-			name:       "app",
-			path:       grafanaRouteAppDashboardAssetPath,
-			uid:        "chestnut-api-route-analysis-app",
-			title:      "Chestnut API App 路由分析",
-			routeRegex: `/api/v1/app(/.*)?`,
-			matches:    []string{"/api/v1/app", "/api/v1/app/orders"},
+			name:            "app",
+			path:            grafanaRouteAppDashboardAssetPath,
+			uid:             "chestnut-api-route-analysis-app",
+			title:           "Chestnut API App 路由分析",
+			routeRegex:      `/api/v1/app(/.*)?`,
+			webSocketRoutes: []string{"/ws/app"},
+			matches:         []string{"/api/v1/app", "/api/v1/app/orders"},
 			doesNotMatch: []string{
 				"/api/v1/apple", "/api/v1/merchant", "/api/v1/admin", "/api/*path",
 			},
 		},
 		{
-			name:       "merchant",
-			path:       grafanaRouteMerchantDashboardAssetPath,
-			uid:        "chestnut-api-route-analysis-merchant",
-			title:      "Chestnut API Merchant 路由分析",
-			routeRegex: `/api/v1/merchant(/.*)?`,
-			matches:    []string{"/api/v1/merchant", "/api/v1/merchant/orders"},
+			name:            "merchant",
+			path:            grafanaRouteMerchantDashboardAssetPath,
+			uid:             "chestnut-api-route-analysis-merchant",
+			title:           "Chestnut API Merchant 路由分析",
+			routeRegex:      `/api/v1/merchant(/.*)?`,
+			webSocketRoutes: []string{"/ws/merchant"},
+			matches:         []string{"/api/v1/merchant", "/api/v1/merchant/orders"},
 			doesNotMatch: []string{
 				"/api/v1/merchant-tools", "/api/v1/app", "/api/v1/admin", "/api/*path",
 			},
 		},
 		{
-			name:       "admin",
-			path:       grafanaRouteAdminDashboardAssetPath,
-			uid:        "chestnut-api-route-analysis-admin",
-			title:      "Chestnut API Admin 路由分析",
-			routeRegex: `/api/v1/(admin|customer-service)(/.*)?`,
+			name:            "admin",
+			path:            grafanaRouteAdminDashboardAssetPath,
+			uid:             "chestnut-api-route-analysis-admin",
+			title:           "Chestnut API Admin 路由分析",
+			routeRegex:      `/api/v1/(admin|customer-service)(/.*)?`,
+			webSocketRoutes: []string{"/ws/admin", "/ws/customer-service"},
 			matches: []string{
 				"/api/v1/admin", "/api/v1/admin/users",
 				"/api/v1/customer-service", "/api/v1/customer-service/tickets",
@@ -638,8 +642,12 @@ func TestGrafanaScenarioRouteAnalysisDashboards(t *testing.T) {
 			if !reflect.DeepEqual(dashboard.Templating, base.Templating) {
 				t.Fatalf("dashboard %q filters differ from the base route analysis dashboard", scenario.path)
 			}
-			if len(dashboard.Panels) != len(base.Panels) {
-				t.Fatalf("dashboard %q panels = %d, want %d", scenario.path, len(dashboard.Panels), len(base.Panels))
+			wantPanelCount := len(base.Panels)
+			if len(scenario.webSocketRoutes) > 0 {
+				wantPanelCount++
+			}
+			if len(dashboard.Panels) != wantPanelCount {
+				t.Fatalf("dashboard %q panels = %d, want %d", scenario.path, len(dashboard.Panels), wantPanelCount)
 			}
 
 			routeMatcher := `route=~"` + scenario.routeRegex + `"`
@@ -703,6 +711,50 @@ func TestGrafanaScenarioRouteAnalysisDashboards(t *testing.T) {
 			if metricSelectorCount != 24 || routeMatcherCount != metricSelectorCount {
 				t.Fatalf("dashboard %q route scoping = %d/%d selectors, want 24/24",
 					scenario.path, routeMatcherCount, metricSelectorCount)
+			}
+
+			if len(scenario.webSocketRoutes) == 0 {
+				return
+			}
+
+			panel := dashboard.Panels[len(base.Panels)]
+			if panel.ID != 28 || panel.Title != "WebSocket 连接数趋势" || panel.Type != "timeseries" ||
+				panel.Datasource.Type != "prometheus" || panel.Datasource.UID != prometheusDatasourceUID ||
+				panel.GridPos.X != 0 || panel.GridPos.Y != 38 || panel.GridPos.Width != 24 || panel.GridPos.Height != 8 {
+				t.Fatalf("dashboard %q WebSocket panel identity or layout is invalid", scenario.path)
+			}
+			if panel.FieldConfig.Defaults.Min == nil || *panel.FieldConfig.Defaults.Min != 0 ||
+				panel.FieldConfig.Defaults.Color.Mode != "palette-classic" ||
+				panel.FieldConfig.Defaults.NoValue != "0" || panel.FieldConfig.Defaults.Unit != "short" ||
+				panel.FieldConfig.Defaults.Custom.DrawStyle != "line" ||
+				panel.FieldConfig.Defaults.Custom.FillOpacity != 10 ||
+				panel.FieldConfig.Defaults.Custom.LineWidth != 2 ||
+				panel.FieldConfig.Defaults.Custom.ShowPoints != "never" {
+				t.Fatalf("dashboard %q WebSocket panel presentation is invalid", scenario.path)
+			}
+			if panel.Options.Legend.DisplayMode != "list" || panel.Options.Legend.Placement != "bottom" ||
+				panel.Options.Legend.SortBy != "Name" ||
+				panel.Options.Legend.SortDesc == nil || *panel.Options.Legend.SortDesc ||
+				panel.Options.Tooltip.Mode != "multi" {
+				t.Fatalf("dashboard %q WebSocket panel legend or tooltip is invalid", scenario.path)
+			}
+			if len(panel.Targets) != len(scenario.webSocketRoutes) {
+				t.Fatalf("dashboard %q WebSocket panel targets = %d, want %d",
+					scenario.path, len(panel.Targets), len(scenario.webSocketRoutes))
+			}
+			for targetIndex, route := range scenario.webSocketRoutes {
+				target := panel.Targets[targetIndex]
+				wantExpr := `sum(chestnut_http_server_websocket_connections{job="chestnut-api",node=~"$node",route="` +
+					route + `"}) or vector(0)`
+				wantRefID := string(rune('A' + targetIndex))
+				if target.Expr != wantExpr || target.Instant || target.LegendFormat != route || target.RefID != wantRefID {
+					t.Fatalf("dashboard %q WebSocket target[%d] = (%q, instant=%v, legend=%q, refId=%q), want (%q, false, %q, %q)",
+						scenario.path, targetIndex, target.Expr, target.Instant, target.LegendFormat, target.RefID,
+						wantExpr, route, wantRefID)
+				}
+				if !strings.Contains(panel.Description, route) {
+					t.Fatalf("dashboard %q WebSocket panel description does not mention route %q", scenario.path, route)
+				}
 			}
 		})
 	}
@@ -1465,7 +1517,7 @@ func assertOverviewSummaryPresentation(t *testing.T, panels map[string]grafanaPa
 	}
 
 	httpInFlight := panels["HTTP 并发请求趋势"]
-	if httpInFlight.GridPos.Width != 12 || httpInFlight.GridPos.X != 0 || httpInFlight.GridPos.Y != 20 ||
+	if httpInFlight.GridPos.Width != 12 || httpInFlight.GridPos.X != 0 || httpInFlight.GridPos.Y != 23 ||
 		httpInFlight.Type != "timeseries" || len(httpInFlight.Targets) != 1 || httpInFlight.Targets[0].Instant ||
 		httpInFlight.FieldConfig.Defaults.Custom.ShowPoints != "never" ||
 		httpInFlight.Options.Tooltip.Mode != "multi" ||
@@ -1477,7 +1529,7 @@ func assertOverviewSummaryPresentation(t *testing.T, panels map[string]grafanaPa
 
 	webSocketConnections := panels["WebSocket 连接数趋势"]
 	if webSocketConnections.GridPos.Width != 12 || webSocketConnections.GridPos.X != 12 ||
-		webSocketConnections.GridPos.Y != 20 || webSocketConnections.Type != "timeseries" ||
+		webSocketConnections.GridPos.Y != 23 || webSocketConnections.Type != "timeseries" ||
 		len(webSocketConnections.Targets) != 1 || webSocketConnections.Targets[0].Instant ||
 		webSocketConnections.FieldConfig.Defaults.Custom.ShowPoints != "never" ||
 		webSocketConnections.Options.Tooltip.Mode != "multi" ||
@@ -1610,11 +1662,11 @@ func assertTargetHealthPanels(t *testing.T, panels map[string]grafanaPanel) {
 		mappingOptions["0"].Text != "异常" || mappingOptions["0"].Color != "red" {
 		t.Fatalf("节点采集明细 mapping options = %v, want 1=green 正常 and 0=red 异常", mappingOptions)
 	}
-	if detailPanel.GridPos.Height != 6 || detailPanel.GridPos.Y != 5 ||
-		panels["集群总 QPS"].GridPos.Y != 12 || panels["HTTP 并发请求趋势"].GridPos.Y != 20 ||
-		panels["所选时段 Recovery Panic 次数"].GridPos.Y != 27 ||
-		panels["HTTP 请求延迟分位数"].GridPos.Y != 35 {
-		t.Fatal("节点采集明细及后续区域 must use the compact vertical layout")
+	if detailPanel.GridPos.Height != 9 || detailPanel.GridPos.Y != 5 ||
+		panels["集群总 QPS"].GridPos.Y != 15 || panels["HTTP 并发请求趋势"].GridPos.Y != 23 ||
+		panels["所选时段 Recovery Panic 次数"].GridPos.Y != 30 ||
+		panels["HTTP 请求延迟分位数"].GridPos.Y != 38 {
+		t.Fatal("节点采集明细 must provide extra room for six nodes and preserve the following vertical layout")
 	}
 	if len(detailPanel.Transformations) != 3 ||
 		detailPanel.Transformations[0].ID != "labelsToFields" ||

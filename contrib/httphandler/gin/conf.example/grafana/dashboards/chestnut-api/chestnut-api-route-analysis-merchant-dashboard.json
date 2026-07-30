@@ -2,7 +2,7 @@
   "annotations": {
     "list": []
   },
-  "description": "按 Node 展示 Chestnut API Merchant 场景路由的整体请求延迟分布、路由 P95、请求量、5xx 比例与 Recovery Panic 次数 Top 10。",
+  "description": "按 Node 展示 Chestnut API Merchant 场景路由的整体请求延迟分布、路由 P95、请求量、5xx 比例、Recovery Panic 次数 Top 10 与 /ws/merchant WebSocket 连接数趋势。",
   "editable": false,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
@@ -938,6 +938,59 @@
         }
       ],
       "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "当前筛选节点的 /ws/merchant 活跃 WebSocket 连接数；曲线表示各采样时刻的连接数，无序列时补 0。",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "pointSize": 5,
+            "showPoints": "never"
+          },
+          "min": 0,
+          "noValue": "0",
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 38
+      },
+      "id": 28,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "sortBy": "Name",
+          "sortDesc": false
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(chestnut_http_server_websocket_connections{job=\"chestnut-api\",node=~\"$node\",route=\"/ws/merchant\"}) or vector(0)",
+          "instant": false,
+          "legendFormat": "/ws/merchant",
+          "refId": "A"
+        }
+      ],
+      "title": "WebSocket 连接数趋势",
+      "type": "timeseries"
     }
   ],
   "preload": false,
