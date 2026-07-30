@@ -47,9 +47,14 @@ func TestPrometheusRequestDurationBuckets(t *testing.T) {
 }
 
 func TestPrometheusEndpointExposesEngineAndDefaultMetrics(t *testing.T) {
-	handler := newPrometheusTestEngine(testPrometheusConfig(), nil)
+	handler := newPrometheusTestEngine(testPrometheusConfig(), func(router *ginframework.RouterGroup) {
+		router.GET("/websocket-probe", func(ctx *ginframework.Context) {
+			ctx.Status(http.StatusOK)
+		})
+	})
 	performRequest(handler, http.MethodGet, "/test/123")
 	performRequest(handler, http.MethodGet, "/panic")
+	performWebSocketUpgrade(handler, "/websocket-probe")
 	metrics := scrapeMetrics(t, handler)
 
 	for _, metricHelp := range []string{
@@ -129,25 +134,23 @@ func TestPrometheusRecordsRouteTemplateHTTPStatusClassAndIgnoresBusinessBody(t *
 	}
 }
 
-func TestPrometheusTracksWebSocketConnectionAndExcludesItFromHTTPRequestDuration(t *testing.T) {
+func TestPrometheusTracksWebSocketConnectionsByRouteAndExcludesThemFromHTTPRequestDuration(t *testing.T) {
 	started := make(chan struct{})
 	release := make(chan struct{})
 	handler := newPrometheusTestEngine(testPrometheusConfig(), func(router *ginframework.RouterGroup) {
-		router.GET("/websocket-upgrade", func(ctx *ginframework.Context) {
+		router.GET("/app/websocket/:id", func(ctx *ginframework.Context) {
 			close(started)
 			<-release
+			ctx.Status(http.StatusOK)
+		})
+		router.GET("/admin/websocket/:id", func(ctx *ginframework.Context) {
 			ctx.Status(http.StatusOK)
 		})
 	})
 
 	done := make(chan *httptest.ResponseRecorder, 1)
 	go func() {
-		request := httptest.NewRequest(http.MethodGet, "/websocket-upgrade", nil)
-		request.Header.Set("Connection", "keep-alive, Upgrade")
-		request.Header.Set("Upgrade", "websocket")
-		recorder := httptest.NewRecorder()
-		handler.ServeHTTP(recorder, request)
-		done <- recorder
+		done <- performWebSocketUpgrade(handler, "/app/websocket/123")
 	}()
 
 	select {
@@ -155,27 +158,43 @@ func TestPrometheusTracksWebSocketConnectionAndExcludesItFromHTTPRequestDuration
 	case <-time.After(testRequestTimeout):
 		t.Fatal("WebSocket handler did not start before timeout")
 	}
+	adminResponse := performWebSocketUpgrade(handler, "/admin/websocket/456")
+	if adminResponse.Code != http.StatusOK {
+		t.Fatalf("GET /admin/websocket/456 status = %d, want %d", adminResponse.Code, http.StatusOK)
+	}
+
 	activeMetrics := scrapeMetrics(t, handler)
 	assertMetricValue(t, activeMetrics, "chestnut_http_server_requests_in_flight", 1, `service="test-api"`)
-	assertMetricValue(t, activeMetrics, "chestnut_http_server_websocket_connections", 1, `service="test-api"`)
+	assertMetricValue(t, activeMetrics, "chestnut_http_server_websocket_connections", 1,
+		`service="test-api"`, `route="/app/websocket/:id"`)
+	assertMetricValue(t, activeMetrics, "chestnut_http_server_websocket_connections", 0,
+		`service="test-api"`, `route="/admin/websocket/:id"`)
 
 	close(release)
 	select {
 	case recorder := <-done:
 		if recorder.Code != http.StatusOK {
-			t.Fatalf("GET /websocket-upgrade status = %d, want %d", recorder.Code, http.StatusOK)
+			t.Fatalf("GET /app/websocket/123 status = %d, want %d", recorder.Code, http.StatusOK)
 		}
 	case <-time.After(testRequestTimeout):
 		t.Fatal("WebSocket handler did not finish before timeout")
 	}
 
 	metrics := scrapeMetrics(t, handler)
-	assertMetricValue(t, metrics, "chestnut_http_server_requests_total", 1,
-		`service="test-api"`, `method="GET"`, `route="/websocket-upgrade"`, `status_class="2xx"`)
-	assertMetricAbsent(t, metrics, "chestnut_http_server_request_duration_seconds_count",
-		`service="test-api"`, `method="GET"`, `route="/websocket-upgrade"`)
+	for _, route := range []string{"/app/websocket/:id", "/admin/websocket/:id"} {
+		assertMetricValue(t, metrics, "chestnut_http_server_requests_total", 1,
+			`service="test-api"`, `method="GET"`, `route="`+route+`"`, `status_class="2xx"`)
+		assertMetricAbsent(t, metrics, "chestnut_http_server_request_duration_seconds_count",
+			`service="test-api"`, `method="GET"`, `route="`+route+`"`)
+		assertMetricValue(t, metrics, "chestnut_http_server_websocket_connections", 0,
+			`service="test-api"`, `route="`+route+`"`)
+	}
 	assertMetricValue(t, metrics, "chestnut_http_server_requests_in_flight", 0, `service="test-api"`)
-	assertMetricValue(t, metrics, "chestnut_http_server_websocket_connections", 0, `service="test-api"`)
+	for _, rawPath := range []string{"/app/websocket/123", "/admin/websocket/456"} {
+		if strings.Contains(metrics, rawPath) {
+			t.Fatalf("GET /metrics body contains raw WebSocket path %q", rawPath)
+		}
+	}
 }
 
 func TestPrometheusExcludesUnmatchedConfiguredAndStatusRequests(t *testing.T) {
@@ -321,7 +340,7 @@ func TestPrometheusTracksInFlightRequestUntilCompletion(t *testing.T) {
 		t.Fatal("blocked handler did not start before timeout")
 	}
 	assertMetricValue(t, scrapeMetrics(t, handler), "chestnut_http_server_requests_in_flight", 1, `service="test-api"`)
-	assertMetricValue(t, scrapeMetrics(t, handler), "chestnut_http_server_websocket_connections", 0, `service="test-api"`)
+	assertMetricAbsent(t, scrapeMetrics(t, handler), "chestnut_http_server_websocket_connections", `service="test-api"`)
 
 	close(release)
 	select {
@@ -394,6 +413,15 @@ func newPrometheusTestEngine(config *appconfig.AppConfig, extraRoutes func(*ginf
 func performRequest(handler http.Handler, method string, target string) *httptest.ResponseRecorder {
 	recorder := httptest.NewRecorder()
 	handler.ServeHTTP(recorder, httptest.NewRequest(method, target, nil))
+	return recorder
+}
+
+func performWebSocketUpgrade(handler http.Handler, target string) *httptest.ResponseRecorder {
+	request := httptest.NewRequest(http.MethodGet, target, nil)
+	request.Header.Set("Connection", "keep-alive, Upgrade")
+	request.Header.Set("Upgrade", "websocket")
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, request)
 	return recorder
 }
 

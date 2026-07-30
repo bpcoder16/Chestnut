@@ -41,7 +41,7 @@ type prometheusHTTPMetrics struct {
 	requests             *prometheus.CounterVec
 	requestDuration      *prometheus.HistogramVec
 	requestsInFlight     prometheus.Gauge
-	webSocketConnections prometheus.Gauge
+	webSocketConnections *prometheus.GaugeVec
 	recoveredPanics      *prometheus.CounterVec
 	gatherer             prometheus.Gatherer
 }
@@ -76,13 +76,13 @@ func newPrometheusHTTPMetrics(config appconfig.Prometheus) *prometheusHTTPMetric
 			Help:        "Current number of matched HTTP requests being handled by the Chestnut server, including active WebSocket handlers.",
 			ConstLabels: constLabels,
 		}),
-		webSocketConnections: prometheus.NewGauge(prometheus.GaugeOpts{
+		webSocketConnections: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace:   prometheusNamespace,
 			Subsystem:   prometheusHTTPSubsystem,
 			Name:        httpWebSocketConnectionsName,
-			Help:        "Current number of active WebSocket connections and in-progress upgrade requests handled by the Chestnut server.",
+			Help:        "Current number of active WebSocket connections and in-progress upgrade requests handled by the Chestnut server, grouped by route.",
 			ConstLabels: constLabels,
-		}),
+		}, []string{routeLabelName}),
 		recoveredPanics: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Namespace:   prometheusNamespace,
 			Subsystem:   prometheusHTTPSubsystem,
@@ -133,12 +133,12 @@ func (m *prometheusHTTPMetrics) middleware() gin.HandlerFunc {
 		startedAt := time.Now()
 		m.requestsInFlight.Inc()
 		if webSocketUpgrade {
-			m.webSocketConnections.Inc()
+			m.webSocketConnections.WithLabelValues(route).Inc()
 		}
 		defer func() {
 			m.requestsInFlight.Dec()
 			if webSocketUpgrade {
-				m.webSocketConnections.Dec()
+				m.webSocketConnections.WithLabelValues(route).Dec()
 			}
 
 			// Recovery 是独立异常事实，即使最终状态被排除也必须保留该信号。
