@@ -1,0 +1,1000 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "description": "按 Node 展示 Chestnut API Merchant 场景路由的整体请求延迟分布、路由 P95、请求量、5xx 比例与 Recovery Panic 次数 Top 10。",
+  "editable": false,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [
+    {
+      "asDropdown": true,
+      "includeVars": true,
+      "keepTime": true,
+      "tags": [
+        "chestnut"
+      ],
+      "targetBlank": false,
+      "title": "Chestnut 仪表盘",
+      "type": "dashboards"
+    }
+  ],
+  "liveNow": false,
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 16,
+      "panels": [],
+      "title": "路由延迟",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "基于 Dashboard 顶部所选完整时间范围聚合普通 HTTP 延迟样本，仅统计 /api/v1/merchant 路径段及其子路由，按 P95 从高到低列出最慢十条路由，并补充同一批样本的请求数、超过 800ms 的请求数与比例。",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 3,
+          "mappings": [],
+          "min": 0,
+          "noValue": "无请求数据",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 0.5
+              },
+              {
+                "color": "red",
+                "value": 0.8
+              }
+            ]
+          },
+          "unit": "s"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Route"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 380
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "P95"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 160
+              },
+              {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "max",
+                "value": 1
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "mode": "basic",
+                  "type": "gauge",
+                  "valueDisplayMode": "text"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "请求数"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "unit",
+                "value": "short"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": ">800ms 比例"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 130
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              },
+              {
+                "id": "max",
+                "value": 100
+              },
+              {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "unit",
+                "value": "percent"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": ">800ms 请求数"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 140
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "unit",
+                "value": "short"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 13,
+        "w": 12,
+        "x": 0,
+        "y": 11
+      },
+      "id": 19,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": []
+      },
+      "targets": [
+        {
+          "expr": "topk(10, histogram_quantile(0.95, sum by (le, route) (increase(chestnut_http_server_request_duration_seconds_bucket{job=\"chestnut-api\",node=~\"$node\",route=~\"/api/v1/merchant(/.*)?\"}[$__range]))))",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "{{route}}",
+          "refId": "A"
+        },
+        {
+          "expr": "sum by (route) (increase(chestnut_http_server_request_duration_seconds_count{job=\"chestnut-api\",node=~\"$node\",route=~\"/api/v1/merchant(/.*)?\"}[$__range]))",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "{{route}}",
+          "refId": "B"
+        },
+        {
+          "expr": "100 * (1 - sum by (route) (increase(chestnut_http_server_request_duration_seconds_bucket{job=\"chestnut-api\",node=~\"$node\",route=~\"/api/v1/merchant(/.*)?\",le=\"0.8\"}[$__range])) / (sum by (route) (increase(chestnut_http_server_request_duration_seconds_count{job=\"chestnut-api\",node=~\"$node\",route=~\"/api/v1/merchant(/.*)?\"}[$__range])) > 0))",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "{{route}}",
+          "refId": "C"
+        },
+        {
+          "expr": "clamp_min(sum by (route) (increase(chestnut_http_server_request_duration_seconds_count{job=\"chestnut-api\",node=~\"$node\",route=~\"/api/v1/merchant(/.*)?\"}[$__range])) - sum by (route) (increase(chestnut_http_server_request_duration_seconds_bucket{job=\"chestnut-api\",node=~\"$node\",route=~\"/api/v1/merchant(/.*)?\",le=\"0.8\"}[$__range])), 0)",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "{{route}}",
+          "refId": "D"
+        }
+      ],
+      "title": "所选时段 P95 最慢路由 Top 10",
+      "transformations": [
+        {
+          "id": "joinByField",
+          "options": {
+            "byField": "route",
+            "mode": "inner"
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "desc": true,
+                "field": "Value #A"
+              }
+            ]
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "Time 1": true,
+              "Time 2": true,
+              "Time 3": true,
+              "Time 4": true
+            },
+            "includeByName": {},
+            "indexByName": {
+              "Value #A": 2,
+              "Value #B": 1,
+              "Value #C": 4,
+              "Value #D": 3,
+              "route": 0
+            },
+            "renameByName": {
+              "Value #A": "P95",
+              "Value #B": "请求数",
+              "Value #C": ">800ms 比例",
+              "Value #D": ">800ms 请求数",
+              "route": "Route"
+            }
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "基于 Dashboard 顶部所选完整时间范围聚合普通 HTTP 延迟样本，仅统计 /api/v1/merchant 路径段及其子路由，按请求数从高到低列出最繁忙的十条路由，并补充同一批样本的 P95、超过 800ms 的请求数与比例。",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 3,
+          "mappings": [],
+          "min": 0,
+          "noValue": "无请求数据",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 0.5
+              },
+              {
+                "color": "red",
+                "value": 0.8
+              }
+            ]
+          },
+          "unit": "s"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Route"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 380
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "P95"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 160
+              },
+              {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "max",
+                "value": 1
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "mode": "basic",
+                  "type": "gauge",
+                  "valueDisplayMode": "text"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "请求数"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "unit",
+                "value": "short"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": ">800ms 比例"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 130
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              },
+              {
+                "id": "max",
+                "value": 100
+              },
+              {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "unit",
+                "value": "percent"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": ">800ms 请求数"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 140
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "unit",
+                "value": "short"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 13,
+        "w": 12,
+        "x": 12,
+        "y": 11
+      },
+      "id": 26,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": []
+      },
+      "targets": [
+        {
+          "expr": "topk(10, sum by (route) (increase(chestnut_http_server_request_duration_seconds_count{job=\"chestnut-api\",node=~\"$node\",route=~\"/api/v1/merchant(/.*)?\"}[$__range])))",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "{{route}}",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, route) (increase(chestnut_http_server_request_duration_seconds_bucket{job=\"chestnut-api\",node=~\"$node\",route=~\"/api/v1/merchant(/.*)?\"}[$__range])))",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "{{route}}",
+          "refId": "B"
+        },
+        {
+          "expr": "100 * (1 - sum by (route) (increase(chestnut_http_server_request_duration_seconds_bucket{job=\"chestnut-api\",node=~\"$node\",route=~\"/api/v1/merchant(/.*)?\",le=\"0.8\"}[$__range])) / (sum by (route) (increase(chestnut_http_server_request_duration_seconds_count{job=\"chestnut-api\",node=~\"$node\",route=~\"/api/v1/merchant(/.*)?\"}[$__range])) > 0))",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "{{route}}",
+          "refId": "C"
+        },
+        {
+          "expr": "clamp_min(sum by (route) (increase(chestnut_http_server_request_duration_seconds_count{job=\"chestnut-api\",node=~\"$node\",route=~\"/api/v1/merchant(/.*)?\"}[$__range])) - sum by (route) (increase(chestnut_http_server_request_duration_seconds_bucket{job=\"chestnut-api\",node=~\"$node\",route=~\"/api/v1/merchant(/.*)?\",le=\"0.8\"}[$__range])), 0)",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "{{route}}",
+          "refId": "D"
+        }
+      ],
+      "title": "所选时段请求数量最高的路由 Top 10",
+      "transformations": [
+        {
+          "id": "joinByField",
+          "options": {
+            "byField": "route",
+            "mode": "inner"
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "desc": true,
+                "field": "Value #A"
+              }
+            ]
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "Time 1": true,
+              "Time 2": true,
+              "Time 3": true,
+              "Time 4": true
+            },
+            "includeByName": {},
+            "indexByName": {
+              "Value #A": 1,
+              "Value #B": 2,
+              "Value #C": 4,
+              "Value #D": 3,
+              "route": 0
+            },
+            "renameByName": {
+              "Value #A": "请求数",
+              "Value #B": "P95",
+              "Value #C": ">800ms 比例",
+              "Value #D": ">800ms 请求数",
+              "route": "Route"
+            }
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "聚合当前筛选节点和 Merchant 场景路由的普通 HTTP 请求耗时分布；横轴跟随 Dashboard 顶部时间范围，纵轴为耗时区间，颜色由浅黄到深红表示该区间的请求速率由低到高。",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "scaleDistribution": {
+              "type": "linear"
+            }
+          },
+          "min": 0,
+          "noValue": "无请求数据",
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 1
+      },
+      "id": 25,
+      "options": {
+        "calculate": false,
+        "cellGap": 1,
+        "cellValues": {
+          "unit": "reqps"
+        },
+        "color": {
+          "exponent": 0.5,
+          "fill": "dark-blue",
+          "mode": "scheme",
+          "reverse": false,
+          "scale": "exponential",
+          "scheme": "YlOrRd",
+          "steps": 64
+        },
+        "filterValues": {
+          "le": 1e-9
+        },
+        "legend": {
+          "show": true
+        },
+        "rowsFrame": {
+          "layout": "auto"
+        },
+        "tooltip": {
+          "mode": "single",
+          "showColorScale": false,
+          "yHistogram": false
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (le) (rate(chestnut_http_server_request_duration_seconds_bucket{job=\"chestnut-api\",node=~\"$node\",route=~\"/api/v1/merchant(/.*)?\"}[$__rate_interval]))",
+          "format": "heatmap",
+          "instant": false,
+          "legendFormat": "{{le}}",
+          "refId": "A"
+        }
+      ],
+      "title": "整体请求延迟分布热力图",
+      "type": "heatmap"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 24
+      },
+      "id": 21,
+      "panels": [],
+      "title": "路由分析",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "基于 Dashboard 顶部所选完整时间范围统计普通 HTTP 请求，仅统计 /api/v1/merchant 路径段及其子路由，仅展示至少发生一次 5xx 的路由，按 5xx 比例从高到低列出前十名，并补充同一时段的请求数与 5xx 次数。",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 2,
+          "mappings": [],
+          "max": 100,
+          "min": 0,
+          "noValue": "所选时段无 HTTP 5xx",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 5
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Route"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 360
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "请求数"
+            },
+            "properties": [
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "unit",
+                "value": "short"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "5xx 次数"
+            },
+            "properties": [
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "unit",
+                "value": "short"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "5xx 比例"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "mode": "basic",
+                  "type": "gauge",
+                  "valueDisplayMode": "text"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 13,
+        "w": 12,
+        "x": 0,
+        "y": 25
+      },
+      "id": 22,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": []
+      },
+      "targets": [
+        {
+          "expr": "topk(10, 100 * ((sum by (route) (increase(chestnut_http_server_requests_total{job=\"chestnut-api\",node=~\"$node\",route=~\"/api/v1/merchant(/.*)?\",status_class=\"5xx\"}[$__range])) > 0) / (sum by (route) (increase(chestnut_http_server_requests_total{job=\"chestnut-api\",node=~\"$node\",route=~\"/api/v1/merchant(/.*)?\"}[$__range])) > 0)))",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "{{route}}",
+          "refId": "A"
+        },
+        {
+          "expr": "sum by (route) (increase(chestnut_http_server_requests_total{job=\"chestnut-api\",node=~\"$node\",route=~\"/api/v1/merchant(/.*)?\"}[$__range])) and on (route) topk(10, 100 * ((sum by (route) (increase(chestnut_http_server_requests_total{job=\"chestnut-api\",node=~\"$node\",route=~\"/api/v1/merchant(/.*)?\",status_class=\"5xx\"}[$__range])) > 0) / (sum by (route) (increase(chestnut_http_server_requests_total{job=\"chestnut-api\",node=~\"$node\",route=~\"/api/v1/merchant(/.*)?\"}[$__range])) > 0)))",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "{{route}}",
+          "refId": "B"
+        },
+        {
+          "expr": "sum by (route) (increase(chestnut_http_server_requests_total{job=\"chestnut-api\",node=~\"$node\",route=~\"/api/v1/merchant(/.*)?\",status_class=\"5xx\"}[$__range])) and on (route) topk(10, 100 * ((sum by (route) (increase(chestnut_http_server_requests_total{job=\"chestnut-api\",node=~\"$node\",route=~\"/api/v1/merchant(/.*)?\",status_class=\"5xx\"}[$__range])) > 0) / (sum by (route) (increase(chestnut_http_server_requests_total{job=\"chestnut-api\",node=~\"$node\",route=~\"/api/v1/merchant(/.*)?\"}[$__range])) > 0)))",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "{{route}}",
+          "refId": "C"
+        }
+      ],
+      "title": "各路由 5xx 比例最高的 Top10",
+      "transformations": [
+        {
+          "id": "joinByField",
+          "options": {
+            "byField": "route",
+            "mode": "inner"
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "desc": true,
+                "field": "Value #A"
+              }
+            ]
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "Time 1": true,
+              "Time 2": true,
+              "Time 3": true
+            },
+            "includeByName": {},
+            "indexByName": {
+              "Value #A": 3,
+              "Value #B": 1,
+              "Value #C": 2,
+              "route": 0
+            },
+            "renameByName": {
+              "Value #A": "5xx 比例",
+              "Value #B": "请求数",
+              "Value #C": "5xx 次数",
+              "route": "Route"
+            }
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "基于 Dashboard 顶部所选完整时间范围统计普通 HTTP 请求，仅统计 /api/v1/merchant 路径段及其子路由，按各路由 Recovery Panic 次数从高到低列出前十名，并补充同一时段的请求数；仅展示至少发生一次 Recovery Panic 的路由。",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "mappings": [],
+          "min": 0,
+          "noValue": "所选时段无 Recovery Panic",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Route"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 360
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Recovery Panic 次数"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "mode": "basic",
+                  "type": "gauge",
+                  "valueDisplayMode": "text"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 13,
+        "w": 12,
+        "x": 12,
+        "y": 25
+      },
+      "id": 27,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": []
+      },
+      "targets": [
+        {
+          "expr": "topk(10, sum by (route) (increase(chestnut_http_server_recovered_panics_total{job=\"chestnut-api\",node=~\"$node\",route=~\"/api/v1/merchant(/.*)?\"}[$__range])) > 0)",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "{{route}}",
+          "refId": "A"
+        },
+        {
+          "expr": "sum by (route) (increase(chestnut_http_server_requests_total{job=\"chestnut-api\",node=~\"$node\",route=~\"/api/v1/merchant(/.*)?\"}[$__range])) and on (route) topk(10, sum by (route) (increase(chestnut_http_server_recovered_panics_total{job=\"chestnut-api\",node=~\"$node\",route=~\"/api/v1/merchant(/.*)?\"}[$__range])) > 0)",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "{{route}}",
+          "refId": "B"
+        }
+      ],
+      "title": "各路由 Recovery Panic 次数最高的 Top10",
+      "transformations": [
+        {
+          "id": "joinByField",
+          "options": {
+            "byField": "route",
+            "mode": "inner"
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "desc": true,
+                "field": "Value #A"
+              }
+            ]
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "Time 1": true,
+              "Time 2": true
+            },
+            "includeByName": {},
+            "indexByName": {
+              "Value #A": 2,
+              "Value #B": 1,
+              "route": 0
+            },
+            "renameByName": {
+              "Value #A": "Recovery Panic 次数",
+              "Value #B": "请求数",
+              "route": "Route"
+            }
+          }
+        }
+      ],
+      "type": "table"
+    }
+  ],
+  "preload": false,
+  "refresh": "1m",
+  "schemaVersion": 42,
+  "style": "light",
+  "tags": [
+    "chestnut",
+    "api"
+  ],
+  "templating": {
+    "list": [
+      {
+        "allValue": ".*",
+        "current": {},
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "definition": "label_values(up{job=\"chestnut-api\"}, node)",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Node",
+        "multi": true,
+        "name": "node",
+        "options": [],
+        "query": {
+          "query": "label_values(up{job=\"chestnut-api\"}, node)",
+          "refId": "Prometheus-node-Variable-Query"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timepicker": {
+    "refresh_intervals": [
+      "30s",
+      "1m",
+      "5m",
+      "15m",
+      "30m",
+      "1h",
+      "2h",
+      "1d"
+    ]
+  },
+  "timezone": "Asia/Shanghai",
+  "title": "Chestnut API Merchant 路由分析",
+  "uid": "chestnut-api-route-analysis-merchant",
+  "version": 1,
+  "weekStart": "monday"
+}

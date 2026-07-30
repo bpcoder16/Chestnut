@@ -3,6 +3,8 @@ package gin
 import (
 	"encoding/json"
 	"os"
+	"reflect"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -14,6 +16,10 @@ const (
 	prometheusScrapeAssetPath                = "conf.example/prometheus/scrape.d/chestnut-api.yaml"
 	grafanaOverviewDashboardAssetPath        = "conf.example/grafana/dashboards/chestnut-api/chestnut-api-overview-dashboard.json"
 	grafanaRouteDashboardAssetPath           = "conf.example/grafana/dashboards/chestnut-api/chestnut-api-route-analysis-dashboard.json"
+	grafanaRouteAppDashboardAssetPath        = "conf.example/grafana/dashboards/chestnut-api/chestnut-api-route-analysis-app-dashboard.json"
+	grafanaRouteMerchantDashboardAssetPath   = "conf.example/grafana/dashboards/chestnut-api/chestnut-api-route-analysis-merchant-dashboard.json"
+	grafanaRouteAdminDashboardAssetPath      = "conf.example/grafana/dashboards/chestnut-api/chestnut-api-route-analysis-admin-dashboard.json"
+	grafanaRouteOthersDashboardAssetPath     = "conf.example/grafana/dashboards/chestnut-api/chestnut-api-route-analysis-others-dashboard.json"
 	grafanaRouteDetailDashboardAssetPath     = "conf.example/grafana/dashboards/chestnut-api/chestnut-api-route-detail-dashboard.json"
 	grafanaInstanceRuntimeDashboardAssetPath = "conf.example/grafana/dashboards/chestnut-api/chestnut-api-instance-runtime-dashboard.json"
 	prometheusDatasourceUID                  = "prometheus"
@@ -512,6 +518,193 @@ func TestGrafanaDashboardAssetsCoverAPIClusterOperations(t *testing.T) {
 			t.Fatalf("panel %q must aggregate by node so list legend order follows the node label: %q",
 				panelTitle, expression)
 		}
+	}
+}
+
+func TestGrafanaScenarioRouteAnalysisDashboards(t *testing.T) {
+	baseRaw, err := os.ReadFile(grafanaRouteDashboardAssetPath)
+	if err != nil {
+		t.Fatalf("os.ReadFile(%q): %v", grafanaRouteDashboardAssetPath, err)
+	}
+
+	var base grafanaDashboardAsset
+	if err := json.Unmarshal(baseRaw, &base); err != nil {
+		t.Fatalf("json.Unmarshal base route analysis dashboard: %v", err)
+	}
+
+	scenarios := []struct {
+		name         string
+		path         string
+		uid          string
+		title        string
+		routeRegex   string
+		matches      []string
+		doesNotMatch []string
+	}{
+		{
+			name:       "app",
+			path:       grafanaRouteAppDashboardAssetPath,
+			uid:        "chestnut-api-route-analysis-app",
+			title:      "Chestnut API App 路由分析",
+			routeRegex: `/api/v1/app(/.*)?`,
+			matches:    []string{"/api/v1/app", "/api/v1/app/orders"},
+			doesNotMatch: []string{
+				"/api/v1/apple", "/api/v1/merchant", "/api/v1/admin", "/api/*path",
+			},
+		},
+		{
+			name:       "merchant",
+			path:       grafanaRouteMerchantDashboardAssetPath,
+			uid:        "chestnut-api-route-analysis-merchant",
+			title:      "Chestnut API Merchant 路由分析",
+			routeRegex: `/api/v1/merchant(/.*)?`,
+			matches:    []string{"/api/v1/merchant", "/api/v1/merchant/orders"},
+			doesNotMatch: []string{
+				"/api/v1/merchant-tools", "/api/v1/app", "/api/v1/admin", "/api/*path",
+			},
+		},
+		{
+			name:       "admin",
+			path:       grafanaRouteAdminDashboardAssetPath,
+			uid:        "chestnut-api-route-analysis-admin",
+			title:      "Chestnut API Admin 路由分析",
+			routeRegex: `/api/v1/(admin|customer-service)(/.*)?`,
+			matches: []string{
+				"/api/v1/admin", "/api/v1/admin/users",
+				"/api/v1/customer-service", "/api/v1/customer-service/tickets",
+			},
+			doesNotMatch: []string{
+				"/api/v1/administrator", "/api/v1/customer-services", "/api/v1/app", "/api/*path",
+			},
+		},
+		{
+			name:       "others",
+			path:       grafanaRouteOthersDashboardAssetPath,
+			uid:        "chestnut-api-route-analysis-others",
+			title:      "Chestnut API Others 路由分析",
+			routeRegex: `(/api/v1/(h5|callback)(/.*)?|/api/[*]path)`,
+			matches: []string{
+				"/api/v1/h5", "/api/v1/h5/pages",
+				"/api/v1/callback", "/api/v1/callback/payment", "/api/*path",
+			},
+			doesNotMatch: []string{
+				"/api/v1/h5-preview", "/api/v1/callbacks", "/api/v1/app", "/api/anything",
+			},
+		},
+	}
+
+	for _, scenario := range scenarios {
+		t.Run(scenario.name, func(t *testing.T) {
+			// Prometheus 正则匹配器会对整个标签值做锚定；这里显式加锚验证路径段边界。
+			routePattern, err := regexp.Compile("^(" + scenario.routeRegex + ")$")
+			if err != nil {
+				t.Fatalf("compile route regex %q: %v", scenario.routeRegex, err)
+			}
+			for _, route := range scenario.matches {
+				if !routePattern.MatchString(route) {
+					t.Errorf("route regex %q does not match expected route %q", scenario.routeRegex, route)
+				}
+			}
+			for _, route := range scenario.doesNotMatch {
+				if routePattern.MatchString(route) {
+					t.Errorf("route regex %q unexpectedly matches route %q", scenario.routeRegex, route)
+				}
+			}
+
+			raw, err := os.ReadFile(scenario.path)
+			if err != nil {
+				t.Fatalf("os.ReadFile(%q): %v", scenario.path, err)
+			}
+
+			var dashboard grafanaDashboardAsset
+			if err := json.Unmarshal(raw, &dashboard); err != nil {
+				t.Fatalf("json.Unmarshal dashboard %q: %v", scenario.path, err)
+			}
+			if dashboard.UID != scenario.uid || dashboard.Title != scenario.title || dashboard.Editable {
+				t.Fatalf("dashboard %q identity = (uid=%q, title=%q, editable=%v), want (%q, %q, false)",
+					scenario.path, dashboard.UID, dashboard.Title, dashboard.Editable, scenario.uid, scenario.title)
+			}
+			if dashboard.Refresh != base.Refresh ||
+				dashboard.SchemaVersion != base.SchemaVersion ||
+				dashboard.Style != base.Style ||
+				dashboard.Timezone != base.Timezone ||
+				dashboard.WeekStart != base.WeekStart ||
+				dashboard.Time != base.Time ||
+				!reflect.DeepEqual(dashboard.Tags, base.Tags) ||
+				!reflect.DeepEqual(dashboard.Timepicker, base.Timepicker) ||
+				!reflect.DeepEqual(dashboard.Links, base.Links) {
+				t.Fatalf("dashboard %q metadata differs from the base route analysis dashboard", scenario.path)
+			}
+			if !reflect.DeepEqual(dashboard.Templating, base.Templating) {
+				t.Fatalf("dashboard %q filters differ from the base route analysis dashboard", scenario.path)
+			}
+			if len(dashboard.Panels) != len(base.Panels) {
+				t.Fatalf("dashboard %q panels = %d, want %d", scenario.path, len(dashboard.Panels), len(base.Panels))
+			}
+
+			routeMatcher := `route=~"` + scenario.routeRegex + `"`
+			metricSelectorCount := 0
+			routeMatcherCount := 0
+			for panelIndex := range base.Panels {
+				basePanel := base.Panels[panelIndex]
+				panel := dashboard.Panels[panelIndex]
+				if panel.ID != basePanel.ID ||
+					panel.Title != basePanel.Title ||
+					panel.Type != basePanel.Type ||
+					panel.GridPos != basePanel.GridPos ||
+					panel.Datasource != basePanel.Datasource ||
+					!reflect.DeepEqual(panel.FieldConfig, basePanel.FieldConfig) ||
+					!reflect.DeepEqual(panel.Options, basePanel.Options) ||
+					!reflect.DeepEqual(panel.Transformations, basePanel.Transformations) {
+					t.Fatalf("dashboard %q panel[%d] structure or presentation differs from the base dashboard",
+						scenario.path, panelIndex)
+				}
+				if len(panel.Targets) != len(basePanel.Targets) {
+					t.Fatalf("dashboard %q panel %q targets = %d, want %d",
+						scenario.path, panel.Title, len(panel.Targets), len(basePanel.Targets))
+				}
+
+				for targetIndex := range basePanel.Targets {
+					baseTarget := basePanel.Targets[targetIndex]
+					target := panel.Targets[targetIndex]
+					if target.Format != baseTarget.Format ||
+						target.Instant != baseTarget.Instant ||
+						target.LegendFormat != baseTarget.LegendFormat ||
+						target.RefID != baseTarget.RefID {
+						t.Fatalf("dashboard %q panel %q target[%d] dimensions differ from the base dashboard",
+							scenario.path, panel.Title, targetIndex)
+					}
+
+					wantExpr := strings.ReplaceAll(
+						baseTarget.Expr,
+						`route!="/api/*path"`,
+						routeMatcher,
+					)
+					wantExpr = strings.ReplaceAll(
+						wantExpr,
+						`{job="chestnut-api",node=~"$node"}`,
+						`{job="chestnut-api",node=~"$node",`+routeMatcher+`}`,
+					)
+					if target.Expr != wantExpr {
+						t.Fatalf("dashboard %q panel %q target[%d] expression differs from scoped base query:\n got: %s\nwant: %s",
+							scenario.path, panel.Title, targetIndex, target.Expr, wantExpr)
+					}
+
+					targetMetricSelectorCount := strings.Count(target.Expr, `job="chestnut-api"`)
+					targetRouteMatcherCount := strings.Count(target.Expr, routeMatcher)
+					if targetMetricSelectorCount != targetRouteMatcherCount {
+						t.Fatalf("dashboard %q panel %q target[%d] scopes %d of %d metric selectors by route",
+							scenario.path, panel.Title, targetIndex, targetRouteMatcherCount, targetMetricSelectorCount)
+					}
+					metricSelectorCount += targetMetricSelectorCount
+					routeMatcherCount += targetRouteMatcherCount
+				}
+			}
+			if metricSelectorCount != 24 || routeMatcherCount != metricSelectorCount {
+				t.Fatalf("dashboard %q route scoping = %d/%d selectors, want 24/24",
+					scenario.path, routeMatcherCount, metricSelectorCount)
+			}
+		})
 	}
 }
 
