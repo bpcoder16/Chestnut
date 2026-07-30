@@ -198,7 +198,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "当前筛选节点正在处理的普通 HTTP 请求数，由总 in-flight 减去 WebSocket 连接数得到；每个点表示对应采样时刻的请求数，时间范围跟随 Dashboard 顶部选择，无序列时补 0。",
+      "description": "当前筛选节点正在处理的普通 HTTP 请求数，由总 in-flight 减去 WebSocket 连接数得到；曲线表示各采样时刻的请求数，时间范围跟随 Dashboard 顶部选择，无序列时补 0。",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -210,7 +210,7 @@
             "fillOpacity": 10,
             "lineWidth": 2,
             "pointSize": 5,
-            "showPoints": "always"
+            "showPoints": "never"
           },
           "min": 0,
           "noValue": "0",
@@ -250,7 +250,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "当前筛选节点的活跃 WebSocket 连接数；每个点表示对应采样时刻的连接数，时间范围跟随 Dashboard 顶部选择，无序列时补 0。",
+      "description": "当前筛选节点的活跃 WebSocket 连接数；曲线表示各采样时刻的连接数，时间范围跟随 Dashboard 顶部选择，无序列时补 0。",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -262,7 +262,7 @@
             "fillOpacity": 10,
             "lineWidth": 2,
             "pointSize": 5,
-            "showPoints": "always"
+            "showPoints": "never"
           },
           "min": 0,
           "noValue": "0",
@@ -785,6 +785,9 @@
       "description": "按 node 展示 Recovery panic 速率；健康节点从未发生或当前没有 panic 时补齐为 0，不可采集节点不补零。",
       "fieldConfig": {
         "defaults": {
+          "custom": {
+            "showPoints": "never"
+          },
           "min": 0,
           "noValue": "无 Recovery 数据",
           "unit": "ops"
@@ -838,6 +841,9 @@
       "description": "普通 HTTP 请求先跨节点按 le 聚合 classic Histogram bucket，再计算集群分位数；WebSocket 升级请求在采集端排除。",
       "fieldConfig": {
         "defaults": {
+          "custom": {
+            "showPoints": "never"
+          },
           "min": 0,
           "noValue": "无请求数据",
           "unit": "s"
@@ -893,6 +899,9 @@
       "description": "普通 HTTP 请求的 Histogram sum 增长率除以 count 增长率；WebSocket 升级请求在采集端排除。",
       "fieldConfig": {
         "defaults": {
+          "custom": {
+            "showPoints": "never"
+          },
           "min": 0,
           "noValue": "无请求数据",
           "unit": "s"

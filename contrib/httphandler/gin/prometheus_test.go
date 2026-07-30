@@ -59,6 +59,8 @@ func TestPrometheusEndpointExposesEngineAndDefaultMetrics(t *testing.T) {
 		"# HELP chestnut_http_server_websocket_connections",
 		"# HELP chestnut_http_server_recovered_panics_total",
 		"# HELP go_goroutines",
+		"# HELP go_memstats_alloc_bytes_total",
+		"# HELP go_sched_gomaxprocs_threads",
 		"# HELP process_cpu_seconds_total",
 	} {
 		if !strings.Contains(metrics, metricHelp) {

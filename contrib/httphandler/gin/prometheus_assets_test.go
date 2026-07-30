@@ -14,8 +14,10 @@ const (
 	prometheusScrapeAssetPath                = "conf.example/prometheus/scrape.d/chestnut-api.yaml"
 	grafanaOverviewDashboardAssetPath        = "conf.example/grafana/dashboards/chestnut-api/chestnut-api-overview-dashboard.json"
 	grafanaRouteDashboardAssetPath           = "conf.example/grafana/dashboards/chestnut-api/chestnut-api-route-analysis-dashboard.json"
+	grafanaRouteDetailDashboardAssetPath     = "conf.example/grafana/dashboards/chestnut-api/chestnut-api-route-detail-dashboard.json"
 	grafanaInstanceRuntimeDashboardAssetPath = "conf.example/grafana/dashboards/chestnut-api/chestnut-api-instance-runtime-dashboard.json"
 	prometheusDatasourceUID                  = "prometheus"
+	grafanaRoutePlaceholderValue             = "请选择 Route"
 	minimumScrapeTargets                     = 3
 )
 
@@ -73,15 +75,27 @@ type grafanaDashboardLink struct {
 }
 
 type grafanaVariable struct {
-	Name       string            `json:"name"`
-	Definition string            `json:"definition"`
-	AllValue   string            `json:"allValue"`
-	IncludeAll bool              `json:"includeAll"`
-	Multi      bool              `json:"multi"`
-	Datasource grafanaDatasource `json:"datasource"`
-	Query      struct {
+	Name        string                  `json:"name"`
+	Label       string                  `json:"label"`
+	Type        string                  `json:"type"`
+	Definition  string                  `json:"definition"`
+	AllValue    string                  `json:"allValue"`
+	IncludeAll  bool                    `json:"includeAll"`
+	Multi       bool                    `json:"multi"`
+	Current     grafanaVariableOption   `json:"current"`
+	Options     []grafanaVariableOption `json:"options"`
+	Regex       string                  `json:"regex"`
+	SkipURLSync bool                    `json:"skipUrlSync"`
+	Datasource  grafanaDatasource       `json:"datasource"`
+	Query       struct {
 		Query string `json:"query"`
 	} `json:"query"`
+}
+
+type grafanaVariableOption struct {
+	Selected bool   `json:"selected"`
+	Text     string `json:"text"`
+	Value    string `json:"value"`
 }
 
 type grafanaDatasource struct {
@@ -148,6 +162,8 @@ type grafanaPanel struct {
 		Legend struct {
 			DisplayMode string `json:"displayMode"`
 			Placement   string `json:"placement"`
+			SortBy      string `json:"sortBy"`
+			SortDesc    *bool  `json:"sortDesc"`
 		} `json:"legend"`
 		Tooltip struct {
 			Mode string `json:"mode"`
@@ -309,8 +325,10 @@ func TestGrafanaDashboardAssetsCoverAPIClusterOperations(t *testing.T) {
 			title:   "Chestnut API 节点与运行时",
 			refresh: "1m",
 			panelTitles: []string{
-				"各节点 QPS", "各节点 P95", "各节点 5xx", "各节点并发请求数", "进程 CPU", "进程 RSS",
-				"Go Heap", "Goroutine", "GC 次数", "GC Pause",
+				"各节点 QPS", "各节点 P95", "各节点 5xx QPS", "各节点 Recovery Panic 趋势",
+				"各节点 HTTP 并发请求趋势", "各节点 WebSocket 连接数趋势",
+				"进程 CPU", "进程 CPU 占整机比例", "进程常驻内存",
+				"Go 堆当前已分配内存", "Go 内存分配速率", "各节点 Go 协程数量趋势", "各节点 GC 频率趋势", "各节点 GC 暂停时间占比趋势",
 			},
 		},
 	}
@@ -435,8 +453,12 @@ func TestGrafanaDashboardAssetsCoverAPIClusterOperations(t *testing.T) {
 		"chestnut_http_server_websocket_connections",
 		"chestnut_http_server_recovered_panics_total",
 		"process_cpu_seconds_total",
+		"go_sched_gomaxprocs_threads",
 		"process_resident_memory_bytes",
 		"go_goroutines",
+		"go_gc_duration_seconds_count",
+		"go_gc_duration_seconds_sum",
+		"go_memstats_alloc_bytes_total",
 		"go_memstats_heap_alloc_bytes",
 	} {
 		if !strings.Contains(expressions, metricName) {
@@ -462,13 +484,230 @@ func TestGrafanaDashboardAssetsCoverAPIClusterOperations(t *testing.T) {
 		}
 	}
 
-	for _, panelTitle := range []string{"各节点 QPS", "各节点 P95", "各节点 5xx", "各节点并发请求数", "进程 CPU", "进程 RSS", "Go Heap", "Goroutine", "GC 次数", "GC Pause"} {
+	for _, panelTitle := range []string{
+		"各节点 QPS", "各节点 P95", "各节点 5xx QPS", "各节点 Recovery Panic 趋势",
+		"各节点 HTTP 并发请求趋势", "各节点 WebSocket 连接数趋势",
+		"进程 CPU", "进程 CPU 占整机比例", "进程常驻内存", "Go 堆当前已分配内存", "Go 内存分配速率",
+		"各节点 Go 协程数量趋势", "各节点 GC 频率趋势", "各节点 GC 暂停时间占比趋势",
+	} {
 		panel := panels[panelTitle]
 		for _, target := range panel.Targets {
 			if !strings.Contains(target.Expr, "node") || target.LegendFormat != "{{node}}" {
 				t.Fatalf("panel %q must use node as its only operational identity", panelTitle)
 			}
 		}
+		if panel.Options.Legend.SortBy != "Name" ||
+			panel.Options.Legend.SortDesc == nil || *panel.Options.Legend.SortDesc {
+			t.Fatalf("panel %q legend must sort by Name ascending", panelTitle)
+		}
+		if panel.Options.Legend.DisplayMode != "list" || panel.Options.Legend.Placement != "bottom" {
+			t.Fatalf("panel %q legend must use a horizontal list below the chart", panelTitle)
+		}
+	}
+	for _, panelTitle := range []string{
+		"进程 CPU", "进程常驻内存", "Go 堆当前已分配内存", "Go 内存分配速率",
+		"各节点 Go 协程数量趋势", "各节点 GC 频率趋势", "各节点 GC 暂停时间占比趋势",
+	} {
+		if expression := panels[panelTitle].Targets[0].Expr; !strings.Contains(expression, "sum by (node) (") {
+			t.Fatalf("panel %q must aggregate by node so list legend order follows the node label: %q",
+				panelTitle, expression)
+		}
+	}
+}
+
+func TestGrafanaRouteDetailDashboardRequiresSingleRoute(t *testing.T) {
+	raw, err := os.ReadFile(grafanaRouteDetailDashboardAssetPath)
+	if err != nil {
+		t.Fatalf("os.ReadFile(%q): %v", grafanaRouteDetailDashboardAssetPath, err)
+	}
+
+	var dashboard grafanaDashboardAsset
+	if err := json.Unmarshal(raw, &dashboard); err != nil {
+		t.Fatalf("json.Unmarshal dashboard: %v", err)
+	}
+	if dashboard.UID != "chestnut-api-route-detail" ||
+		dashboard.Title != "Chestnut API 路由详情" ||
+		dashboard.Editable {
+		t.Fatalf("route detail dashboard identity = (uid=%q, title=%q, editable=%v)",
+			dashboard.UID, dashboard.Title, dashboard.Editable)
+	}
+	if dashboard.Refresh != "30s" || dashboard.Time.From != "now-1h" || dashboard.Time.To != "now" ||
+		dashboard.SchemaVersion != 42 || dashboard.Timezone != "Asia/Shanghai" {
+		t.Fatalf("route detail dashboard has inconsistent time or schema settings")
+	}
+
+	if len(dashboard.Templating.List) != 1 {
+		t.Fatalf("route detail dashboard variables = %d, want only Route", len(dashboard.Templating.List))
+	}
+	routeVariable := dashboard.Templating.List[0]
+	const routeVariableQuery = `query_result(count by (route) (chestnut_http_server_recovered_panics_total{job="chestnut-api"}) or label_replace(vector(0), "route", "请选择 Route", "", ""))`
+	if routeVariable.Name != "route" || routeVariable.Label != "Route" || routeVariable.Type != "query" ||
+		routeVariable.Datasource.UID != prometheusDatasourceUID ||
+		routeVariable.Definition != routeVariableQuery || routeVariable.Query.Query != routeVariableQuery {
+		t.Fatalf("route detail dashboard variable is invalid: %#v", routeVariable)
+	}
+	if routeVariable.Multi || routeVariable.IncludeAll || routeVariable.AllValue != "" {
+		t.Fatal("Route variable must be single-select without an All option")
+	}
+	if routeVariable.SkipURLSync {
+		t.Fatal("Route variable must accept Grafana var-route URL parameters")
+	}
+	if routeVariable.Regex != `/.*route="([^"]+)".*/` {
+		t.Fatalf("Route variable regex = %q, want route label extraction", routeVariable.Regex)
+	}
+	if !routeVariable.Current.Selected ||
+		routeVariable.Current.Text != grafanaRoutePlaceholderValue ||
+		routeVariable.Current.Value != grafanaRoutePlaceholderValue ||
+		len(routeVariable.Options) != 1 ||
+		!routeVariable.Options[0].Selected ||
+		routeVariable.Options[0].Value != grafanaRoutePlaceholderValue {
+		t.Fatalf("Route variable must default to the non-matching placeholder %q", grafanaRoutePlaceholderValue)
+	}
+
+	type gridPosition struct {
+		x      int
+		y      int
+		width  int
+		height int
+	}
+	wantPanels := map[string]gridPosition{
+		"集群总 QPS":           {x: 0, y: 1, width: 12, height: 8},
+		"HTTP 状态类别趋势":       {x: 12, y: 1, width: 12, height: 8},
+		"HTTP 请求延迟分位数":      {x: 0, y: 10, width: 12, height: 9},
+		"HTTP 平均响应耗时":       {x: 12, y: 10, width: 12, height: 9},
+		"Recovery Panic 趋势": {x: 0, y: 20, width: 24, height: 8},
+	}
+	wantRows := map[string]int{
+		"Route 流量": 0,
+		"Route 延迟": 9,
+		"Route 异常": 19,
+	}
+	panels := make(map[string]grafanaPanel, len(wantPanels))
+	seenRows := make(map[string]struct{}, len(wantRows))
+	for _, panel := range dashboard.Panels {
+		if panel.Type == "row" {
+			wantY, exists := wantRows[panel.Title]
+			if !exists {
+				t.Fatalf("route detail dashboard has unexpected row %q", panel.Title)
+			}
+			if _, duplicate := seenRows[panel.Title]; duplicate {
+				t.Fatalf("route detail dashboard repeats row %q", panel.Title)
+			}
+			seenRows[panel.Title] = struct{}{}
+			if panel.GridPos.X != 0 || panel.GridPos.Y != wantY ||
+				panel.GridPos.Width != 24 || panel.GridPos.Height != 1 {
+				t.Fatalf("route detail dashboard row layout is invalid: %#v", panel)
+			}
+			continue
+		}
+
+		wantGrid, exists := wantPanels[panel.Title]
+		if !exists {
+			t.Fatalf("route detail dashboard has unexpected panel %q", panel.Title)
+		}
+		if _, duplicate := panels[panel.Title]; duplicate {
+			t.Fatalf("route detail dashboard repeats panel %q", panel.Title)
+		}
+		panels[panel.Title] = panel
+		if panel.Type != "timeseries" || panel.Datasource.UID != prometheusDatasourceUID ||
+			panel.GridPos.X != wantGrid.x || panel.GridPos.Y != wantGrid.y ||
+			panel.GridPos.Width != wantGrid.width || panel.GridPos.Height != wantGrid.height {
+			t.Fatalf("route detail dashboard panel %q layout or datasource is invalid", panel.Title)
+		}
+		if panel.FieldConfig.Defaults.NoValue != grafanaRoutePlaceholderValue ||
+			panel.FieldConfig.Defaults.Min == nil || *panel.FieldConfig.Defaults.Min != 0 {
+			t.Fatalf("route detail dashboard panel %q must expose empty-selection semantics", panel.Title)
+		}
+		for _, target := range panel.Targets {
+			routeMatcherCount := strings.Count(target.Expr, `route="$route"`)
+			jobMatcherCount := strings.Count(target.Expr, `job="chestnut-api"`)
+			if routeMatcherCount == 0 || routeMatcherCount != jobMatcherCount ||
+				strings.Contains(target.Expr, "$node") ||
+				strings.Contains(target.Expr, `route=~`) ||
+				strings.Contains(target.Expr, "vector(0)") {
+				t.Fatalf("route detail dashboard panel %q target must filter every series by exactly one Route and no Node variable: %q",
+					panel.Title, target.Expr)
+			}
+		}
+	}
+	if len(seenRows) != len(wantRows) || len(panels) != len(wantPanels) {
+		t.Fatalf("route detail dashboard has %d rows and %d data panels, want %d and %d",
+			len(seenRows), len(panels), len(wantRows), len(wantPanels))
+	}
+
+	qps := panels["集群总 QPS"]
+	if len(qps.Targets) != 1 ||
+		!strings.Contains(qps.Targets[0].Expr, "rate(chestnut_http_server_requests_total") ||
+		!strings.Contains(qps.Targets[0].Expr, "0 * sum(chestnut_http_server_recovered_panics_total") {
+		t.Fatalf("route detail QPS must retain a selected-route zero baseline: %q", qps.Targets[0].Expr)
+	}
+	statusTrend := panels["HTTP 状态类别趋势"]
+	wantStatusClasses := []string{"2xx", "3xx", "4xx", "5xx"}
+	if len(statusTrend.Targets) != len(wantStatusClasses) {
+		t.Fatalf("route detail HTTP status targets = %d, want %d", len(statusTrend.Targets), len(wantStatusClasses))
+	}
+	for index, statusClass := range wantStatusClasses {
+		target := statusTrend.Targets[index]
+		if !strings.Contains(target.Expr, `status_class="`+statusClass+`"`) ||
+			!strings.Contains(target.Expr, "0 * sum(chestnut_http_server_recovered_panics_total") ||
+			target.LegendFormat != statusClass {
+			t.Fatalf("route detail HTTP status target[%d] is invalid: %#v", index, target)
+		}
+	}
+
+	latencyQuantiles := panels["HTTP 请求延迟分位数"]
+	wantQuantiles := []struct {
+		quantile string
+		legend   string
+	}{
+		{quantile: "0.50", legend: "P50"},
+		{quantile: "0.90", legend: "P90"},
+		{quantile: "0.95", legend: "P95"},
+		{quantile: "0.99", legend: "P99"},
+	}
+	if latencyQuantiles.FieldConfig.Defaults.Unit != "s" ||
+		latencyQuantiles.FieldConfig.Defaults.Custom.ShowPoints != "never" ||
+		len(latencyQuantiles.Targets) != len(wantQuantiles) {
+		t.Fatal("route detail HTTP latency quantiles must display four point-free series in seconds")
+	}
+	for index, want := range wantQuantiles {
+		target := latencyQuantiles.Targets[index]
+		if !strings.Contains(target.Expr, "histogram_quantile("+want.quantile) ||
+			!strings.Contains(target.Expr, "sum by (le) (rate(chestnut_http_server_request_duration_seconds_bucket") ||
+			!strings.Contains(target.Expr, "and on() (sum(rate(chestnut_http_server_request_duration_seconds_count") ||
+			!strings.Contains(target.Expr, "> 0)") ||
+			!strings.Contains(target.Expr, "or 0 * sum(chestnut_http_server_recovered_panics_total") ||
+			!strings.Contains(target.Expr, "[$__rate_interval]") ||
+			target.LegendFormat != want.legend {
+			t.Fatalf("route detail HTTP latency quantile target[%d] is invalid: %#v", index, target)
+		}
+	}
+
+	averageLatency := panels["HTTP 平均响应耗时"]
+	if averageLatency.FieldConfig.Defaults.Unit != "s" ||
+		averageLatency.FieldConfig.Defaults.Custom.ShowPoints != "never" ||
+		len(averageLatency.Targets) != 1 ||
+		!strings.Contains(averageLatency.Targets[0].Expr, "chestnut_http_server_request_duration_seconds_sum") ||
+		!strings.Contains(averageLatency.Targets[0].Expr, "chestnut_http_server_request_duration_seconds_count") ||
+		!strings.Contains(averageLatency.Targets[0].Expr, "[$__rate_interval]") ||
+		!strings.Contains(averageLatency.Targets[0].Expr, "> 0)") ||
+		!strings.Contains(averageLatency.Targets[0].Expr, "or 0 * sum(chestnut_http_server_recovered_panics_total") {
+		t.Fatalf("route detail HTTP average latency query is invalid: %#v", averageLatency.Targets)
+	}
+
+	recoveryPanics := panels["Recovery Panic 趋势"]
+	if recoveryPanics.FieldConfig.Defaults.Unit != "ops" ||
+		recoveryPanics.FieldConfig.Defaults.Custom.ShowPoints != "never" ||
+		len(recoveryPanics.Targets) != 1 ||
+		!strings.Contains(recoveryPanics.Targets[0].Expr, "sum by (node) (rate(chestnut_http_server_recovered_panics_total") ||
+		!strings.Contains(recoveryPanics.Targets[0].Expr, "[$__rate_interval]") ||
+		recoveryPanics.Targets[0].LegendFormat != "{{node}}" ||
+		recoveryPanics.Options.Legend.DisplayMode != "list" ||
+		recoveryPanics.Options.Legend.Placement != "bottom" ||
+		recoveryPanics.Options.Legend.SortBy != "Name" ||
+		recoveryPanics.Options.Legend.SortDesc == nil ||
+		*recoveryPanics.Options.Legend.SortDesc {
+		t.Fatalf("route detail Recovery Panic trend is invalid: %#v", recoveryPanics)
 	}
 }
 
@@ -883,8 +1122,51 @@ func assertDashboardDiagnosticSemantics(t *testing.T, panels map[string]grafanaP
 		!strings.Contains(expression, "or vector(0)") || !strings.Contains(expression, "> 0)") {
 		t.Fatalf("所选时段 HTTP 5xx 比例 must cover the selected range and distinguish zero errors from zero traffic: %q", expression)
 	}
-	if expression := panels["各节点 5xx"].Targets[0].Expr; !strings.Contains(expression, "or 0 *") {
-		t.Fatalf("panel %q must retain healthy zero-error series: %q", "各节点 5xx", expression)
+	node5xxQPS := panels["各节点 5xx QPS"]
+	if expression := node5xxQPS.Targets[0].Expr; node5xxQPS.FieldConfig.Defaults.Unit != "reqps" ||
+		!strings.Contains(expression, `status_class="5xx"`) ||
+		!strings.Contains(expression, "rate(") {
+		t.Fatalf("各节点 5xx QPS must retain its HTTP 5xx request-rate semantics: %q", expression)
+	}
+	nodeRecoveryPanics := panels["各节点 Recovery Panic 趋势"]
+	nodeHTTPInFlight := panels["各节点 HTTP 并发请求趋势"]
+	nodeWebSocketConnections := panels["各节点 WebSocket 连接数趋势"]
+	if node5xxQPS.GridPos.X != 0 || node5xxQPS.GridPos.Y != 10 ||
+		node5xxQPS.GridPos.Width != 12 || node5xxQPS.GridPos.Height != 8 ||
+		nodeRecoveryPanics.GridPos.X != 12 || nodeRecoveryPanics.GridPos.Y != 10 ||
+		nodeRecoveryPanics.GridPos.Width != 12 || nodeRecoveryPanics.GridPos.Height != 8 ||
+		nodeHTTPInFlight.GridPos.X != 0 || nodeHTTPInFlight.GridPos.Y != 18 ||
+		nodeHTTPInFlight.GridPos.Width != 12 || nodeHTTPInFlight.GridPos.Height != 8 ||
+		nodeWebSocketConnections.GridPos.X != 12 || nodeWebSocketConnections.GridPos.Y != 18 ||
+		nodeWebSocketConnections.GridPos.Width != 12 || nodeWebSocketConnections.GridPos.Height != 8 ||
+		panels["进程 CPU"].GridPos.Y != 27 || panels["各节点 Go 协程数量趋势"].GridPos.Y != 43 {
+		t.Fatal("instance-runtime dashboard must use paired node-level HTTP and WebSocket concurrency panels")
+	}
+	if expression := nodeHTTPInFlight.Targets[0].Expr; nodeHTTPInFlight.FieldConfig.Defaults.Custom.ShowPoints != "never" ||
+		!strings.Contains(expression, "clamp_min(") ||
+		!strings.Contains(expression, "chestnut_http_server_requests_in_flight") ||
+		!strings.Contains(expression, "chestnut_http_server_websocket_connections") ||
+		strings.Count(expression, "or 0 * max by (node) (up{") != 2 {
+		t.Fatalf("各节点 HTTP 并发请求趋势 must subtract WebSocket connections and hide points: %q", expression)
+	}
+	if expression := nodeWebSocketConnections.Targets[0].Expr; nodeWebSocketConnections.FieldConfig.Defaults.Custom.ShowPoints != "never" ||
+		!strings.Contains(expression, "sum by (node) (chestnut_http_server_websocket_connections") ||
+		!strings.Contains(expression, "or 0 * max by (node) (up{") {
+		t.Fatalf("各节点 WebSocket 连接数趋势 must aggregate by node, fill healthy nodes with zero, and hide points: %q", expression)
+	}
+	for _, panelTitle := range []string{"各节点 QPS", "各节点 P95", "各节点 5xx QPS"} {
+		panel := panels[panelTitle]
+		expression := panel.Targets[0].Expr
+		if panel.FieldConfig.Defaults.Custom.ShowPoints != "never" ||
+			!strings.Contains(expression, "or 0 * max by (node) (up{") ||
+			!strings.Contains(expression, "== 1)") {
+			t.Fatalf("panel %q must hide points and fill zero only for healthy nodes: %q", panelTitle, expression)
+		}
+	}
+	if expression := panels["各节点 P95"].Targets[0].Expr; !strings.Contains(expression, "and on (node)") ||
+		!strings.Contains(expression, "chestnut_http_server_request_duration_seconds_count") ||
+		!strings.Contains(expression, "> 0)") {
+		t.Fatalf("各节点 P95 must discard zero-sample NaN values before filling healthy nodes with zero: %q", expression)
 	}
 	selectedRangePanics := panels["所选时段 Recovery Panic 次数"]
 	if len(selectedRangePanics.Targets) != 1 || !selectedRangePanics.Targets[0].Instant {
@@ -895,13 +1177,73 @@ func assertDashboardDiagnosticSemantics(t *testing.T, panels map[string]grafanaP
 		!strings.Contains(expression, "or vector(0)") || !strings.Contains(expression, "count(up{") {
 		t.Fatalf("所选时段 Recovery Panic 次数 must cover the selected range and preserve missing-target semantics: %q", expression)
 	}
-	if expression := panels["Recovery Panic 趋势"].Targets[0].Expr; !strings.Contains(expression, "or 0 * max by (node) (up{") ||
-		!strings.Contains(expression, "== 1)") {
-		t.Fatalf("Recovery Panic 趋势 must fill zero only for healthy nodes: %q", expression)
+	for _, panelTitle := range []string{"Recovery Panic 趋势", "各节点 Recovery Panic 趋势"} {
+		panel := panels[panelTitle]
+		expression := panel.Targets[0].Expr
+		if panel.FieldConfig.Defaults.Custom.ShowPoints != "never" ||
+			!strings.Contains(expression, "or 0 * max by (node) (up{") ||
+			!strings.Contains(expression, "== 1)") {
+			t.Fatalf("%s must hide points and fill zero only for healthy nodes: %q", panelTitle, expression)
+		}
 	}
-	if panels["GC Pause"].FieldConfig.Defaults.Unit != "percentunit" {
-		t.Fatalf("GC Pause unit = %q, want percentunit for seconds-per-second ratio",
-			panels["GC Pause"].FieldConfig.Defaults.Unit)
+	goGCPauseShare := panels["各节点 GC 暂停时间占比趋势"]
+	if expression := goGCPauseShare.Targets[0].Expr; goGCPauseShare.FieldConfig.Defaults.Unit != "percentunit" ||
+		goGCPauseShare.FieldConfig.Defaults.Custom.ShowPoints != "never" ||
+		!strings.Contains(expression, "rate(go_gc_duration_seconds_sum") ||
+		!strings.Contains(expression, "[$__rate_interval]") ||
+		!strings.Contains(expression, "or 0 * max by (node) (up{") ||
+		!strings.Contains(expression, "== 1)") {
+		t.Fatalf("各节点 GC 暂停时间占比趋势 must use GC pause seconds per second, fill healthy nodes with zero, and hide points: %q",
+			expression)
+	}
+	goGCFrequency := panels["各节点 GC 频率趋势"]
+	if expression := goGCFrequency.Targets[0].Expr; goGCFrequency.FieldConfig.Defaults.Unit != "ops" ||
+		goGCFrequency.FieldConfig.Defaults.Custom.ShowPoints != "never" ||
+		!strings.Contains(expression, "rate(go_gc_duration_seconds_count") ||
+		!strings.Contains(expression, "[$__rate_interval]") ||
+		!strings.Contains(expression, "or 0 * max by (node) (up{") ||
+		!strings.Contains(expression, "== 1)") {
+		t.Fatalf("各节点 GC 频率趋势 must use the default Go GC counter, fill healthy nodes with zero, and hide points: %q",
+			expression)
+	}
+	processCPU := panels["进程 CPU"]
+	processCPUShare := panels["进程 CPU 占整机比例"]
+	processRSS := panels["进程常驻内存"]
+	goHeap := panels["Go 堆当前已分配内存"]
+	goAllocationRate := panels["Go 内存分配速率"]
+	for _, panelTitle := range []string{
+		"进程 CPU", "进程 CPU 占整机比例", "进程常驻内存", "Go 堆当前已分配内存",
+		"Go 内存分配速率", "各节点 Go 协程数量趋势",
+	} {
+		if panels[panelTitle].FieldConfig.Defaults.Custom.ShowPoints != "never" {
+			t.Fatalf("panel %q must hide data points", panelTitle)
+		}
+	}
+	if processCPU.GridPos.X != 0 || processCPU.GridPos.Y != 27 ||
+		processCPU.GridPos.Width != 12 || processCPU.GridPos.Height != 8 ||
+		processCPUShare.GridPos.X != 12 || processCPUShare.GridPos.Y != 27 ||
+		processCPUShare.GridPos.Width != 12 || processCPUShare.GridPos.Height != 8 ||
+		processRSS.GridPos.X != 0 || processRSS.GridPos.Y != 35 || processRSS.GridPos.Width != 8 ||
+		goHeap.GridPos.X != 8 || goHeap.GridPos.Y != 35 || goHeap.GridPos.Width != 8 ||
+		goAllocationRate.GridPos.X != 16 || goAllocationRate.GridPos.Y != 35 ||
+		goAllocationRate.GridPos.Width != 8 ||
+		panels["各节点 Go 协程数量趋势"].GridPos.Y != 43 || panels["各节点 GC 频率趋势"].GridPos.Y != 43 ||
+		panels["各节点 GC 暂停时间占比趋势"].GridPos.Y != 43 {
+		t.Fatal("instance-runtime dashboard must pair CPU panels, place three memory panels, then place Go counters below")
+	}
+	if expression := goAllocationRate.Targets[0].Expr; goAllocationRate.FieldConfig.Defaults.Unit != "Bps" ||
+		!strings.Contains(expression, "rate(go_memstats_alloc_bytes_total") ||
+		!strings.Contains(expression, "[$__rate_interval]") {
+		t.Fatalf("Go 内存分配速率 must display the per-second allocation rate using the dashboard rate interval: %q",
+			expression)
+	}
+	if expression := processCPUShare.Targets[0].Expr; processCPUShare.FieldConfig.Defaults.Unit != "percent" ||
+		processCPUShare.FieldConfig.Defaults.Custom.ShowPoints != "never" ||
+		!strings.HasPrefix(expression, "100 * ") ||
+		!strings.Contains(expression, "sum by (node) (rate(process_cpu_seconds_total") ||
+		!strings.Contains(expression, "max by (node) (go_sched_gomaxprocs_threads") {
+		t.Fatalf("进程 CPU 占整机比例 must divide process CPU cores by node GOMAXPROCS and display percent without points: %q",
+			expression)
 	}
 }
 
@@ -932,23 +1274,29 @@ func assertOverviewSummaryPresentation(t *testing.T, panels map[string]grafanaPa
 	httpInFlight := panels["HTTP 并发请求趋势"]
 	if httpInFlight.GridPos.Width != 12 || httpInFlight.GridPos.X != 0 || httpInFlight.GridPos.Y != 20 ||
 		httpInFlight.Type != "timeseries" || len(httpInFlight.Targets) != 1 || httpInFlight.Targets[0].Instant ||
-		httpInFlight.FieldConfig.Defaults.Custom.ShowPoints != "always" ||
+		httpInFlight.FieldConfig.Defaults.Custom.ShowPoints != "never" ||
 		httpInFlight.Options.Tooltip.Mode != "multi" ||
 		!strings.Contains(httpInFlight.Targets[0].Expr, "chestnut_http_server_requests_in_flight") ||
 		!strings.Contains(httpInFlight.Targets[0].Expr, "chestnut_http_server_websocket_connections") ||
 		strings.Count(httpInFlight.Targets[0].Expr, "vector(0)") != 2 {
-		t.Fatalf("HTTP 并发请求趋势 must show hoverable selected-range points and fill missing data with zero")
+		t.Fatalf("HTTP 并发请求趋势 must hide points and fill missing data with zero")
 	}
 
 	webSocketConnections := panels["WebSocket 连接数趋势"]
 	if webSocketConnections.GridPos.Width != 12 || webSocketConnections.GridPos.X != 12 ||
 		webSocketConnections.GridPos.Y != 20 || webSocketConnections.Type != "timeseries" ||
 		len(webSocketConnections.Targets) != 1 || webSocketConnections.Targets[0].Instant ||
-		webSocketConnections.FieldConfig.Defaults.Custom.ShowPoints != "always" ||
+		webSocketConnections.FieldConfig.Defaults.Custom.ShowPoints != "never" ||
 		webSocketConnections.Options.Tooltip.Mode != "multi" ||
 		!strings.Contains(webSocketConnections.Targets[0].Expr, "chestnut_http_server_websocket_connections") ||
 		!strings.Contains(webSocketConnections.Targets[0].Expr, "or vector(0)") {
-		t.Fatalf("WebSocket 连接数趋势 must show hoverable selected-range points and fill missing data with zero")
+		t.Fatalf("WebSocket 连接数趋势 must hide points and fill missing data with zero")
+	}
+
+	for _, panelTitle := range []string{"HTTP 请求延迟分位数", "HTTP 平均响应耗时"} {
+		if panels[panelTitle].FieldConfig.Defaults.Custom.ShowPoints != "never" {
+			t.Fatalf("%s must hide points", panelTitle)
+		}
 	}
 
 	uptime := panels["最近启动节点运行时长"]

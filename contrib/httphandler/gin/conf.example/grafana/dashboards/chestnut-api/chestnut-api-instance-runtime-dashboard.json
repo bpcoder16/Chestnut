@@ -40,9 +40,12 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "按 node 对比请求速率。",
+      "description": "按 node 对比请求速率；健康但尚无请求序列的节点显示为 0。",
       "fieldConfig": {
         "defaults": {
+          "custom": {
+            "showPoints": "never"
+          },
           "min": 0,
           "noValue": "无请求数据",
           "unit": "reqps"
@@ -58,8 +61,10 @@
       "id": 26,
       "options": {
         "legend": {
-          "displayMode": "table",
-          "placement": "right"
+          "displayMode": "list",
+          "placement": "bottom",
+          "sortBy": "Name",
+          "sortDesc": false
         },
         "tooltip": {
           "mode": "multi"
@@ -67,7 +72,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (node) (rate(chestnut_http_server_requests_total{job=\"chestnut-api\",node=~\"$node\"}[$__rate_interval]))",
+          "expr": "sum by (node) (rate(chestnut_http_server_requests_total{job=\"chestnut-api\",node=~\"$node\"}[$__rate_interval])) or 0 * max by (node) (up{job=\"chestnut-api\",node=~\"$node\"} == 1)",
           "legendFormat": "{{node}}",
           "refId": "A"
         }
@@ -80,9 +85,12 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "按 node 聚合 bucket 后计算 P95，不平均节点分位数。",
+      "description": "按 node 聚合 bucket 后计算 P95，不平均节点分位数；健康但当前窗口无有效耗时样本的节点显示为 0。",
       "fieldConfig": {
         "defaults": {
+          "custom": {
+            "showPoints": "never"
+          },
           "min": 0,
           "noValue": "无请求数据",
           "unit": "s"
@@ -98,8 +106,10 @@
       "id": 27,
       "options": {
         "legend": {
-          "displayMode": "table",
-          "placement": "right"
+          "displayMode": "list",
+          "placement": "bottom",
+          "sortBy": "Name",
+          "sortDesc": false
         },
         "tooltip": {
           "mode": "multi"
@@ -107,7 +117,7 @@
       },
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum by (le, node) (rate(chestnut_http_server_request_duration_seconds_bucket{job=\"chestnut-api\",node=~\"$node\"}[$__rate_interval])))",
+          "expr": "(histogram_quantile(0.95, sum by (le, node) (rate(chestnut_http_server_request_duration_seconds_bucket{job=\"chestnut-api\",node=~\"$node\"}[$__rate_interval]))) and on (node) (sum by (node) (rate(chestnut_http_server_request_duration_seconds_count{job=\"chestnut-api\",node=~\"$node\"}[$__rate_interval])) > 0)) or 0 * max by (node) (up{job=\"chestnut-api\",node=~\"$node\"} == 1)",
           "legendFormat": "{{node}}",
           "refId": "A"
         }
@@ -120,9 +130,12 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "按 node 展示 HTTP 5xx 请求速率；有请求但无 5xx 的节点仍显示为 0，避免健康节点从图中消失。",
+      "description": "按 node 展示 HTTP 5xx 请求速率；健康但无 5xx 请求序列的节点显示为 0。",
       "fieldConfig": {
         "defaults": {
+          "custom": {
+            "showPoints": "never"
+          },
           "min": 0,
           "noValue": "无请求数据",
           "unit": "reqps"
@@ -138,8 +151,10 @@
       "id": 28,
       "options": {
         "legend": {
-          "displayMode": "table",
-          "placement": "right"
+          "displayMode": "list",
+          "placement": "bottom",
+          "sortBy": "Name",
+          "sortDesc": false
         },
         "tooltip": {
           "mode": "multi"
@@ -147,12 +162,12 @@
       },
       "targets": [
         {
-          "expr": "sum by (node) (rate(chestnut_http_server_requests_total{job=\"chestnut-api\",node=~\"$node\",status_class=\"5xx\"}[$__rate_interval])) or 0 * sum by (node) (rate(chestnut_http_server_requests_total{job=\"chestnut-api\",node=~\"$node\"}[$__rate_interval]))",
+          "expr": "sum by (node) (rate(chestnut_http_server_requests_total{job=\"chestnut-api\",node=~\"$node\",status_class=\"5xx\"}[$__rate_interval])) or 0 * max by (node) (up{job=\"chestnut-api\",node=~\"$node\"} == 1)",
           "legendFormat": "{{node}}",
           "refId": "A"
         }
       ],
-      "title": "各节点 5xx",
+      "title": "各节点 5xx QPS",
       "type": "timeseries"
     },
     {
@@ -160,9 +175,102 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "按 node 展示当前处理中的业务请求数。",
+      "description": "按 node 展示 Recovery panic 速率；健康节点从未发生或当前没有 panic 时补齐为 0，不可采集节点不补零。",
       "fieldConfig": {
         "defaults": {
+          "custom": {
+            "showPoints": "never"
+          },
+          "min": 0,
+          "noValue": "无 Recovery 数据",
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 10
+      },
+      "id": 37,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "sortBy": "Name",
+          "sortDesc": false
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (node) (rate(chestnut_http_server_recovered_panics_total{job=\"chestnut-api\",node=~\"$node\"}[$__rate_interval])) or 0 * max by (node) (up{job=\"chestnut-api\",node=~\"$node\"} == 1)",
+          "legendFormat": "{{node}}",
+          "refId": "A"
+        }
+      ],
+      "title": "各节点 Recovery Panic 趋势",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "按 node 展示当前处理中的普通 HTTP 请求数，由总 in-flight 减去 WebSocket 连接数得到；曲线表示各采样时刻的请求数，健康节点无序列时补 0。",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "showPoints": "never"
+          },
+          "min": 0,
+          "noValue": "无节点数据",
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 18
+      },
+      "id": 29,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "sortBy": "Name",
+          "sortDesc": false
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "clamp_min((sum by (node) (chestnut_http_server_requests_in_flight{job=\"chestnut-api\",node=~\"$node\"}) or 0 * max by (node) (up{job=\"chestnut-api\",node=~\"$node\"} == 1)) - (sum by (node) (chestnut_http_server_websocket_connections{job=\"chestnut-api\",node=~\"$node\"}) or 0 * max by (node) (up{job=\"chestnut-api\",node=~\"$node\"} == 1)), 0)",
+          "legendFormat": "{{node}}",
+          "refId": "A"
+        }
+      ],
+      "title": "各节点 HTTP 并发请求趋势",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "按 node 展示当前活跃 WebSocket 连接数；曲线表示各采样时刻的连接数，健康节点无序列时补 0。",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "showPoints": "never"
+          },
           "min": 0,
           "noValue": "无节点数据",
           "unit": "short"
@@ -173,13 +281,15 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 10
+        "y": 18
       },
-      "id": 29,
+      "id": 38,
       "options": {
         "legend": {
-          "displayMode": "table",
-          "placement": "right"
+          "displayMode": "list",
+          "placement": "bottom",
+          "sortBy": "Name",
+          "sortDesc": false
         },
         "tooltip": {
           "mode": "multi"
@@ -187,12 +297,12 @@
       },
       "targets": [
         {
-          "expr": "max by (node) (chestnut_http_server_requests_in_flight{job=\"chestnut-api\",node=~\"$node\"})",
+          "expr": "sum by (node) (chestnut_http_server_websocket_connections{job=\"chestnut-api\",node=~\"$node\"}) or 0 * max by (node) (up{job=\"chestnut-api\",node=~\"$node\"} == 1)",
           "legendFormat": "{{node}}",
           "refId": "A"
         }
       ],
-      "title": "各节点并发请求数",
+      "title": "各节点 WebSocket 连接数趋势",
       "type": "timeseries"
     },
     {
@@ -201,7 +311,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 18
+        "y": 26
       },
       "id": 30,
       "panels": [],
@@ -216,6 +326,9 @@
       "description": "进程 CPU 使用核数；按 node 展示默认运行时指标。",
       "fieldConfig": {
         "defaults": {
+          "custom": {
+            "showPoints": "never"
+          },
           "min": 0,
           "noValue": "无进程数据",
           "unit": "cores"
@@ -224,15 +337,17 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 8,
+        "w": 12,
         "x": 0,
-        "y": 19
+        "y": 27
       },
       "id": 31,
       "options": {
         "legend": {
-          "displayMode": "table",
-          "placement": "right"
+          "displayMode": "list",
+          "placement": "bottom",
+          "sortBy": "Name",
+          "sortDesc": false
         },
         "tooltip": {
           "mode": "multi"
@@ -240,7 +355,7 @@
       },
       "targets": [
         {
-          "expr": "rate(process_cpu_seconds_total{job=\"chestnut-api\",node=~\"$node\"}[$__rate_interval])",
+          "expr": "sum by (node) (rate(process_cpu_seconds_total{job=\"chestnut-api\",node=~\"$node\"}[$__rate_interval]))",
           "legendFormat": "{{node}}",
           "refId": "A"
         }
@@ -253,9 +368,57 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "进程常驻内存大小。",
+      "description": "进程 CPU 核数除以 go_sched_gomaxprocs_threads 后换算为百分比；直接运行且未限制 GOMAXPROCS 时近似表示整机逻辑 CPU 占比，容器或手工限额场景表示进程可用 CPU 配额占比。",
       "fieldConfig": {
         "defaults": {
+          "custom": {
+            "showPoints": "never"
+          },
+          "min": 0,
+          "noValue": "无进程数据",
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 27
+      },
+      "id": 39,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "sortBy": "Name",
+          "sortDesc": false
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "100 * sum by (node) (rate(process_cpu_seconds_total{job=\"chestnut-api\",node=~\"$node\"}[$__rate_interval])) / max by (node) (go_sched_gomaxprocs_threads{job=\"chestnut-api\",node=~\"$node\"})",
+          "legendFormat": "{{node}}",
+          "refId": "A"
+        }
+      ],
+      "title": "进程 CPU 占整机比例",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "各节点进程当前驻留在物理内存中的大小（RSS），不等同于 Go Heap。",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "showPoints": "never"
+          },
           "min": 0,
           "noValue": "无进程数据",
           "unit": "bytes"
@@ -265,14 +428,16 @@
       "gridPos": {
         "h": 8,
         "w": 8,
-        "x": 8,
-        "y": 19
+        "x": 0,
+        "y": 35
       },
       "id": 32,
       "options": {
         "legend": {
-          "displayMode": "table",
-          "placement": "right"
+          "displayMode": "list",
+          "placement": "bottom",
+          "sortBy": "Name",
+          "sortDesc": false
         },
         "tooltip": {
           "mode": "multi"
@@ -280,12 +445,12 @@
       },
       "targets": [
         {
-          "expr": "process_resident_memory_bytes{job=\"chestnut-api\",node=~\"$node\"}",
+          "expr": "sum by (node) (process_resident_memory_bytes{job=\"chestnut-api\",node=~\"$node\"})",
           "legendFormat": "{{node}}",
           "refId": "A"
         }
       ],
-      "title": "进程 RSS",
+      "title": "进程常驻内存",
       "type": "timeseries"
     },
     {
@@ -293,9 +458,12 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Go heap 当前分配字节数。",
+      "description": "Go 堆当前已分配字节数。",
       "fieldConfig": {
         "defaults": {
+          "custom": {
+            "showPoints": "never"
+          },
           "min": 0,
           "noValue": "无 Go 指标",
           "unit": "bytes"
@@ -305,14 +473,16 @@
       "gridPos": {
         "h": 8,
         "w": 8,
-        "x": 16,
-        "y": 19
+        "x": 8,
+        "y": 35
       },
       "id": 33,
       "options": {
         "legend": {
-          "displayMode": "table",
-          "placement": "right"
+          "displayMode": "list",
+          "placement": "bottom",
+          "sortBy": "Name",
+          "sortDesc": false
         },
         "tooltip": {
           "mode": "multi"
@@ -320,12 +490,57 @@
       },
       "targets": [
         {
-          "expr": "go_memstats_heap_alloc_bytes{job=\"chestnut-api\",node=~\"$node\"}",
+          "expr": "sum by (node) (go_memstats_heap_alloc_bytes{job=\"chestnut-api\",node=~\"$node\"})",
           "legendFormat": "{{node}}",
           "refId": "A"
         }
       ],
-      "title": "Go Heap",
+      "title": "Go 堆当前已分配内存",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Go 堆累计分配字节数的每秒速率，用于观察内存分配压力。",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "showPoints": "never"
+          },
+          "min": 0,
+          "noValue": "无 Go 指标",
+          "unit": "Bps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 35
+      },
+      "id": 40,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "sortBy": "Name",
+          "sortDesc": false
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (node) (rate(go_memstats_alloc_bytes_total{job=\"chestnut-api\",node=~\"$node\"}[$__rate_interval]))",
+          "legendFormat": "{{node}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Go 内存分配速率",
       "type": "timeseries"
     },
     {
@@ -336,6 +551,9 @@
       "description": "Go 当前 goroutine 数量。",
       "fieldConfig": {
         "defaults": {
+          "custom": {
+            "showPoints": "never"
+          },
           "min": 0,
           "noValue": "无 Go 指标",
           "unit": "short"
@@ -346,13 +564,15 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 27
+        "y": 43
       },
       "id": 34,
       "options": {
         "legend": {
-          "displayMode": "table",
-          "placement": "right"
+          "displayMode": "list",
+          "placement": "bottom",
+          "sortBy": "Name",
+          "sortDesc": false
         },
         "tooltip": {
           "mode": "multi"
@@ -360,12 +580,12 @@
       },
       "targets": [
         {
-          "expr": "go_goroutines{job=\"chestnut-api\",node=~\"$node\"}",
+          "expr": "sum by (node) (go_goroutines{job=\"chestnut-api\",node=~\"$node\"})",
           "legendFormat": "{{node}}",
           "refId": "A"
         }
       ],
-      "title": "Goroutine",
+      "title": "各节点 Go 协程数量趋势",
       "type": "timeseries"
     },
     {
@@ -373,9 +593,12 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Go GC 周期速率。",
+      "description": "各节点每秒发生的 Go GC 次数；例如 0.2 ops/s 表示平均约 5 秒发生一次 GC。",
       "fieldConfig": {
         "defaults": {
+          "custom": {
+            "showPoints": "never"
+          },
           "min": 0,
           "noValue": "无 Go 指标",
           "unit": "ops"
@@ -386,13 +609,15 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 27
+        "y": 43
       },
       "id": 35,
       "options": {
         "legend": {
-          "displayMode": "table",
-          "placement": "right"
+          "displayMode": "list",
+          "placement": "bottom",
+          "sortBy": "Name",
+          "sortDesc": false
         },
         "tooltip": {
           "mode": "multi"
@@ -400,12 +625,12 @@
       },
       "targets": [
         {
-          "expr": "rate(go_gc_cycles_total_gc_cycles_total{job=\"chestnut-api\",node=~\"$node\"}[$__rate_interval])",
+          "expr": "sum by (node) (rate(go_gc_duration_seconds_count{job=\"chestnut-api\",node=~\"$node\"}[$__rate_interval])) or 0 * max by (node) (up{job=\"chestnut-api\",node=~\"$node\"} == 1)",
           "legendFormat": "{{node}}",
           "refId": "A"
         }
       ],
-      "title": "GC 次数",
+      "title": "各节点 GC 频率趋势",
       "type": "timeseries"
     },
     {
@@ -413,9 +638,12 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Go GC stop-the-world pause 总时长占墙钟时间的比例；例如 0.01 表示约 1% 时间处于 GC pause。",
+      "description": "各节点 Go GC 导致的 STW 暂停总时长占墙钟时间的比例；0.01% 表示平均每秒约有 0.1 ms 处于 GC 暂停。",
       "fieldConfig": {
         "defaults": {
+          "custom": {
+            "showPoints": "never"
+          },
           "min": 0,
           "noValue": "无 Go 指标",
           "unit": "percentunit"
@@ -426,13 +654,15 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 27
+        "y": 43
       },
       "id": 36,
       "options": {
         "legend": {
-          "displayMode": "table",
-          "placement": "right"
+          "displayMode": "list",
+          "placement": "bottom",
+          "sortBy": "Name",
+          "sortDesc": false
         },
         "tooltip": {
           "mode": "multi"
@@ -440,12 +670,12 @@
       },
       "targets": [
         {
-          "expr": "rate(go_gc_duration_seconds_sum{job=\"chestnut-api\",node=~\"$node\"}[$__rate_interval])",
+          "expr": "sum by (node) (rate(go_gc_duration_seconds_sum{job=\"chestnut-api\",node=~\"$node\"}[$__rate_interval])) or 0 * max by (node) (up{job=\"chestnut-api\",node=~\"$node\"} == 1)",
           "legendFormat": "{{node}}",
           "refId": "A"
         }
       ],
-      "title": "GC Pause",
+      "title": "各节点 GC 暂停时间占比趋势",
       "type": "timeseries"
     }
   ],
