@@ -24,7 +24,7 @@ prometheus:
   enabled: false
   # 服务名会成为低基数指标标签；启用时必须显式填写非空值。
   serviceName: "Chestnut"
-  # 仅支持精确 URL Path，不支持正则、glob 或 query 条件。
+  # 按 Gin FullPath 精确匹配路由模板；支持 /api/*path、/users/:id，不支持 glob 或正则。
   excludedPaths:
     - "/metrics"
     - "/health"

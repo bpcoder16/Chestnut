@@ -124,7 +124,7 @@ func (m *prometheusHTTPMetrics) initializeRecoveredPanicRoutes(routes gin.Routes
 func (m *prometheusHTTPMetrics) middleware() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		route := ctx.FullPath()
-		if route == "" || m.isExcludedPath(ctx.Request.URL.Path) {
+		if route == "" || m.isExcludedPath(route) {
 			ctx.Next()
 			return
 		}
@@ -168,8 +168,8 @@ func (m *prometheusHTTPMetrics) handler() http.Handler {
 	return promhttp.HandlerFor(m.gatherer, promhttp.HandlerOpts{})
 }
 
-func (m *prometheusHTTPMetrics) isExcludedPath(requestPath string) bool {
-	_, excluded := m.excludedPaths[requestPath]
+func (m *prometheusHTTPMetrics) isExcludedPath(routePath string) bool {
+	_, excluded := m.excludedPaths[routePath]
 	return excluded
 }
 

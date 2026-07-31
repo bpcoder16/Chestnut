@@ -146,7 +146,7 @@ func main() {
 prometheus:
   enabled: true
   serviceName: "replace-with-service-name"
-  # 仅支持精确 URL Path；不支持正则、glob 或 query 条件。
+  # 按 Gin FullPath 精确匹配路由模板；支持 /api/*path、/users/:id，不支持 glob 或正则。
   excludedPaths:
     - "/metrics"
     - "/health"

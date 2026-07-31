@@ -227,6 +227,33 @@ func TestPrometheusExcludesUnmatchedConfiguredAndStatusRequests(t *testing.T) {
 	assertMetricValue(t, metrics, "chestnut_http_server_requests_in_flight", 0, `service="test-api"`)
 }
 
+func TestPrometheusExcludesConfiguredRouteTemplate(t *testing.T) {
+	config := testPrometheusConfig()
+	config.Prometheus.ExcludedPaths = append(config.Prometheus.ExcludedPaths, "/api/*path")
+	handler := newPrometheusTestEngine(config, func(router *ginframework.RouterGroup) {
+		router.GET("/api/*path", func(ctx *ginframework.Context) {
+			ctx.Status(http.StatusNoContent)
+		})
+	})
+
+	response := performRequest(handler, http.MethodGet, "/api/users/123")
+	if response.Code != http.StatusNoContent {
+		t.Fatalf("GET /api/users/123 status = %d, want %d", response.Code, http.StatusNoContent)
+	}
+
+	metrics := scrapeMetrics(t, handler)
+	for _, metricName := range []string{
+		"chestnut_http_server_requests_total",
+		"chestnut_http_server_request_duration_seconds_count",
+		"chestnut_http_server_recovered_panics_total",
+	} {
+		assertMetricAbsent(t, metrics, metricName, `route="/api/*path"`)
+	}
+	if strings.Contains(metrics, "/api/users/123") {
+		t.Fatal("GET /metrics body contains excluded raw request path")
+	}
+}
+
 func TestPrometheusRecordsRecoveredPanicSeparatelyFromActiveHTTP500(t *testing.T) {
 	handler := newPrometheusTestEngine(testPrometheusConfig(), nil)
 	baselineMetrics := scrapeMetrics(t, handler)
