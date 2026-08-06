@@ -167,10 +167,11 @@ prometheus:
 | `chestnut_http_server_requests_in_flight` | Gauge | `service` | 当前正在处理的匹配业务请求总数，包含活跃 WebSocket Handler |
 | `chestnut_http_server_websocket_connections` | Gauge | `service`, `route` | 当前 WebSocket Upgrade 请求数，按路由模板区分不同长连接端；升级成功后在连接关闭前表示活跃连接数 |
 | `chestnut_http_server_recovered_panics_total` | Counter | `service`, `method`, `route` | 被 Chestnut Recovery 实际捕获的 panic 数；已注册且未排除的路由在启动时预初始化为 0 |
+| `chestnut_http_server_business_responses_total` | Counter | `service`, `method`, `route`, `code` | JSON 响应顶层业务码计数；当前只采集数值 `code=400`，并按已注册且未排除的路由预初始化为 0 |
 
 每个 Gin Engine 使用独立 registry，创建多个 Engine 不会重复注册或共享请求计数。`/metrics` 同时合并 Prometheus 默认 gatherer，因此仍可采集 `go_*`、`process_*` 和应用已注册到默认 registry 的自定义指标。
 
-采集只使用 Gin `FullPath()` 路由模板、HTTP method 和最终 HTTP status，不读取请求体、响应体或业务 JSON `Response.Code`。请求 Counter 和 Histogram 都使用 `status_class`（如 `2xx`、`5xx`），不保留精确状态码标签，以控制时序基数。WebSocket Upgrade 请求仍计入 Counter 和总 in-flight，并按 `route` 单独计入 `websocket_connections`；成功升级后，该 Gauge 会保持到连接关闭。WebSocket 不会写入 HTTP 请求耗时 Histogram，避免把长连接存活时间误认为响应延迟。未匹配路由不会产生 `unknown` 或原始 URI 时序；`/metrics` 由框架强制排除，配置中的探活路径在开始计时和增加 in-flight 前排除，配置的 HTTP 404 在请求完成后排除。最终返回排除状态的请求在处理期间可能短暂计入 in-flight，但结束后会归零。
+采集使用 Gin `FullPath()` 路由模板、HTTP method 和最终 HTTP status，不读取请求体。为统计业务错误，会额外捕获 Content-Type 含 `json` 且不超过 512 B 的普通 HTTP 响应，只解析顶层数值 `code`；当前仅为 `code=400` 增加固定标签 Counter，不采集 `msg`、业务数据或任意动态响应值。超过限制、非 JSON、嵌套 `code`、字符串 `"400"` 和 WebSocket 响应不会计入该指标。请求 Counter 和 Histogram 都使用 `status_class`（如 `2xx`、`5xx`），不保留精确 HTTP 状态码标签，以控制时序基数。WebSocket Upgrade 请求仍计入 Counter 和总 in-flight，并按 `route` 单独计入 `websocket_connections`；成功升级后，该 Gauge 会保持到连接关闭。WebSocket 不会写入 HTTP 请求耗时 Histogram，避免把长连接存活时间误认为响应延迟。未匹配路由不会产生 `unknown` 或原始 URI 时序；`/metrics` 由框架强制排除，配置中的探活路径在开始计时和增加 in-flight 前排除，配置的 HTTP 404 在请求完成后排除。最终返回排除状态的请求在处理期间可能短暂计入 in-flight，但结束后会归零。
 
 启用后的中间件顺序是 `Prometheus -> Recovery -> 调用方中间件 -> 路由`。响应尚未提交时发生 panic，Recovery 返回 HTTP 500；响应已经提交后发生 panic，Recovery 保持客户端实际收到的状态、Header 和 body，不缓存或重放响应。两种情况都会增加 Recovery Counter，请求 Counter 和 Histogram 使用客户端实际状态；即使实际状态位于 `excludedStatusCodes`，请求 Counter/Histogram 仍按规则排除，但 Recovery Counter 会保留真实 panic 信号。业务主动返回 HTTP 500 不会增加 Recovery Counter。
 

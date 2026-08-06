@@ -63,6 +63,7 @@ func TestPrometheusEndpointExposesEngineAndDefaultMetrics(t *testing.T) {
 		"# HELP chestnut_http_server_requests_in_flight",
 		"# HELP chestnut_http_server_websocket_connections",
 		"# HELP chestnut_http_server_recovered_panics_total",
+		"# HELP chestnut_http_server_business_responses_total",
 		"# HELP go_goroutines",
 		"# HELP go_memstats_alloc_bytes_total",
 		"# HELP go_sched_gomaxprocs_threads",
@@ -100,19 +101,22 @@ func TestPrometheusInitializesMetricsForRegisteredRoutes(t *testing.T) {
 			`service="test-api"`, `method="`+route.method+`"`, `route="`+route.path+`"`)
 		assertMetricValue(t, metrics, "chestnut_http_server_recovered_panics_total", 0,
 			`service="test-api"`, `method="`+route.method+`"`, `route="`+route.path+`"`)
+		assertMetricValue(t, metrics, "chestnut_http_server_business_responses_total", 0,
+			`service="test-api"`, `method="`+route.method+`"`, `route="`+route.path+`"`, `code="400"`)
 	}
 	for _, excludedRoute := range []string{"/metrics", "/health", "/ready"} {
 		for _, metricName := range []string{
 			"chestnut_http_server_requests_total",
 			"chestnut_http_server_request_duration_seconds_count",
 			"chestnut_http_server_recovered_panics_total",
+			"chestnut_http_server_business_responses_total",
 		} {
 			assertMetricAbsent(t, metrics, metricName, `route="`+excludedRoute+`"`)
 		}
 	}
 }
 
-func TestPrometheusRecordsRouteTemplateHTTPStatusClassAndIgnoresBusinessBody(t *testing.T) {
+func TestPrometheusRecordsRouteTemplateHTTPStatusClassAndBusinessCode(t *testing.T) {
 	handler := newPrometheusTestEngine(testPrometheusConfig(), nil)
 
 	created := performRequest(handler, http.MethodGet, "/test/123")
@@ -138,11 +142,47 @@ func TestPrometheusRecordsRouteTemplateHTTPStatusClassAndIgnoresBusinessBody(t *
 	assertMetricAbsent(t, metrics, "chestnut_http_server_request_duration_seconds_count", `status_class=`)
 	assertMetricValue(t, metrics, "chestnut_http_server_requests_total", 1,
 		`service="test-api"`, `method="GET"`, `route="/business-error"`, `status_class="2xx"`)
+	assertMetricValue(t, metrics, "chestnut_http_server_business_responses_total", 1,
+		`service="test-api"`, `method="GET"`, `route="/business-error"`, `code="400"`)
 
-	for _, forbidden := range []string{"/test/123", "/test/ok", `code="400"`, "服务异常"} {
+	for _, forbidden := range []string{"/test/123", "/test/ok", "服务异常"} {
 		if strings.Contains(metrics, forbidden) {
 			t.Fatalf("GET /metrics body contains forbidden request/body value %q", forbidden)
 		}
+	}
+}
+
+func TestPrometheusTracksOnlyTopLevelNumericBusinessCode400WithinBodyLimit(t *testing.T) {
+	handler := newPrometheusTestEngine(testPrometheusConfig(), func(router *ginframework.RouterGroup) {
+		router.GET("/business-code-string", func(ctx *ginframework.Context) {
+			ctx.JSON(http.StatusOK, ginframework.H{"code": "400"})
+		})
+		router.GET("/nested-business-code", func(ctx *ginframework.Context) {
+			ctx.JSON(http.StatusOK, ginframework.H{"data": ginframework.H{"code": 400}})
+		})
+		router.GET("/other-business-code", func(ctx *ginframework.Context) {
+			ctx.JSON(http.StatusOK, ginframework.H{"code": 401})
+		})
+		router.GET("/large-business-error", func(ctx *ginframework.Context) {
+			ctx.JSON(http.StatusOK, ginframework.H{"code": 400, "data": strings.Repeat("x", prometheusResponseBodyLimit)})
+		})
+	})
+
+	for _, route := range []string{
+		"/business-code-string", "/nested-business-code", "/other-business-code", "/large-business-error",
+	} {
+		response := performRequest(handler, http.MethodGet, route)
+		if response.Code != http.StatusOK {
+			t.Fatalf("GET %s status = %d, want %d", route, response.Code, http.StatusOK)
+		}
+	}
+
+	metrics := scrapeMetrics(t, handler)
+	for _, route := range []string{
+		"/business-code-string", "/nested-business-code", "/other-business-code", "/large-business-error",
+	} {
+		assertMetricValue(t, metrics, "chestnut_http_server_business_responses_total", 0,
+			`service="test-api"`, `method="GET"`, `route="`+route+`"`, `code="400"`)
 	}
 }
 

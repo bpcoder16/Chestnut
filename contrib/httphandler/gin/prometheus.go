@@ -1,8 +1,11 @@
 package gin
 
 import (
+	"bytes"
+	"encoding/json"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/bpcoder16/Chestnut/v4/appconfig"
@@ -18,16 +21,22 @@ const (
 	prometheusNamespace      = "chestnut"
 	prometheusHTTPSubsystem  = "http_server"
 
-	httpRequestsMetricName         = "requests_total"
-	httpRequestDurationMetricName  = "request_duration_seconds"
-	httpRequestsInFlightMetricName = "requests_in_flight"
-	httpWebSocketConnectionsName   = "websocket_connections"
-	httpRecoveredPanicsMetricName  = "recovered_panics_total"
+	httpRequestsMetricName          = "requests_total"
+	httpRequestDurationMetricName   = "request_duration_seconds"
+	httpRequestsInFlightMetricName  = "requests_in_flight"
+	httpWebSocketConnectionsName    = "websocket_connections"
+	httpRecoveredPanicsMetricName   = "recovered_panics_total"
+	httpBusinessResponsesMetricName = "business_responses_total"
 
-	serviceLabelName     = "service"
-	methodLabelName      = "method"
-	routeLabelName       = "route"
-	statusClassLabelName = "status_class"
+	serviceLabelName              = "service"
+	methodLabelName               = "method"
+	routeLabelName                = "route"
+	statusClassLabelName          = "status_class"
+	businessResponseCodeLabelName = "code"
+
+	trackedBusinessResponseCode      = 400
+	trackedBusinessResponseCodeValue = "400"
+	prometheusResponseBodyLimit      = 512
 )
 
 // 保持默认 bucket 数量不变，用 800ms 监控边界替换对 API 延迟价值较低的 5ms 边界。
@@ -45,6 +54,7 @@ type prometheusHTTPMetrics struct {
 	requestsInFlight     prometheus.Gauge
 	webSocketConnections *prometheus.GaugeVec
 	recoveredPanics      *prometheus.CounterVec
+	businessResponses    *prometheus.CounterVec
 	gatherer             prometheus.Gatherer
 }
 
@@ -92,6 +102,13 @@ func newPrometheusHTTPMetrics(config appconfig.Prometheus) *prometheusHTTPMetric
 			Help:        "Total number of HTTP requests recovered from panics by Chestnut.",
 			ConstLabels: constLabels,
 		}, []string{methodLabelName, routeLabelName}),
+		businessResponses: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Namespace:   prometheusNamespace,
+			Subsystem:   prometheusHTTPSubsystem,
+			Name:        httpBusinessResponsesMetricName,
+			Help:        "Total number of completed HTTP requests whose top-level JSON response code is a tracked business response code.",
+			ConstLabels: constLabels,
+		}, []string{methodLabelName, routeLabelName, businessResponseCodeLabelName}),
 	}
 
 	metrics.excludedPaths[prometheusMetricsPath] = struct{}{}
@@ -108,6 +125,7 @@ func newPrometheusHTTPMetrics(config appconfig.Prometheus) *prometheusHTTPMetric
 		metrics.requestsInFlight,
 		metrics.webSocketConnections,
 		metrics.recoveredPanics,
+		metrics.businessResponses,
 	)
 	metrics.gatherer = prometheus.Gatherers{registry, prometheus.DefaultGatherer}
 	return metrics
@@ -124,6 +142,7 @@ func (m *prometheusHTTPMetrics) initializeRouteMetrics(routes gin.RoutesInfo) {
 		}
 		m.requestDuration.WithLabelValues(route.Method, route.Path)
 		m.recoveredPanics.WithLabelValues(route.Method, route.Path)
+		m.businessResponses.WithLabelValues(route.Method, route.Path, trackedBusinessResponseCodeValue)
 	}
 }
 
@@ -136,6 +155,8 @@ func (m *prometheusHTTPMetrics) middleware() gin.HandlerFunc {
 		}
 
 		webSocketUpgrade := websocket.IsWebSocketUpgrade(ctx.Request)
+		writer := &prometheusResponseWriter{ResponseWriter: ctx.Writer}
+		ctx.Writer = writer
 		startedAt := time.Now()
 		m.requestsInFlight.Inc()
 		if webSocketUpgrade {
@@ -157,6 +178,12 @@ func (m *prometheusHTTPMetrics) middleware() gin.HandlerFunc {
 				return
 			}
 
+			if !webSocketUpgrade && !writer.truncated && hasTrackedBusinessResponseCode(writer.body.Bytes()) {
+				m.businessResponses.WithLabelValues(
+					ctx.Request.Method, route, trackedBusinessResponseCodeValue,
+				).Inc()
+			}
+
 			statusClass := strconv.Itoa(statusCode/100) + "xx"
 			m.requests.WithLabelValues(ctx.Request.Method, route, statusClass).Inc()
 			// WebSocket Handler 在连接关闭后才返回，记录该耗时会把连接存活时间误当成 HTTP 响应延迟。
@@ -168,6 +195,44 @@ func (m *prometheusHTTPMetrics) middleware() gin.HandlerFunc {
 
 		ctx.Next()
 	}
+}
+
+type prometheusResponseWriter struct {
+	gin.ResponseWriter
+	body      bytes.Buffer
+	truncated bool
+}
+
+func (w *prometheusResponseWriter) Write(body []byte) (int, error) {
+	written, err := w.ResponseWriter.Write(body)
+	w.capture(body[:written])
+	return written, err
+}
+
+func (w *prometheusResponseWriter) WriteString(body string) (int, error) {
+	written, err := w.ResponseWriter.WriteString(body)
+	w.capture([]byte(body[:written]))
+	return written, err
+}
+
+func (w *prometheusResponseWriter) capture(body []byte) {
+	if w.truncated || !strings.Contains(strings.ToLower(w.Header().Get("Content-Type")), "json") {
+		return
+	}
+
+	remaining := prometheusResponseBodyLimit - w.body.Len()
+	if len(body) > remaining {
+		w.truncated = true
+		return
+	}
+	w.body.Write(body)
+}
+
+func hasTrackedBusinessResponseCode(body []byte) bool {
+	var response struct {
+		Code int `json:"code"`
+	}
+	return json.Unmarshal(body, &response) == nil && response.Code == trackedBusinessResponseCode
 }
 
 func (m *prometheusHTTPMetrics) handler() http.Handler {

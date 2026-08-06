@@ -323,6 +323,7 @@ func TestGrafanaDashboardAssetsCoverAPIClusterOperations(t *testing.T) {
 			panelTitles: []string{
 				"所选时段 P95 最慢路由 Top 10", "所选时段请求数量最高的路由 Top 10", "整体请求延迟分布热力图",
 				"各路由 5xx 比例最高的 Top10", "各路由 Recovery Panic 次数最高的 Top10",
+				"各路由业务 code=400 次数最高的 Top10",
 			},
 		},
 		{
@@ -458,6 +459,7 @@ func TestGrafanaDashboardAssetsCoverAPIClusterOperations(t *testing.T) {
 		"chestnut_http_server_requests_in_flight",
 		"chestnut_http_server_websocket_connections",
 		"chestnut_http_server_recovered_panics_total",
+		"chestnut_http_server_business_responses_total",
 		"process_cpu_seconds_total",
 		"go_sched_gomaxprocs_threads",
 		"process_resident_memory_bytes",
@@ -708,8 +710,8 @@ func TestGrafanaScenarioRouteAnalysisDashboards(t *testing.T) {
 					routeMatcherCount += targetRouteMatcherCount
 				}
 			}
-			if metricSelectorCount != 24 || routeMatcherCount != metricSelectorCount {
-				t.Fatalf("dashboard %q route scoping = %d/%d selectors, want 24/24",
+			if metricSelectorCount != 27 || routeMatcherCount != metricSelectorCount {
+				t.Fatalf("dashboard %q route scoping = %d/%d selectors, want 27/27",
 					scenario.path, routeMatcherCount, metricSelectorCount)
 			}
 
@@ -718,9 +720,9 @@ func TestGrafanaScenarioRouteAnalysisDashboards(t *testing.T) {
 			}
 
 			panel := dashboard.Panels[len(base.Panels)]
-			if panel.ID != 28 || panel.Title != "WebSocket 连接数趋势" || panel.Type != "timeseries" ||
+			if panel.ID != 29 || panel.Title != "WebSocket 连接数趋势" || panel.Type != "timeseries" ||
 				panel.Datasource.Type != "prometheus" || panel.Datasource.UID != prometheusDatasourceUID ||
-				panel.GridPos.X != 0 || panel.GridPos.Y != 38 || panel.GridPos.Width != 24 || panel.GridPos.Height != 8 {
+				panel.GridPos.X != 0 || panel.GridPos.Y != 51 || panel.GridPos.Width != 24 || panel.GridPos.Height != 8 {
 				t.Fatalf("dashboard %q WebSocket panel identity or layout is invalid", scenario.path)
 			}
 			if panel.FieldConfig.Defaults.Min == nil || *panel.FieldConfig.Defaults.Min != 0 ||
@@ -1251,8 +1253,8 @@ func assertDashboardDiagnosticSemantics(t *testing.T, panels map[string]grafanaP
 		t.Fatal("各路由 5xx 比例最高的 Top10 must use percentage thresholds at 1% and 5%")
 	}
 	if route5xxTop10.GridPos.X != 0 || route5xxTop10.GridPos.Y != 25 ||
-		route5xxTop10.GridPos.Width != 12 || route5xxTop10.GridPos.Height != selectedRangeP95.GridPos.Height {
-		t.Fatal("各路由 5xx 比例最高的 Top10 must occupy the left half of the route-analysis row")
+		route5xxTop10.GridPos.Width != 24 || route5xxTop10.GridPos.Height != selectedRangeP95.GridPos.Height {
+		t.Fatal("各路由 5xx 比例最高的 Top10 must occupy a full-width route-analysis row")
 	}
 
 	routePanicTop10 := panels["各路由 Recovery Panic 次数最高的 Top10"]
@@ -1327,9 +1329,52 @@ func assertDashboardDiagnosticSemantics(t *testing.T, panels map[string]grafanaP
 		routePanicSteps[1].Color != "red" || routePanicSteps[1].Value == nil || *routePanicSteps[1].Value != 1 {
 		t.Fatal("各路由 Recovery Panic 次数最高的 Top10 must turn red at one panic")
 	}
-	if routePanicTop10.GridPos.X != 12 || routePanicTop10.GridPos.Y != 25 ||
+	if routePanicTop10.GridPos.X != 0 || routePanicTop10.GridPos.Y != 38 ||
 		routePanicTop10.GridPos.Width != 12 || routePanicTop10.GridPos.Height != selectedRangeP95.GridPos.Height {
-		t.Fatal("各路由 Recovery Panic 次数最高的 Top10 must occupy the right half of the route-analysis row")
+		t.Fatal("各路由 Recovery Panic 次数最高的 Top10 must occupy the left half of the exception-count row")
+	}
+
+	businessCodeTop10 := panels["各路由业务 code=400 次数最高的 Top10"]
+	if businessCodeTop10.Type != "table" || len(businessCodeTop10.Targets) != 2 {
+		t.Fatal("各路由业务 code=400 次数最高的 Top10 must combine the business response count and request count")
+	}
+	for index, target := range businessCodeTop10.Targets {
+		if !target.Instant || target.Format != "table" {
+			t.Fatalf("各路由业务 code=400 次数最高的 Top10 target[%d] must be an instant table query", index)
+		}
+		if strings.Count(target.Expr, `route!="/api/*path"`) != strings.Count(target.Expr, "increase(") {
+			t.Fatalf("各路由业务 code=400 次数最高的 Top10 target[%d] must exclude /api/*path from every range aggregation: %q",
+				index, target.Expr)
+		}
+	}
+	businessCodeCountTarget := businessCodeTop10.Targets[0]
+	if businessCodeCountTarget.RefID != "A" ||
+		!strings.Contains(businessCodeCountTarget.Expr, "topk(10") ||
+		!strings.Contains(businessCodeCountTarget.Expr, "chestnut_http_server_business_responses_total") ||
+		!strings.Contains(businessCodeCountTarget.Expr, `code="400"`) ||
+		!strings.Contains(businessCodeCountTarget.Expr, "> 0)") ||
+		strings.Count(businessCodeCountTarget.Expr, "increase(") != 1 ||
+		strings.Contains(businessCodeCountTarget.Expr, "rate(") {
+		t.Fatalf("各路由业务 code=400 次数最高的 Top10 business-count query is invalid: %q", businessCodeCountTarget.Expr)
+	}
+	businessCodeRequestCountTarget := businessCodeTop10.Targets[1]
+	if businessCodeRequestCountTarget.RefID != "B" ||
+		!strings.Contains(businessCodeRequestCountTarget.Expr, "chestnut_http_server_requests_total") ||
+		!strings.Contains(businessCodeRequestCountTarget.Expr, "chestnut_http_server_business_responses_total") ||
+		!strings.Contains(businessCodeRequestCountTarget.Expr, `code="400"`) ||
+		!strings.Contains(businessCodeRequestCountTarget.Expr, "and on (route)") ||
+		strings.Count(businessCodeRequestCountTarget.Expr, "increase(") != 2 ||
+		strings.Contains(businessCodeRequestCountTarget.Expr, "rate(") {
+		t.Fatalf("各路由业务 code=400 次数最高的 Top10 request-count query is invalid: %q", businessCodeRequestCountTarget.Expr)
+	}
+	if businessCodeTop10.FieldConfig.Defaults.NoValue != "所选时段无业务 code=400" ||
+		businessCodeTop10.GridPos.X != 12 || businessCodeTop10.GridPos.Y != 38 ||
+		businessCodeTop10.GridPos.Width != 12 || businessCodeTop10.GridPos.Height != selectedRangeP95.GridPos.Height {
+		t.Fatal("各路由业务 code=400 次数最高的 Top10 presentation or layout is invalid")
+	}
+	if renamedFields := businessCodeTop10.Transformations[2].Options.RenameByName; renamedFields["route"] != "Route" || renamedFields["Value #A"] != "业务 code=400 次数" ||
+		renamedFields["Value #B"] != "请求数" {
+		t.Fatalf("各路由业务 code=400 次数最高的 Top10 renamed fields = %v", renamedFields)
 	}
 	for _, removedTitle := range []string{"路由 QPS Top 10", "各路由 5xx 比例", "请求明细"} {
 		if _, exists := panels[removedTitle]; exists {

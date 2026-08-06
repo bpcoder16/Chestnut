@@ -569,7 +569,7 @@
           "steps": 64
         },
         "filterValues": {
-          "le": 1e-9
+          "le": 1e-09
         },
         "legend": {
           "show": true
@@ -708,7 +708,7 @@
       },
       "gridPos": {
         "h": 13,
-        "w": 12,
+        "w": 24,
         "x": 0,
         "y": 25
       },
@@ -861,8 +861,8 @@
       "gridPos": {
         "h": 13,
         "w": 12,
-        "x": 12,
-        "y": 25
+        "x": 0,
+        "y": 38
       },
       "id": 27,
       "options": {
@@ -944,6 +944,148 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
+      "description": "基于 Dashboard 顶部所选完整时间范围统计普通 HTTP 请求，按响应 JSON 顶层业务 code=400 的次数从高到低列出前十名，并补充同一时段的请求数；仅展示至少出现一次该业务响应码的路由。",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "mappings": [],
+          "min": 0,
+          "noValue": "所选时段无业务 code=400",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Route"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 360
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "业务 code=400 次数"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "mode": "basic",
+                  "type": "gauge",
+                  "valueDisplayMode": "text"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 13,
+        "w": 12,
+        "x": 12,
+        "y": 38
+      },
+      "id": 28,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": []
+      },
+      "targets": [
+        {
+          "expr": "topk(10, sum by (route) (increase(chestnut_http_server_business_responses_total{job=\"chestnut-api\",node=~\"$node\",route=~\"/api/v1/merchant(/.*)?\",code=\"400\"}[$__range])) > 0)",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "{{route}}",
+          "refId": "A"
+        },
+        {
+          "expr": "sum by (route) (increase(chestnut_http_server_requests_total{job=\"chestnut-api\",node=~\"$node\",route=~\"/api/v1/merchant(/.*)?\"}[$__range])) and on (route) topk(10, sum by (route) (increase(chestnut_http_server_business_responses_total{job=\"chestnut-api\",node=~\"$node\",route=~\"/api/v1/merchant(/.*)?\",code=\"400\"}[$__range])) > 0)",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "{{route}}",
+          "refId": "B"
+        }
+      ],
+      "title": "各路由业务 code=400 次数最高的 Top10",
+      "transformations": [
+        {
+          "id": "joinByField",
+          "options": {
+            "byField": "route",
+            "mode": "inner"
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "desc": true,
+                "field": "Value #A"
+              }
+            ]
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "Time 1": true,
+              "Time 2": true
+            },
+            "includeByName": {},
+            "indexByName": {
+              "Value #A": 2,
+              "Value #B": 1,
+              "route": 0
+            },
+            "renameByName": {
+              "Value #A": "业务 code=400 次数",
+              "Value #B": "请求数",
+              "route": "Route"
+            }
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "description": "当前筛选节点的 /ws/merchant 活跃 WebSocket 连接数；曲线表示各采样时刻的连接数，无序列时补 0。",
       "fieldConfig": {
         "defaults": {
@@ -967,9 +1109,9 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 38
+        "y": 51
       },
-      "id": 28,
+      "id": 29,
       "options": {
         "legend": {
           "displayMode": "list",
