@@ -35,6 +35,8 @@ var httpRequestDurationBuckets = []float64{
 	0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 0.8, 1, 2.5, 5, 10,
 }
 
+var httpStatusClasses = []string{"1xx", "2xx", "3xx", "4xx", "5xx"}
+
 type prometheusHTTPMetrics struct {
 	excludedPaths        map[string]struct{}
 	excludedStatusCodes  map[int]struct{}
@@ -111,12 +113,16 @@ func newPrometheusHTTPMetrics(config appconfig.Prometheus) *prometheusHTTPMetric
 	return metrics
 }
 
-func (m *prometheusHTTPMetrics) initializeRecoveredPanicRoutes(routes gin.RoutesInfo) {
+func (m *prometheusHTTPMetrics) initializeRouteMetrics(routes gin.RoutesInfo) {
 	for _, route := range routes {
 		if m.isExcludedPath(route.Path) {
 			continue
 		}
-		// 在服务开始接收请求前暴露零值，为 Prometheus 抓取首次 Panic 的 0→1 增量提供基线。
+		// 在服务开始接收请求前暴露零值，为 rate/increase 统计首次请求的 0→1 增量提供基线。
+		for _, statusClass := range httpStatusClasses {
+			m.requests.WithLabelValues(route.Method, route.Path, statusClass)
+		}
+		m.requestDuration.WithLabelValues(route.Method, route.Path)
 		m.recoveredPanics.WithLabelValues(route.Method, route.Path)
 	}
 }

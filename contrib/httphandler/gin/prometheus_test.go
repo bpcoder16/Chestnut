@@ -74,7 +74,7 @@ func TestPrometheusEndpointExposesEngineAndDefaultMetrics(t *testing.T) {
 	}
 }
 
-func TestPrometheusInitializesRecoveredPanicCountersForRegisteredRoutes(t *testing.T) {
+func TestPrometheusInitializesMetricsForRegisteredRoutes(t *testing.T) {
 	handler := newPrometheusTestEngine(testPrometheusConfig(), func(router *ginframework.RouterGroup) {
 		router.POST("/write", func(ctx *ginframework.Context) {
 			ctx.Status(http.StatusNoContent)
@@ -91,12 +91,24 @@ func TestPrometheusInitializesRecoveredPanicCountersForRegisteredRoutes(t *testi
 		{method: http.MethodGet, path: "/test/:id"},
 		{method: http.MethodPost, path: "/write"},
 	} {
+		for _, statusClass := range httpStatusClasses {
+			assertMetricValue(t, metrics, "chestnut_http_server_requests_total", 0,
+				`service="test-api"`, `method="`+route.method+`"`, `route="`+route.path+`"`,
+				`status_class="`+statusClass+`"`)
+		}
+		assertMetricValue(t, metrics, "chestnut_http_server_request_duration_seconds_count", 0,
+			`service="test-api"`, `method="`+route.method+`"`, `route="`+route.path+`"`)
 		assertMetricValue(t, metrics, "chestnut_http_server_recovered_panics_total", 0,
 			`service="test-api"`, `method="`+route.method+`"`, `route="`+route.path+`"`)
 	}
 	for _, excludedRoute := range []string{"/metrics", "/health", "/ready"} {
-		assertMetricAbsent(t, metrics, "chestnut_http_server_recovered_panics_total",
-			`route="`+excludedRoute+`"`)
+		for _, metricName := range []string{
+			"chestnut_http_server_requests_total",
+			"chestnut_http_server_request_duration_seconds_count",
+			"chestnut_http_server_recovered_panics_total",
+		} {
+			assertMetricAbsent(t, metrics, metricName, `route="`+excludedRoute+`"`)
+		}
 	}
 }
 
@@ -184,7 +196,7 @@ func TestPrometheusTracksWebSocketConnectionsByRouteAndExcludesThemFromHTTPReque
 	for _, route := range []string{"/app/websocket/:id", "/admin/websocket/:id"} {
 		assertMetricValue(t, metrics, "chestnut_http_server_requests_total", 1,
 			`service="test-api"`, `method="GET"`, `route="`+route+`"`, `status_class="2xx"`)
-		assertMetricAbsent(t, metrics, "chestnut_http_server_request_duration_seconds_count",
+		assertMetricValue(t, metrics, "chestnut_http_server_request_duration_seconds_count", 0,
 			`service="test-api"`, `method="GET"`, `route="`+route+`"`)
 		assertMetricValue(t, metrics, "chestnut_http_server_websocket_connections", 0,
 			`service="test-api"`, `route="`+route+`"`)
@@ -220,8 +232,10 @@ func TestPrometheusExcludesUnmatchedConfiguredAndStatusRequests(t *testing.T) {
 			t.Fatalf("GET /metrics body contains excluded route/path %q", forbidden)
 		}
 	}
-	assertMetricAbsent(t, metrics, "chestnut_http_server_requests_total", `route="/matched-not-found"`)
-	assertMetricAbsent(t, metrics, "chestnut_http_server_request_duration_seconds_count", `route="/matched-not-found"`)
+	assertMetricValue(t, metrics, "chestnut_http_server_requests_total", 0,
+		`service="test-api"`, `method="GET"`, `route="/matched-not-found"`, `status_class="4xx"`)
+	assertMetricValue(t, metrics, "chestnut_http_server_request_duration_seconds_count", 0,
+		`service="test-api"`, `method="GET"`, `route="/matched-not-found"`)
 	assertMetricValue(t, metrics, "chestnut_http_server_recovered_panics_total", 0,
 		`service="test-api"`, `method="GET"`, `route="/matched-not-found"`)
 	assertMetricValue(t, metrics, "chestnut_http_server_requests_in_flight", 0, `service="test-api"`)
@@ -338,8 +352,10 @@ func TestPrometheusRecordsRecoveryForExcludedCommittedStatus(t *testing.T) {
 	}
 
 	metrics := scrapeMetrics(t, handler)
-	assertMetricAbsent(t, metrics, "chestnut_http_server_requests_total", `route="/committed-not-found-panic"`)
-	assertMetricAbsent(t, metrics, "chestnut_http_server_request_duration_seconds_count", `route="/committed-not-found-panic"`)
+	assertMetricValue(t, metrics, "chestnut_http_server_requests_total", 0,
+		`service="test-api"`, `method="GET"`, `route="/committed-not-found-panic"`, `status_class="4xx"`)
+	assertMetricValue(t, metrics, "chestnut_http_server_request_duration_seconds_count", 0,
+		`service="test-api"`, `method="GET"`, `route="/committed-not-found-panic"`)
 	assertMetricValue(t, metrics, "chestnut_http_server_recovered_panics_total", 1,
 		`service="test-api"`, `method="GET"`, `route="/committed-not-found-panic"`)
 	assertMetricValue(t, metrics, "chestnut_http_server_requests_in_flight", 0, `service="test-api"`)
@@ -392,7 +408,7 @@ func TestPrometheusRegistriesAreIsolatedPerEngine(t *testing.T) {
 
 	assertMetricValue(t, scrapeMetrics(t, engineA), "chestnut_http_server_requests_total", 1,
 		`service="test-api"`, `method="GET"`, `route="/test/:id"`, `status_class="2xx"`)
-	assertMetricAbsent(t, scrapeMetrics(t, engineB), "chestnut_http_server_requests_total",
+	assertMetricValue(t, scrapeMetrics(t, engineB), "chestnut_http_server_requests_total", 0,
 		`service="test-api"`, `method="GET"`, `route="/test/:id"`, `status_class="2xx"`)
 }
 
