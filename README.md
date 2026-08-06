@@ -183,7 +183,7 @@ prometheus:
   - `contrib/httphandler/gin/conf.example/grafana/dashboards/chestnut-api/chestnut-api-route-analysis-dashboard.json`
   - `contrib/httphandler/gin/conf.example/grafana/dashboards/chestnut-api/chestnut-api-instance-runtime-dashboard.json`
 
-把 scrape 文件复制到 Qilin 监控 package 的 `config/prometheus/scrape.d/`，逐台替换文档 target、`environment`、`cluster` 和 `node`；把三个 Dashboard JSON 复制到 `config/grafana/dashboards/chestnut-api/`。Dashboard 使用已 provision 的 Prometheus datasource UID `prometheus`，稳定 UID 分别为 `chestnut-api-overview`、`chestnut-api-route-analysis` 和 `chestnut-api-instance-runtime`。概览页每 30 秒刷新，路由分析及实例与运行时页面每分钟刷新；三个页面通过 `chestnut` 标签下拉导航，并保留当前时间范围和同名变量。文件为只读交付，不需要在 Grafana UI 手工创建面板。
+把 scrape 文件复制到 Qilin 监控 package 的 `config/prometheus/scrape.d/`，逐台替换文档 target、`environment`、`cluster` 和 `node`；把三个 Dashboard JSON 复制到 `config/grafana/dashboards/chestnut-api/`。Dashboard 使用已 provision 的 Prometheus datasource UID `prometheus`，稳定 UID 分别为 `chestnut-api-overview`、`chestnut-api-route-analysis` 和 `chestnut-api-instance-runtime`。所有 Chestnut API Dashboard 默认每 5 分钟刷新；页面通过 `chestnut` 标签下拉导航，并保留当前时间范围和同名变量。文件为只读交付，不需要在 Grafana UI 手工创建面板。
 
 三个 Dashboard 只保留 `node` 筛选变量，值直接从 Prometheus `up{job="chestnut-api"}` 读取；`job` 固定为 `chestnut-api`，`service`、`instance` 和 `route` 不作为筛选项，路由仅在分析面板中按指标标签聚合。仍在 scrape 配置中的失败 target 会以 `up=0` 保留在变量和“节点采集明细”中。健康区只使用 target labels：全部健康、单节点 down、全部 down 分别显示对应可用数、不可用数、可用率和正常/异常明细，只有当前筛选范围不存在任何 `up` 序列时才显示“无节点采集数据”。不要在 target labels 重复添加 `service`，否则 Prometheus 默认 `honor_labels=false` 会产生 `exported_service` 冲突。运行时 `go_*`、`process_*` 指标没有应用 `service` 标签，Dashboard 对这些指标使用 target 标签筛选。
 

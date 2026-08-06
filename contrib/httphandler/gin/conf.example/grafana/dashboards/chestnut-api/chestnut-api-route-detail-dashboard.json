@@ -365,7 +365,7 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 24,
+        "w": 12,
         "x": 0,
         "y": 20
       },
@@ -391,10 +391,56 @@
       ],
       "title": "Recovery Panic 趋势",
       "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "按 node 展示所选 Route 返回 JSON 顶层业务 code=400 的每秒速率；计数器按注册路由预初始化，未发生时保留 0，未选择 Route 时无序列。",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "showPoints": "never"
+          },
+          "min": 0,
+          "noValue": "请选择 Route",
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 20
+      },
+      "id": 9,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "sortBy": "Name",
+          "sortDesc": false
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (node) (rate(chestnut_http_server_business_responses_total{job=\"chestnut-api\",route=\"$route\",code=\"400\"}[$__rate_interval]))",
+          "instant": false,
+          "legendFormat": "{{node}}",
+          "refId": "A"
+        }
+      ],
+      "title": "业务 code=400 趋势",
+      "type": "timeseries"
     }
   ],
   "preload": false,
-  "refresh": "30s",
+  "refresh": "5m",
   "schemaVersion": 42,
   "style": "light",
   "tags": [

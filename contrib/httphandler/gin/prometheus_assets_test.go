@@ -307,7 +307,7 @@ func TestGrafanaDashboardAssetsCoverAPIClusterOperations(t *testing.T) {
 			path:    grafanaOverviewDashboardAssetPath,
 			uid:     "chestnut-api-overview",
 			title:   "Chestnut API 监控概览",
-			refresh: "30s",
+			refresh: "5m",
 			panelTitles: []string{
 				"可用节点数", "不可用节点数", "节点可用率", "节点采集明细", "最近启动节点运行时长",
 				"HTTP 并发请求趋势", "WebSocket 连接数趋势",
@@ -319,18 +319,18 @@ func TestGrafanaDashboardAssetsCoverAPIClusterOperations(t *testing.T) {
 			path:    grafanaRouteDashboardAssetPath,
 			uid:     "chestnut-api-route-analysis",
 			title:   "Chestnut API 路由分析",
-			refresh: "1m",
+			refresh: "5m",
 			panelTitles: []string{
 				"所选时段 P95 最慢路由 Top 10", "所选时段请求数量最高的路由 Top 10", "整体请求延迟分布热力图",
 				"各路由 5xx 比例最高的 Top10", "各路由 Recovery Panic 次数最高的 Top10",
-				"各路由业务 code=400 次数最高的 Top10",
+				"各路由业务 code=400 比例最高的 Top10",
 			},
 		},
 		{
 			path:    grafanaInstanceRuntimeDashboardAssetPath,
 			uid:     "chestnut-api-instance-runtime",
 			title:   "Chestnut API 节点与运行时",
-			refresh: "1m",
+			refresh: "5m",
 			panelTitles: []string{
 				"各节点 QPS", "各节点 P95", "各节点 5xx QPS", "各节点 Recovery Panic 趋势",
 				"各节点 HTTP 并发请求趋势", "各节点 WebSocket 连接数趋势",
@@ -710,8 +710,8 @@ func TestGrafanaScenarioRouteAnalysisDashboards(t *testing.T) {
 					routeMatcherCount += targetRouteMatcherCount
 				}
 			}
-			if metricSelectorCount != 27 || routeMatcherCount != metricSelectorCount {
-				t.Fatalf("dashboard %q route scoping = %d/%d selectors, want 27/27",
+			if metricSelectorCount != 32 || routeMatcherCount != metricSelectorCount {
+				t.Fatalf("dashboard %q route scoping = %d/%d selectors, want 32/32",
 					scenario.path, routeMatcherCount, metricSelectorCount)
 			}
 
@@ -778,7 +778,7 @@ func TestGrafanaRouteDetailDashboardRequiresSingleRoute(t *testing.T) {
 		t.Fatalf("route detail dashboard identity = (uid=%q, title=%q, editable=%v)",
 			dashboard.UID, dashboard.Title, dashboard.Editable)
 	}
-	if dashboard.Refresh != "30s" || dashboard.Time.From != "now-1h" || dashboard.Time.To != "now" ||
+	if dashboard.Refresh != "5m" || dashboard.Time.From != "now-1h" || dashboard.Time.To != "now" ||
 		dashboard.SchemaVersion != 42 || dashboard.Timezone != "Asia/Shanghai" {
 		t.Fatalf("route detail dashboard has inconsistent time or schema settings")
 	}
@@ -822,7 +822,8 @@ func TestGrafanaRouteDetailDashboardRequiresSingleRoute(t *testing.T) {
 		"HTTP 状态类别趋势":       {x: 12, y: 1, width: 12, height: 8},
 		"HTTP 请求延迟分位数":      {x: 0, y: 10, width: 12, height: 9},
 		"HTTP 平均响应耗时":       {x: 12, y: 10, width: 12, height: 9},
-		"Recovery Panic 趋势": {x: 0, y: 20, width: 24, height: 8},
+		"Recovery Panic 趋势": {x: 0, y: 20, width: 12, height: 8},
+		"业务 code=400 趋势":    {x: 12, y: 20, width: 12, height: 8},
 	}
 	wantRows := map[string]int{
 		"Route 流量": 0,
@@ -955,6 +956,22 @@ func TestGrafanaRouteDetailDashboardRequiresSingleRoute(t *testing.T) {
 		recoveryPanics.Options.Legend.SortDesc == nil ||
 		*recoveryPanics.Options.Legend.SortDesc {
 		t.Fatalf("route detail Recovery Panic trend is invalid: %#v", recoveryPanics)
+	}
+
+	businessCodeTrend := panels["业务 code=400 趋势"]
+	if businessCodeTrend.FieldConfig.Defaults.Unit != "reqps" ||
+		businessCodeTrend.FieldConfig.Defaults.Custom.ShowPoints != "never" ||
+		len(businessCodeTrend.Targets) != 1 ||
+		!strings.Contains(businessCodeTrend.Targets[0].Expr, "sum by (node) (rate(chestnut_http_server_business_responses_total") ||
+		!strings.Contains(businessCodeTrend.Targets[0].Expr, `code="400"`) ||
+		!strings.Contains(businessCodeTrend.Targets[0].Expr, "[$__rate_interval]") ||
+		businessCodeTrend.Targets[0].LegendFormat != "{{node}}" ||
+		businessCodeTrend.Options.Legend.DisplayMode != "list" ||
+		businessCodeTrend.Options.Legend.Placement != "bottom" ||
+		businessCodeTrend.Options.Legend.SortBy != "Name" ||
+		businessCodeTrend.Options.Legend.SortDesc == nil ||
+		*businessCodeTrend.Options.Legend.SortDesc {
+		t.Fatalf("route detail business code=400 trend is invalid: %#v", businessCodeTrend)
 	}
 }
 
@@ -1334,47 +1351,63 @@ func assertDashboardDiagnosticSemantics(t *testing.T, panels map[string]grafanaP
 		t.Fatal("各路由 Recovery Panic 次数最高的 Top10 must occupy the left half of the exception-count row")
 	}
 
-	businessCodeTop10 := panels["各路由业务 code=400 次数最高的 Top10"]
-	if businessCodeTop10.Type != "table" || len(businessCodeTop10.Targets) != 2 {
-		t.Fatal("各路由业务 code=400 次数最高的 Top10 must combine the business response count and request count")
+	businessCodeTop10 := panels["各路由业务 code=400 比例最高的 Top10"]
+	if businessCodeTop10.Type != "table" || len(businessCodeTop10.Targets) != 3 {
+		t.Fatal("各路由业务 code=400 比例最高的 Top10 must combine the ratio, request count, and business response count")
 	}
 	for index, target := range businessCodeTop10.Targets {
 		if !target.Instant || target.Format != "table" {
-			t.Fatalf("各路由业务 code=400 次数最高的 Top10 target[%d] must be an instant table query", index)
+			t.Fatalf("各路由业务 code=400 比例最高的 Top10 target[%d] must be an instant table query", index)
 		}
 		if strings.Count(target.Expr, `route!="/api/*path"`) != strings.Count(target.Expr, "increase(") {
-			t.Fatalf("各路由业务 code=400 次数最高的 Top10 target[%d] must exclude /api/*path from every range aggregation: %q",
+			t.Fatalf("各路由业务 code=400 比例最高的 Top10 target[%d] must exclude /api/*path from every range aggregation: %q",
 				index, target.Expr)
 		}
 	}
-	businessCodeCountTarget := businessCodeTop10.Targets[0]
-	if businessCodeCountTarget.RefID != "A" ||
-		!strings.Contains(businessCodeCountTarget.Expr, "topk(10") ||
-		!strings.Contains(businessCodeCountTarget.Expr, "chestnut_http_server_business_responses_total") ||
-		!strings.Contains(businessCodeCountTarget.Expr, `code="400"`) ||
-		!strings.Contains(businessCodeCountTarget.Expr, "> 0)") ||
-		strings.Count(businessCodeCountTarget.Expr, "increase(") != 1 ||
-		strings.Contains(businessCodeCountTarget.Expr, "rate(") {
-		t.Fatalf("各路由业务 code=400 次数最高的 Top10 business-count query is invalid: %q", businessCodeCountTarget.Expr)
+	businessCodeRatioTarget := businessCodeTop10.Targets[0]
+	if businessCodeRatioTarget.RefID != "A" ||
+		!strings.Contains(businessCodeRatioTarget.Expr, "topk(10") ||
+		!strings.Contains(businessCodeRatioTarget.Expr, "chestnut_http_server_business_responses_total") ||
+		!strings.Contains(businessCodeRatioTarget.Expr, "chestnut_http_server_requests_total") ||
+		!strings.Contains(businessCodeRatioTarget.Expr, `code="400"`) ||
+		!strings.Contains(businessCodeRatioTarget.Expr, ">= 0.1") ||
+		strings.Count(businessCodeRatioTarget.Expr, "increase(") != 2 ||
+		strings.Contains(businessCodeRatioTarget.Expr, "rate(") {
+		t.Fatalf("各路由业务 code=400 比例最高的 Top10 ratio query is invalid: %q", businessCodeRatioTarget.Expr)
 	}
 	businessCodeRequestCountTarget := businessCodeTop10.Targets[1]
 	if businessCodeRequestCountTarget.RefID != "B" ||
 		!strings.Contains(businessCodeRequestCountTarget.Expr, "chestnut_http_server_requests_total") ||
 		!strings.Contains(businessCodeRequestCountTarget.Expr, "chestnut_http_server_business_responses_total") ||
 		!strings.Contains(businessCodeRequestCountTarget.Expr, `code="400"`) ||
+		!strings.Contains(businessCodeRequestCountTarget.Expr, ">= 0.1") ||
 		!strings.Contains(businessCodeRequestCountTarget.Expr, "and on (route)") ||
-		strings.Count(businessCodeRequestCountTarget.Expr, "increase(") != 2 ||
+		strings.Count(businessCodeRequestCountTarget.Expr, "increase(") != 3 ||
 		strings.Contains(businessCodeRequestCountTarget.Expr, "rate(") {
-		t.Fatalf("各路由业务 code=400 次数最高的 Top10 request-count query is invalid: %q", businessCodeRequestCountTarget.Expr)
+		t.Fatalf("各路由业务 code=400 比例最高的 Top10 request-count query is invalid: %q", businessCodeRequestCountTarget.Expr)
 	}
-	if businessCodeTop10.FieldConfig.Defaults.NoValue != "所选时段无业务 code=400" ||
+	businessCodeCountTarget := businessCodeTop10.Targets[2]
+	if businessCodeCountTarget.RefID != "C" ||
+		!strings.Contains(businessCodeCountTarget.Expr, "chestnut_http_server_business_responses_total") ||
+		!strings.Contains(businessCodeCountTarget.Expr, "chestnut_http_server_requests_total") ||
+		!strings.Contains(businessCodeCountTarget.Expr, `code="400"`) ||
+		!strings.Contains(businessCodeCountTarget.Expr, ">= 0.1") ||
+		!strings.Contains(businessCodeCountTarget.Expr, "and on (route)") ||
+		strings.Count(businessCodeCountTarget.Expr, "increase(") != 3 ||
+		strings.Contains(businessCodeCountTarget.Expr, "rate(") {
+		t.Fatalf("各路由业务 code=400 比例最高的 Top10 business-count query is invalid: %q", businessCodeCountTarget.Expr)
+	}
+	if businessCodeTop10.FieldConfig.Defaults.NoValue != "所选时段无比例达到 0.1% 的业务 code=400 路由" ||
+		businessCodeTop10.FieldConfig.Defaults.Unit != "percent" ||
+		businessCodeTop10.FieldConfig.Defaults.Decimals == nil || *businessCodeTop10.FieldConfig.Defaults.Decimals != 2 ||
 		businessCodeTop10.GridPos.X != 12 || businessCodeTop10.GridPos.Y != 38 ||
 		businessCodeTop10.GridPos.Width != 12 || businessCodeTop10.GridPos.Height != selectedRangeP95.GridPos.Height {
-		t.Fatal("各路由业务 code=400 次数最高的 Top10 presentation or layout is invalid")
+		t.Fatal("各路由业务 code=400 比例最高的 Top10 presentation or layout is invalid")
 	}
-	if renamedFields := businessCodeTop10.Transformations[2].Options.RenameByName; renamedFields["route"] != "Route" || renamedFields["Value #A"] != "业务 code=400 次数" ||
-		renamedFields["Value #B"] != "请求数" {
-		t.Fatalf("各路由业务 code=400 次数最高的 Top10 renamed fields = %v", renamedFields)
+	if renamedFields := businessCodeTop10.Transformations[2].Options.RenameByName; renamedFields["route"] != "Route" ||
+		renamedFields["Value #A"] != "业务 code=400 比例" || renamedFields["Value #B"] != "请求数" ||
+		renamedFields["Value #C"] != "业务 code=400 次数" {
+		t.Fatalf("各路由业务 code=400 比例最高的 Top10 renamed fields = %v", renamedFields)
 	}
 	for _, removedTitle := range []string{"路由 QPS Top 10", "各路由 5xx 比例", "请求明细"} {
 		if _, exists := panels[removedTitle]; exists {

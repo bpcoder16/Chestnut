@@ -680,7 +680,7 @@
     }
   ],
   "preload": false,
-  "refresh": "1m",
+  "refresh": "5m",
   "schemaVersion": 42,
   "style": "light",
   "tags": [

@@ -944,16 +944,16 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "基于 Dashboard 顶部所选完整时间范围统计普通 HTTP 请求，按响应 JSON 顶层业务 code=400 的次数从高到低列出前十名，并补充同一时段的请求数；仅展示至少出现一次该业务响应码的路由。",
+      "description": "基于 Dashboard 顶部所选完整时间范围统计普通 HTTP 请求，按响应 JSON 顶层业务 code=400 次数占请求数的百分比从高到低列出前十名，并展示请求数与业务 code=400 次数；比例低于 0.1% 的路由不展示。",
       "fieldConfig": {
         "defaults": {
           "color": {
             "mode": "thresholds"
           },
-          "decimals": 0,
+          "decimals": 2,
           "mappings": [],
           "min": 0,
-          "noValue": "所选时段无业务 code=400",
+          "noValue": "所选时段无比例达到 0.1% 的业务 code=400 路由",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -962,12 +962,17 @@
                 "value": null
               },
               {
+                "color": "yellow",
+                "value": 0.1
+              },
+              {
                 "color": "red",
                 "value": 1
               }
             ]
           },
-          "unit": "short"
+          "unit": "percent",
+          "max": 100
         },
         "overrides": [
           {
@@ -985,7 +990,39 @@
           {
             "matcher": {
               "id": "byName",
+              "options": "请求数"
+            },
+            "properties": [
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "unit",
+                "value": "short"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
               "options": "业务 code=400 次数"
+            },
+            "properties": [
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "unit",
+                "value": "short"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "业务 code=400 比例"
             },
             "properties": [
               {
@@ -1022,21 +1059,28 @@
       },
       "targets": [
         {
-          "expr": "topk(10, sum by (route) (increase(chestnut_http_server_business_responses_total{job=\"chestnut-api\",node=~\"$node\",route=~\"/api/v1/(admin|customer-service)(/.*)?\",code=\"400\"}[$__range])) > 0)",
+          "expr": "topk(10, (100 * ((sum by (route) (increase(chestnut_http_server_business_responses_total{job=\"chestnut-api\",node=~\"$node\",route=~\"/api/v1/(admin|customer-service)(/.*)?\",code=\"400\"}[$__range])) > 0) / (sum by (route) (increase(chestnut_http_server_requests_total{job=\"chestnut-api\",node=~\"$node\",route=~\"/api/v1/(admin|customer-service)(/.*)?\"}[$__range])) > 0))) >= 0.1)",
           "format": "table",
           "instant": true,
           "legendFormat": "{{route}}",
           "refId": "A"
         },
         {
-          "expr": "sum by (route) (increase(chestnut_http_server_requests_total{job=\"chestnut-api\",node=~\"$node\",route=~\"/api/v1/(admin|customer-service)(/.*)?\"}[$__range])) and on (route) topk(10, sum by (route) (increase(chestnut_http_server_business_responses_total{job=\"chestnut-api\",node=~\"$node\",route=~\"/api/v1/(admin|customer-service)(/.*)?\",code=\"400\"}[$__range])) > 0)",
+          "expr": "sum by (route) (increase(chestnut_http_server_requests_total{job=\"chestnut-api\",node=~\"$node\",route=~\"/api/v1/(admin|customer-service)(/.*)?\"}[$__range])) and on (route) topk(10, (100 * ((sum by (route) (increase(chestnut_http_server_business_responses_total{job=\"chestnut-api\",node=~\"$node\",route=~\"/api/v1/(admin|customer-service)(/.*)?\",code=\"400\"}[$__range])) > 0) / (sum by (route) (increase(chestnut_http_server_requests_total{job=\"chestnut-api\",node=~\"$node\",route=~\"/api/v1/(admin|customer-service)(/.*)?\"}[$__range])) > 0))) >= 0.1)",
           "format": "table",
           "instant": true,
           "legendFormat": "{{route}}",
           "refId": "B"
+        },
+        {
+          "expr": "sum by (route) (increase(chestnut_http_server_business_responses_total{job=\"chestnut-api\",node=~\"$node\",route=~\"/api/v1/(admin|customer-service)(/.*)?\",code=\"400\"}[$__range])) and on (route) topk(10, (100 * ((sum by (route) (increase(chestnut_http_server_business_responses_total{job=\"chestnut-api\",node=~\"$node\",route=~\"/api/v1/(admin|customer-service)(/.*)?\",code=\"400\"}[$__range])) > 0) / (sum by (route) (increase(chestnut_http_server_requests_total{job=\"chestnut-api\",node=~\"$node\",route=~\"/api/v1/(admin|customer-service)(/.*)?\"}[$__range])) > 0))) >= 0.1)",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "{{route}}",
+          "refId": "C"
         }
       ],
-      "title": "各路由业务 code=400 次数最高的 Top10",
+      "title": "各路由业务 code=400 比例最高的 Top10",
       "transformations": [
         {
           "id": "joinByField",
@@ -1063,17 +1107,20 @@
             "excludeByName": {
               "Time": true,
               "Time 1": true,
-              "Time 2": true
+              "Time 2": true,
+              "Time 3": true
             },
             "includeByName": {},
             "indexByName": {
-              "Value #A": 2,
+              "Value #A": 3,
               "Value #B": 1,
+              "Value #C": 2,
               "route": 0
             },
             "renameByName": {
-              "Value #A": "业务 code=400 次数",
+              "Value #A": "业务 code=400 比例",
               "Value #B": "请求数",
+              "Value #C": "业务 code=400 次数",
               "route": "Route"
             }
           }
@@ -1142,7 +1189,7 @@
     }
   ],
   "preload": false,
-  "refresh": "1m",
+  "refresh": "5m",
   "schemaVersion": 42,
   "style": "light",
   "tags": [
