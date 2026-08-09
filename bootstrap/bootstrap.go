@@ -46,7 +46,7 @@ func MustInit(ctx context.Context, config *appconfig.AppConfig, funcList ...func
 
 func getWriters(config *appconfig.AppConfig) (debugWriter, infoWriter, warnErrorFatalWriter io.Writer) {
 	if config.Log.UseRotateLog {
-		debugWriter, infoWriter, warnErrorFatalWriter = zaplogger.GetFileRotateLogWriters(config.Log.LogDir, env.AppName(), env.AppName())
+		debugWriter, infoWriter, warnErrorFatalWriter = zaplogger.GetFileRotateLogWritersWithRetentionDays(config.Log.LogDir, env.AppName(), env.AppName(), config.Log.RetentionDays)
 	} else {
 		debugWriter, infoWriter, warnErrorFatalWriter = zaplogger.GetStandardWriters(config.Log.LogDir, env.AppName(), env.AppName())
 	}
@@ -55,14 +55,14 @@ func getWriters(config *appconfig.AppConfig) (debugWriter, infoWriter, warnError
 
 func getRequestWriter(config *appconfig.AppConfig) io.Writer {
 	if config.Log.UseRotateLog {
-		return zaplogger.GetFileRotateRequestLogWriter(config.Log.LogDir, env.AppName(), env.AppName())
+		return zaplogger.GetFileRotateRequestLogWriterWithRetentionDays(config.Log.LogDir, env.AppName(), env.AppName(), config.Log.RetentionDays)
 	}
 	return zaplogger.GetStandardRequestWriter(config.Log.LogDir, env.AppName(), env.AppName())
 }
 
 func getCronWriters(config *appconfig.AppConfig) (debugWriter, infoWriter, warnErrorFatalWriter io.Writer) {
 	if config.Log.UseRotateLog {
-		debugWriter, infoWriter, warnErrorFatalWriter = zaplogger.GetFileRotateCronLogWriters(config.Log.LogDir, env.AppName(), env.AppName())
+		debugWriter, infoWriter, warnErrorFatalWriter = zaplogger.GetFileRotateCronLogWritersWithRetentionDays(config.Log.LogDir, env.AppName(), env.AppName(), config.Log.RetentionDays)
 	} else {
 		debugWriter, infoWriter, warnErrorFatalWriter = zaplogger.GetStandardCronWriters(config.Log.LogDir, env.AppName(), env.AppName())
 	}

@@ -12,6 +12,8 @@ log:
   logDir: ""
   useRotateLog: false
   stdRedirectFileSupport: false
+  # 轮转日志保留天数；未设置或设置为 0 时保持默认的 30 天。
+  retentionDays: 30
 
 ipWhitelist:
   enabled: false

@@ -12,6 +12,7 @@ import (
 
 const (
 	testPrometheusServiceName = "test-api"
+	testLogRetentionDays      = 7
 	invalidHTTPStatusCode     = 600
 )
 
@@ -62,6 +63,45 @@ prometheus:
 	}
 	if len(config.Prometheus.ExcludedStatusCodes) != 1 || config.Prometheus.ExcludedStatusCodes[0] != http.StatusNotFound {
 		t.Fatalf("Prometheus.ExcludedStatusCodes = %v, want [%d]", config.Prometheus.ExcludedStatusCodes, http.StatusNotFound)
+	}
+}
+
+func TestParseConfigLoadsLogRetentionDays(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "app-server.yaml")
+	content := []byte(`env:
+  appName: "test"
+  runMode: "test"
+log:
+  retentionDays: 7
+`)
+	if err := os.WriteFile(configPath, content, 0o600); err != nil {
+		t.Fatalf("os.WriteFile() error = %v", err)
+	}
+
+	var config AppConfig
+	if err := ParseConfig(configPath, &config); err != nil {
+		t.Fatalf("ParseConfig() error = %v", err)
+	}
+	if config.Log.RetentionDays != testLogRetentionDays {
+		t.Fatalf("Log.RetentionDays = %d, want %d", config.Log.RetentionDays, testLogRetentionDays)
+	}
+}
+
+func TestAppConfigCheckRejectsNegativeLogRetentionDays(t *testing.T) {
+	config := AppConfig{
+		Env: env.Option{
+			AppName: "test",
+			RunMode: env.RunModeTest,
+		},
+		Log: Log{RetentionDays: -1},
+	}
+
+	err := config.Check()
+	if err == nil {
+		t.Fatal("AppConfig.Check() error = nil, want error")
+	}
+	if !strings.Contains(err.Error(), "log.retentionDays") {
+		t.Fatalf("AppConfig.Check() error = %q, want log.retentionDays", err)
 	}
 }
 

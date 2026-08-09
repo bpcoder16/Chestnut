@@ -27,6 +27,8 @@ type Log struct {
 	LogDir                 string
 	UseRotateLog           bool
 	StdRedirectFileSupport bool
+	// RetentionDays 指定轮转日志保留天数，0 表示使用默认的 30 天。
+	RetentionDays int
 }
 
 type Default struct {
@@ -94,6 +96,9 @@ func (c *AppConfig) Check() (err error) {
 	}
 	if c.Default.CronDistributedLockSupport && !c.Default.RedisSupport {
 		err = errors.New("CronDistributedLockSupport requires RedisSupport to be enabled")
+	}
+	if c.Log.RetentionDays < 0 {
+		err = errors.New("log.retentionDays must not be negative")
 	}
 	if c.Prometheus.Enabled {
 		if prometheusErr := c.Prometheus.check(); prometheusErr != nil {
